@@ -1,0 +1,61 @@
+# Build outputs
+build/
+out/
+*.apk
+*.aab
+*.bin
+*.elf
+*.map
+
+# Gradle
+.gradle/
+gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+
+# Android Studio
+.idea/
+*.iml
+local.properties
+*.hprof
+
+# PlatformIO
+.pio/
+.pioenvs/
+*.bin
+*.elf
+
+# IDE
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets
+*.keystore
+*.jks
+local.properties
+secrets.properties
+
+# Logs
+*.log
+
+# Model files (large, not committed)
+app/src/main/assets/models/*.gguf
+app/src/main/assets/tokenizer/*.json
+app/src/main/jniLibs/**/*.so
+
+# ESP32
+esp/.pio/
+esp/build/
+
+# CMake
+cmake-build-*/
+CMakeFiles/
+
+# Coverage
+*.ec
+coverage/
