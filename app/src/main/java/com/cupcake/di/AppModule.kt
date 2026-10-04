@@ -1,13 +1,19 @@
 package com.cupcake.di
 
 import android.content.Context
+import com.cupcake.ai.CharacterManager
+import com.cupcake.ai.EnergyManager
+import com.cupcake.ai.LlamaEngine
 import com.cupcake.data.source.local.AppDatabase
 import com.cupcake.data.source.remote.ApiClient
 import com.cupcake.data.source.remote.ApiServices
 import com.cupcake.domain.repository.ChatRepository
 import com.cupcake.domain.repository.ModelRepository
 import com.cupcake.domain.repository.SystemPromptRepository
+import com.cupcake.game.GameManager
 import com.cupcake.native.QwenNative
+import com.cupcake.network.EspWebSocketServer
+import com.cupcake.tts.TtsManager
 import com.google.common.util.concurrent.ListeningExecutorService
 import com.google.common.util.concurrent.MoreExecutors
 import dagger.Module
@@ -34,6 +40,50 @@ object AppModule {
     @Singleton
     fun provideQwenNative(): QwenNative {
         return QwenNative.getInstance()
+    }
+
+    @Provides
+    @Singleton
+    fun provideLlamaEngine(@dagger.hilt.android.qualifiers.ApplicationContext context: Context): LlamaEngine {
+        val engine = LlamaEngine.getInstance()
+        LlamaEngine.initialize(context)
+        return engine
+    }
+
+    @Provides
+    @Singleton
+    fun provideCharacterManager(@dagger.hilt.android.qualifiers.ApplicationContext context: Context): CharacterManager {
+        CharacterManager.initialize(context.filesDir)
+        return CharacterManager
+    }
+
+    @Provides
+    @Singleton
+    fun provideEnergyManager(@dagger.hilt.android.qualifiers.ApplicationContext context: Context): EnergyManager {
+        return EnergyManager(context)
+    }
+
+    @Provides
+    @Singleton
+    fun provideTtsManager(@dagger.hilt.android.qualifiers.ApplicationContext context: Context): TtsManager {
+        val tts = TtsManager(context)
+        tts.initialize()
+        return tts
+    }
+
+    @Provides
+    @Singleton
+    fun provideEspWebSocketServer(): EspWebSocketServer {
+        return EspWebSocketServer
+    }
+
+    @Provides
+    @Singleton
+    fun provideGameManager(
+        llamaEngine: LlamaEngine,
+        characterManager: CharacterManager
+    ): GameManager {
+        return GameManager(llamaEngine, characterManager)
     }
 
     @Provides

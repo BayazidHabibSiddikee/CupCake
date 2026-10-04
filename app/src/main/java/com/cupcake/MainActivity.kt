@@ -9,7 +9,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.cupcake.ui.screen.chat.ChatScreen
+import com.cupcake.ui.screen.character.CharacterScreen
 import com.cupcake.ui.screen.device.DeviceScreen
+import com.cupcake.ui.screen.game.GameScreen
 import com.cupcake.ui.screen.home.HomeScreen
 import com.cupcake.ui.screen.settings.SettingsScreen
 import com.cupcake.ui.screen.systemprompt.SystemPromptScreen
@@ -42,6 +44,12 @@ class MainActivity : ComponentActivity() {
                             },
                             onNavigateToSettings = {
                                 navController.navigate("settings")
+                            },
+                            onNavigateToCharacters = {
+                                navController.navigate("characters")
+                            },
+                            onNavigateToGames = {
+                                navController.navigate("games")
                             }
                         )
                     }
@@ -64,6 +72,14 @@ class MainActivity : ComponentActivity() {
                     
                     composable("settings") {
                         SettingsScreen(onClose = { navController.popBackStack() })
+                    }
+                    
+                    composable("characters") {
+                        CharacterScreen(onClose = { navController.popBackStack() })
+                    }
+                    
+                    composable("games") {
+                        GameScreen(onClose = { navController.popBackStack() })
                     }
                     
                     composable(

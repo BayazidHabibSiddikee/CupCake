@@ -34,7 +34,9 @@ fun HomeScreen(
     viewModel: HomeViewModel = viewModel(),
     onNavigateToChat: (String) -> Unit,
     onNavigateToDevice: (String) -> Unit,
-    onNavigateToSettings: () -> Unit
+    onNavigateToSettings: () -> Unit,
+    onNavigateToCharacters: () -> Unit,
+    onNavigateToGames: () -> Unit
 ) {
     val conversations by viewModel.conversations.collectAsStateWithLifecycle()
     val showNewChatDialog by viewModel.showNewChatDialog.collectAsStateWithLifecycle()
@@ -45,6 +47,12 @@ fun HomeScreen(
             TopAppBar(
                 title = { Text("CupCake") },
                 actions = {
+                    androidx.compose.material3.IconButton(onClick = onNavigateToCharacters) {
+                        Icon(painterResource(androidx.compose.material.icons.Icons.Filled.Psychology), contentDescription = "Characters")
+                    }
+                    androidx.compose.material3.IconButton(onClick = onNavigateToGames) {
+                        Icon(painterResource(androidx.compose.material.icons.Icons.Filled.VideogameAsset), contentDescription = "Games")
+                    }
                     androidx.compose.material3.IconButton(onClick = onNavigateToSettings) {
                         Icon(painterResource(androidx.compose.material.icons.Icons.Filled.Settings), contentDescription = "Settings")
                     }
@@ -73,8 +81,22 @@ fun HomeScreen(
                             )
                             Text("No conversations yet", fontSize = 20.sp, fontWeight = FontWeight.Medium)
                             Text("Start a new chat or connect a device", color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)
-                            Button(onClick = { viewModel.showNewChatDialog.value = true }) {
-                                Text("New Chat")
+                            
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Button(onClick = { viewModel.showNewChatDialog.value = true }) {
+                                    Text("New Chat")
+                                }
+                                androidx.compose.material3.OutlinedButton(onClick = onNavigateToCharacters) {
+                                    Icon(painterResource(androidx.compose.material.icons.Icons.Filled.Psychology), contentDescription = null)
+                                    Text("Choose Character")
+                                }
+                                androidx.compose.material3.OutlinedButton(onClick = onNavigateToGames) {
+                                    Icon(painterResource(androidx.compose.material.icons.Icons.Filled.VideogameAsset), contentDescription = null)
+                                    Text("Play Games")
+                                }
                             }
                         }
                     }

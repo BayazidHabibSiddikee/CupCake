@@ -5,6 +5,7 @@ plugins {
     id("com.google.dagger.hilt.android")
     id("kotlin-kapt")
     id("androidx.navigation.safeargs.kotlin")
+    id("org.jetbrains.kotlin.plugin.serialization")
 }
 
 android {
@@ -24,7 +25,7 @@ android {
                 cppFlags.add("-std=c++17")
                 cppFlags.add("-frtti")
                 cppFlags.add("-fexceptions")
-                cppFlags.add("-DQWEN_LOG_LEVEL=2")
+                cppFlags.add("-DLLAMA_LOG_LEVEL=2")
                 arguments.add("-DANDROID_STL=c++_shared")
                 arguments.add("-DANDROID_ARM_NEON=TRUE")
             }
@@ -85,7 +86,7 @@ android {
     packagingOptions {
         resources.excludes.add("META-INF/*")
         jniLibs.pickFirsts.add("libc++_shared.so")
-        jniLibs.pickFirsts.add("libqwen.so")
+        jniLibs.pickFirsts.add("libllama_jni.so")
     }
 
     externalNativeBuild {
@@ -126,6 +127,13 @@ dependencies {
     val truth = libs.truth.get()
     val turbine = libs.turbine.get()
 
+    // Ktor for WebSocket server
+    val ktorVersion = "2.3.9"
+    implementation("io.ktor:ktor-server-core:$ktorVersion")
+    implementation("io.ktor:ktor-server-netty:$ktorVersion")
+    implementation("io.ktor:ktor-server-websockets:$ktorVersion")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
+
     implementation(coreSplashScreen)
     implementation(activityCompose)
     implementation(lifecycleViewmodelCompose)
@@ -155,6 +163,12 @@ dependencies {
 
     implementation(accompanistPermissions)
     implementation(accompanistSystemUi)
+
+    // WorkManager for background tasks
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
+
+    // Play Billing for Pro upgrade
+    implementation("com.android.billingclient:billing-ktx:7.0.0")
 
     testImplementation(junit)
     testImplementation(mockk)
