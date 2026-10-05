@@ -8,10 +8,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -26,6 +29,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cupcake.game.GameManager
 import com.cupcake.ui.theme.CupCakeTheme
@@ -38,12 +43,12 @@ import androidx.compose.material.icons.filled.VideogameAsset
 @Composable
 fun GameScreen(
     onClose: () -> Unit,
-    viewModel: GameViewModel = viewModel()
+    viewModel: GameViewModel = hiltViewModel()
 ) {
     val gameState by viewModel.gameState.collectAsStateWithLifecycle()
     val availableGames by viewModel.availableGames.collectAsStateWithLifecycle()
     val showGameSelector by viewModel.showGameSelector.collectAsStateWithLifecycle()
-    val selectedDifficulty by viewModel.selectedDifficulty
+    val selectedDifficulty by viewModel.selectedDifficulty.collectAsStateWithLifecycle()
 
     CupCakeTheme {
         Column(Modifier.fillMaxSize()) {
@@ -51,17 +56,17 @@ fun GameScreen(
                 title = { Text("Games") },
                 navigationIcon = { 
                     androidx.compose.material3.IconButton(onClick = onClose) { 
-                        Icon(painterResource(androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack), contentDescription = "Back") 
+                        Icon(imageVector = androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") 
                     } 
                 },
                 actions = {
                     if (gameState != null) {
                         IconButton(onClick = { viewModel.endGame() }) {
-                            Icon(painterResource(androidx.compose.material.icons.Icons.Filled.Close), contentDescription = "End game")
+                            Icon(imageVector = androidx.compose.material.icons.Icons.Filled.Close, contentDescription = "End game")
                         }
                     } else {
                         IconButton(onClick = { viewModel.showGameSelector.value = true }) {
-                            Icon(painterResource(androidx.compose.material.icons.Icons.Filled.VideogameAsset), contentDescription = "New game")
+                            Icon(imageVector = androidx.compose.material.icons.Icons.Filled.VideogameAsset, contentDescription = "New game")
                         }
                     }
                 },
@@ -70,7 +75,8 @@ fun GameScreen(
                 )
             )
 
-            if (gameState == null) {
+            val activeGameState = gameState
+            if (activeGameState == null) {
                 // Game selection screen
                 Box(
                     modifier = Modifier.fillMaxSize(),
@@ -109,19 +115,12 @@ fun GameScreen(
                                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    com.cupcake.game.TicTacToeEngine.Difficulty.values().forEach { diff ->
-                                        androidx.compose.material3.Chip(
-                                            onClick = { selectedDifficulty.value = diff },
-                                            selected = (selectedDifficulty.value == diff),
-                                            colors = androidx.compose.material3.ChipDefaults.chipColors(
-                                                containerColor = if (selectedDifficulty.value == diff)
-                                                    androidx.compose.material3.MaterialTheme.colorScheme.primaryContainer
-                                                else
-                                                    androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerHigh
-                                            )
-                                        ) {
-                                            Text(diff.name)
-                                        }
+                                    com.cupcake.game.TicTacToeEngine.Difficulty.entries.forEach { diff ->
+                                        FilterChip(
+                                            selected = (selectedDifficulty == diff),
+                                            onClick = { viewModel.selectedDifficulty.value = diff },
+                                            label = { Text(diff.name) }
+                                        )
                                     }
                                 }
                             }
@@ -130,17 +129,18 @@ fun GameScreen(
                 }
             } else {
                 // Active game screen
-                when (gameState.state.gameType) {
+                when (activeGameState.state.gameType) {
                     com.cupcake.game.Game.GameType.TIC_TAC_TOE -> TicTacToeBoard(
-                        state = gameState.state,
-                        onCellClick = { pos -> viewModel.makeMove(pos) }
+                        state = activeGameState.state,
+                        onCellClick = { pos -> viewModel.makeMove(pos) },
+                        onRestart = { viewModel.restartGame() }
                     )
                     else -> {
                         Box(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("${gameState.state.gameType.name} coming soon!", fontSize = 18.sp)
+                            Text("${activeGameState.state.gameType.name} coming soon!", fontSize = 18.sp)
                         }
                     }
                 }
@@ -182,7 +182,8 @@ fun GameOptionCard(
 @Composable
 fun TicTacToeBoard(
     state: com.cupcake.game.Game.State,
-    onCellClick: (Int) -> Unit
+    onCellClick: (Int) -> Unit,
+    onRestart: () -> Unit = {}
 ) {
     val board = state.board as? com.cupcake.game.Game.TicTacToeBoard ?: return
     
@@ -235,7 +236,7 @@ fun TicTacToeBoard(
 
         // Restart button
         if (state.status != com.cupcake.game.Game.GameStatus.PLAYING) {
-            Button(onClick = { viewModel.restartGame() }) {
+            Button(onClick = onRestart) {
                 Text("Play Again")
             }
         }
@@ -287,56 +288,5 @@ private fun isWinningCell(board: com.cupcake.game.Game.TicTacToeBoard, pos: Int,
     )
     return lines.any { line ->
         pos in line && line.all { board.get(it) == winner }
-    }
-}
-
-data class GameOption(
-    val type: com.cupcake.game.Game.GameType,
-    val name: String,
-    val description: String,
-    val icon: String,
-    val personality: String
-)
-
-@Composable
-fun rememberGameOptions(): List<GameOption> {
-    return remember {
-        listOf(
-            GameOption(
-                type = com.cupcake.game.Game.GameType.TIC_TAC_TOE,
-                name = "Tic-Tac-Toe",
-                description = "Classic 3x3 with rage reactions",
-                icon = "⭕❌",
-                personality = "rage_gamer"
-            ),
-            GameOption(
-                type = com.cupcake.game.Game.GameType.CHESS,
-                name = "Chess",
-                description = "Play against Stockfish engine",
-                icon = "♟️",
-                personality = "rage_gamer"
-            ),
-            GameOption(
-                type = com.cupcake.game.Game.GameType.ROCK_PAPER_SCISSORS,
-                name = "Rock Paper Scissors",
-                description = "Quick rounds with trash talk",
-                icon = "🪨📄✂️",
-                personality = "sarcastic"
-            ),
-            GameOption(
-                type = com.cupcake.game.Game.GameType.GUESS_NUMBER,
-                name = "Guess the Number",
-                description = "Bot picks 1-100, you guess",
-                icon = "🔢",
-                personality = "grumpy"
-            ),
-            GameOption(
-                type = com.cupcake.game.Game.GameType.MATH_QUIZ,
-                name = "Math Quiz",
-                description = "Bot gives wrong answers on purpose",
-                icon = "➕➖✖️➗",
-                personality = "tutor_bot"
-            )
-        )
     }
 }

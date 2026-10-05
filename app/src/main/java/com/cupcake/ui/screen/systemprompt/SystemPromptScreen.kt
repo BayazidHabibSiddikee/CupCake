@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
@@ -17,6 +18,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -25,13 +27,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardOptions
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.cupcake.data.model.PromptImage
 import com.cupcake.data.model.SystemPrompt
 import com.cupcake.ui.component.ImagePickerSheet
 import com.cupcake.ui.theme.CupCakeTheme
@@ -40,6 +44,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Save
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
@@ -47,8 +52,9 @@ import androidx.compose.material.icons.filled.Save
 fun SystemPromptScreen(
     promptId: String? = null,
     onClose: () -> Unit,
-    viewModel: SystemPromptViewModel = viewModel()
+    viewModel: SystemPromptViewModel = hiltViewModel()
 ) {
+    LaunchedEffect(promptId) { viewModel.loadPrompt(promptId) }
     val prompt by viewModel.prompt.collectAsStateWithLifecycle()
     val prompts by viewModel.allPrompts.collectAsStateWithLifecycle()
     val showDeleteDialog by viewModel.showDeleteDialog.collectAsStateWithLifecycle()
@@ -65,15 +71,15 @@ fun SystemPromptScreen(
             // Header
             androidx.compose.material3.TopAppBar(
                 title = { Text(if (promptId == null) "New System Prompt" else "Edit System Prompt") },
-                navigationIcon = { IconButton(onClick = onClose) { Icon(painterResource(androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack), contentDescription = "Back") } },
+                navigationIcon = { IconButton(onClick = onClose) { Icon(imageVector = androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } },
                 actions = {
                     if (promptId != null) {
                         IconButton(onClick = { viewModel.showDeleteDialog.value = true }) {
-                            Icon(painterResource(androidx.compose.material.icons.Icons.Filled.Delete), contentDescription = "Delete", tint = androidx.compose.material3.MaterialTheme.colorScheme.error)
+                            Icon(imageVector = androidx.compose.material.icons.Icons.Filled.Delete, contentDescription = "Delete", tint = androidx.compose.material3.MaterialTheme.colorScheme.error)
                         }
                     }
                     IconButton(onClick = { viewModel.save(name, text) }, enabled = name.isNotBlank()) {
-                        Icon(painterResource(androidx.compose.material.icons.Icons.Filled.Save), contentDescription = "Save")
+                        Icon(imageVector = androidx.compose.material.icons.Icons.Filled.Save, contentDescription = "Save")
                     }
                 },
                 colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
@@ -164,7 +170,7 @@ fun ImagesSection(
         ) {
             Text("Attached Images (${images.size})", fontWeight = FontWeight.Medium, fontSize = 16.sp)
             androidx.compose.material3.IconButton(onClick = onAddImage) {
-                Icon(painterResource(androidx.compose.material.icons.Icons.Filled.Add), contentDescription = "Add image")
+                Icon(imageVector = androidx.compose.material.icons.Icons.Filled.Add, contentDescription = "Add image")
             }
         }
 
@@ -208,22 +214,21 @@ fun ImageCard(
             Box(
                 modifier = Modifier
                     .size(60.dp)
-                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp)),
+                contentAlignment = Alignment.Center
             ) {
-                androidx.compose.ui.res.painterResource(id = androidx.compose.material.icons.Icons.Filled.Image).also { painter ->
-                    androidx.compose.foundation.Image(
-                        painter = painter,
-                        contentDescription = "Image thumbnail",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Filled.Image,
+                    contentDescription = "Image thumbnail",
+                    modifier = Modifier.fillMaxSize(),
+                    tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
 
             // Info
             Column(Modifier.weight(1f)) {
                 Text(
-                    text = image.description.ifEmpty { "Image ${images.indexOf(image) + 1}" },
+                    text = image.description.ifEmpty { "Image" },
                     fontSize = 14.sp,
                     maxLines = 1,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
@@ -242,7 +247,7 @@ fun ImageCard(
             // Remove button
             androidx.compose.material3.IconButton(onClick = onRemove) {
                 Icon(
-                    painter = painterResource(androidx.compose.material.icons.Icons.Filled.Delete),
+                    imageVector = androidx.compose.material.icons.Icons.Filled.Delete,
                     contentDescription = "Remove",
                     tint = androidx.compose.material3.MaterialTheme.colorScheme.error
                 )

@@ -2,34 +2,34 @@ package com.cupcake.ui.screen.chat
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cupcake.data.model.ChatMessage
 import com.cupcake.data.model.ModelConfig
+import com.cupcake.data.model.SystemPrompt
 import com.cupcake.ui.component.ChatMessageItem
 import com.cupcake.ui.component.MessageInput
 import com.cupcake.ui.theme.CupCakeTheme
-import kotlinx.coroutines.launch
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Settings
@@ -38,7 +38,7 @@ import androidx.compose.material.icons.filled.Settings
 @Composable
 fun ChatScreen(
     conversationId: String,
-    viewModel: ChatViewModel = viewModel()
+    viewModel: ChatViewModel = hiltViewModel()
 ) {
     val messages by viewModel.messages.collectAsStateWithLifecycle()
     val isGenerating by viewModel.isGenerating.collectAsStateWithLifecycle()
@@ -113,9 +113,9 @@ fun ChatHeader(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Model indicator
-            androidx.compose.material3.Row(
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 androidx.compose.material3.Text(
                     text = when (modelConfig.provider) {
@@ -130,17 +130,17 @@ fun ChatHeader(
                 )
 
                 IconButton(onClick = onModelConfigClick) {
-                    androidx.compose.material.icons.Icons.Filled.Settings
+                    Icon(imageVector = Icons.Filled.Settings, contentDescription = "Model config")
                 }
             }
 
             // System prompt indicator
             systemPrompt?.let { prompt ->
-                androidx.compose.material3.Row(
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 8.dp),
-                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     androidx.compose.material3.Text(
                         text = "📋 ${prompt.name} (${prompt.images.size} images)",
@@ -149,7 +149,7 @@ fun ChatHeader(
                         fontWeight = FontWeight.Medium
                     )
                     IconButton(onClick = onSystemPromptClick) {
-                        androidx.compose.material.icons.Icons.Filled.Edit
+                        Icon(imageVector = Icons.Filled.Edit, contentDescription = "Edit prompt")
                     }
                 }
             }

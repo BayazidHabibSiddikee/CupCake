@@ -140,6 +140,7 @@ dependencies {
     val navigationCompose = libs.androidx.navigation.compose.get()
     val hilt = libs.hilt.android.get()
     val hiltCompiler = libs.hilt.compiler.get()
+    val hiltNavigationCompose = libs.androidx.hilt.navigation.compose.get()
     val room = libs.androidx.room.runtime.get()
     val roomKtx = libs.androidx.room.ktx.get()
     val roomCompiler = libs.androidx.room.compiler.get()
@@ -188,6 +189,7 @@ dependencies {
     implementation(navigationCompose)
 
     implementation(hilt)
+    implementation(hiltNavigationCompose)
     kapt(hiltCompiler)
 
     implementation(room)

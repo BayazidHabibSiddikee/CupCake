@@ -3,9 +3,11 @@ package com.cupcake.ui.screen.character
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
@@ -23,14 +25,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cupcake.ai.CharacterManager
+import com.cupcake.data.model.Character
 import com.cupcake.ui.theme.CupCakeTheme
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -43,13 +47,13 @@ import androidx.compose.material.icons.filled.Save
 @Composable
 fun CharacterScreen(
     onClose: () -> Unit,
-    viewModel: CharacterViewModel = viewModel()
+    viewModel: CharacterViewModel = hiltViewModel()
 ) {
     val characters by viewModel.characters.collectAsStateWithLifecycle()
     val showCreateDialog by viewModel.showCreateDialog.collectAsStateWithLifecycle()
-    val newCharName by viewModel.newCharName
-    val newCharPrompt by viewModel.newCharPrompt
-    val newCharPersonality by viewModel.newCharPersonality
+    val newCharName by viewModel.newCharName.collectAsStateWithLifecycle()
+    val newCharPrompt by viewModel.newCharPrompt.collectAsStateWithLifecycle()
+    val newCharPersonality by viewModel.newCharPersonality.collectAsStateWithLifecycle()
 
     CupCakeTheme {
         Column(
@@ -58,10 +62,10 @@ fun CharacterScreen(
         ) {
             androidx.compose.material3.TopAppBar(
                 title = { Text("Characters") },
-                navigationIcon = { IconButton(onClick = onClose) { Icon(painterResource(androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack), contentDescription = "Back") } },
+                navigationIcon = { IconButton(onClick = onClose) { Icon(imageVector = androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } },
                 actions = {
                     IconButton(onClick = { viewModel.showCreateDialog.value = true }) {
-                        Icon(painterResource(androidx.compose.material.icons.Icons.Filled.Add), contentDescription = "Create character")
+                        Icon(imageVector = androidx.compose.material.icons.Icons.Filled.Add, contentDescription = "Create character")
                     }
                 },
                 colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
@@ -154,7 +158,7 @@ fun CharacterScreen(
 
 @Composable
 fun CharacterCard(
-    character: CharacterManager.Character,
+    character: Character,
     isSelected: Boolean,
     onSelect: () -> Unit,
     onEdit: () -> Unit,
@@ -234,17 +238,17 @@ fun CharacterCard(
                 if (!character.isBuiltIn) {
                     androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         IconButton(onClick = onEdit) {
-                            Icon(painterResource(androidx.compose.material.icons.Icons.Filled.Edit), contentDescription = "Edit")
+                            Icon(imageVector = androidx.compose.material.icons.Icons.Filled.Edit, contentDescription = "Edit")
                         }
                         IconButton(onClick = onDelete) {
-                            Icon(painterResource(androidx.compose.material.icons.Icons.Filled.Delete), contentDescription = "Delete", tint = androidx.compose.material3.MaterialTheme.colorScheme.error)
+                            Icon(imageVector = androidx.compose.material.icons.Icons.Filled.Delete, contentDescription = "Delete", tint = androidx.compose.material3.MaterialTheme.colorScheme.error)
                         }
                     }
                 }
             }
 
             // Prompt preview
-            androidx.compose.foundation.layout.Text(
+            Text(
                 text = character.systemPrompt.take(150) + "...",
                 fontSize = 12.sp,
                 color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),

@@ -7,6 +7,9 @@ import com.cupcake.ai.CharacterManager
 import com.cupcake.ai.EnergyManager
 import com.cupcake.ai.LlamaEngine
 import com.cupcake.data.model.Character
+import com.cupcake.data.model.ChatMessage
+import com.cupcake.data.model.ModelConfig
+import com.cupcake.data.model.SystemPrompt
 import com.cupcake.game.GameManager
 import com.cupcake.network.EspWebSocketServer
 import com.cupcake.tts.TtsManager
@@ -51,6 +54,12 @@ class ChatViewModel @Inject constructor(
 
     private val _connectedDevices = MutableStateFlow<List<String>>(emptyList())
     val connectedDevices = _connectedDevices.asStateFlow()
+
+    private val _modelConfig = MutableStateFlow(ModelConfig.default())
+    val modelConfig = _modelConfig.asStateFlow()
+
+    private val _systemPrompt = MutableStateFlow<SystemPrompt?>(null)
+    val systemPrompt = _systemPrompt.asStateFlow()
 
     private val _gameState = MutableStateFlow<com.cupcake.game.GameManager.Result?>(null)
     val gameState = _gameState.asStateFlow()
@@ -119,18 +128,16 @@ class ChatViewModel @Inject constructor(
 
         // Check energy
         if (!energyManager.hasEnergy()) {
-            addMessage(ChatMessage(
-                role = ChatMessage.MessageRole.ASSISTANT,
-                content = "⚡ Energy depleted! Watch an ad or upgrade to Pro to continue.",
-                isSystem = true
-            ))
+            addMessage(
+                ChatMessage.system(
+                    "⚡ Energy depleted! Watch an ad or upgrade to Pro to continue.",
+                    currentConversationId
+                )
+            )
             return
         }
 
-        val userMessage = ChatMessage(
-            role = ChatMessage.MessageRole.USER,
-            content = text
-        )
+        val userMessage = ChatMessage.user(text, currentConversationId)
         addMessage(userMessage)
 
         _isGenerating.value = true
@@ -153,9 +160,10 @@ class ChatViewModel @Inject constructor(
                     energyManager.consumeEnergy()
                     
                     // Add assistant message
-                    val assistantMessage = ChatMessage(
-                        role = ChatMessage.MessageRole.ASSISTANT,
-                        content = fullResponse.trim()
+                    val assistantMessage = ChatMessage.assistant(
+                        fullResponse.trim(),
+                        currentConversationId,
+                        modelUsed = _modelConfig.value.modelName
                     )
                     addMessage(assistantMessage)
                     
@@ -252,6 +260,19 @@ Assistant:""".trimIndent()
         energyManager.purchasePro()
     }
 
+    // Header actions (TODO: wire to config sheets)
+    fun onModelConfigClick() {
+        Log.d("ChatViewModel", "Model config clicked")
+    }
+
+    fun onSystemPromptClick() {
+        Log.d("ChatViewModel", "System prompt clicked")
+    }
+
+    fun onAttachImage() {
+        Log.d("ChatViewModel", "Attach image clicked")
+    }
+
     // ESP32 controls
     fun sendFaceExpression(expression: String) {
         espServer.sendFaceExpression(expression)
@@ -268,14 +289,5 @@ Assistant:""".trimIndent()
     override fun onCleared() {
         espServer.stop()
         super.onCleared()
-    }
-
-    data class ChatMessage(
-        val role: MessageRole,
-        val content: String,
-        val timestamp: Long = System.currentTimeMillis(),
-        val isSystem: Boolean = false
-    ) {
-        enum class MessageRole { USER, ASSISTANT, SYSTEM }
     }
 }

@@ -4,9 +4,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
@@ -30,6 +32,8 @@ import androidx.compose.ui.text.input.KeyboardOptions
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cupcake.data.model.ApiProvider
 import com.cupcake.data.model.ModelConfig
@@ -49,14 +53,14 @@ import androidx.compose.material.icons.filled.Wifi
 @Composable
 fun SettingsScreen(
     onClose: () -> Unit,
-    viewModel: SettingsViewModel = viewModel()
+    viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val providers by viewModel.providers.collectAsStateWithLifecycle()
     val showAddProviderDialog by viewModel.showAddProviderDialog.collectAsStateWithLifecycle()
-    val selectedProviderType by viewModel.selectedProviderType
-    val newProviderName by viewModel.newProviderName
-    val newProviderUrl by viewModel.newProviderUrl
-    val newProviderApiKey by viewModel.newProviderApiKey
+    val selectedProviderType by viewModel.selectedProviderType.collectAsStateWithLifecycle()
+    val newProviderName by viewModel.newProviderName.collectAsStateWithLifecycle()
+    val newProviderUrl by viewModel.newProviderUrl.collectAsStateWithLifecycle()
+    val newProviderApiKey by viewModel.newProviderApiKey.collectAsStateWithLifecycle()
 
     CupCakeTheme {
         Column(
@@ -66,7 +70,7 @@ fun SettingsScreen(
             // Header
             androidx.compose.material3.TopAppBar(
                 title = { Text("Settings") },
-                navigationIcon = { IconButton(onClick = onClose) { Icon(painterResource(androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack), contentDescription = "Back") } },
+                navigationIcon = { IconButton(onClick = onClose) { Icon(imageVector = androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } },
                 colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
                     containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerLow
                 )
@@ -98,7 +102,7 @@ fun SettingsScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(painterResource(androidx.compose.material.icons.Icons.Filled.CloudOff), contentDescription = null, modifier = Modifier.size(48.dp))
+                            Icon(imageVector = androidx.compose.material.icons.Icons.Filled.CloudOff, contentDescription = null, modifier = Modifier.size(48.dp))
                             Text("No custom providers configured", fontSize = 16.sp, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)
                             Text("Add a custom API endpoint to use cloud models", fontSize = 14.sp, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)
                         }
@@ -125,7 +129,7 @@ fun SettingsScreen(
                     onClick = { viewModel.showAddProviderDialog.value = true },
                     modifier = Modifier.fillMaxWidth().padding(top = 16.dp)
                 ) {
-                    Icon(painterResource(androidx.compose.material.icons.Icons.Filled.Add), contentDescription = null)
+                    Icon(imageVector = androidx.compose.material.icons.Icons.Filled.Add, contentDescription = null)
                     Text("Add Custom Provider")
                 }
             }
@@ -177,7 +181,7 @@ fun ProviderSection(
                 Text(title, fontWeight = FontWeight.Medium, fontSize = 16.sp)
                 Text(subtitle, fontSize = 14.sp, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Icon(painterResource(androidx.compose.material.icons.Icons.Filled.ChevronRight), contentDescription = null)
+            Icon(imageVector = androidx.compose.material.icons.Icons.Filled.ChevronRight, contentDescription = null)
         }
     }
 }
@@ -218,16 +222,16 @@ fun ProviderCard(
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     IconButton(onClick = onTest) {
-                        Icon(painterResource(androidx.compose.material.icons.Icons.Filled.Wifi), contentDescription = "Test connection")
+                        Icon(imageVector = androidx.compose.material.icons.Icons.Filled.Wifi, contentDescription = "Test connection")
                     }
                     IconButton(onClick = onEdit) {
-                        Icon(painterResource(androidx.compose.material.icons.Icons.Filled.Edit), contentDescription = "Edit")
+                        Icon(imageVector = androidx.compose.material.icons.Icons.Filled.Edit, contentDescription = "Edit")
                     }
                     IconButton(onClick = onSelect) {
-                        Icon(painterResource(androidx.compose.material.icons.Icons.Filled.CheckCircle), contentDescription = "Select", tint = androidx.compose.material3.MaterialTheme.colorScheme.primary)
+                        Icon(imageVector = androidx.compose.material.icons.Icons.Filled.CheckCircle, contentDescription = "Select", tint = androidx.compose.material3.MaterialTheme.colorScheme.primary)
                     }
                     IconButton(onClick = onDelete) {
-                        Icon(painterResource(androidx.compose.material.icons.Icons.Filled.Delete), contentDescription = "Delete", tint = androidx.compose.material3.MaterialTheme.colorScheme.error)
+                        Icon(imageVector = androidx.compose.material.icons.Icons.Filled.Delete, contentDescription = "Delete", tint = androidx.compose.material3.MaterialTheme.colorScheme.error)
                     }
                 }
             }
@@ -296,11 +300,11 @@ fun AddProviderDialog(
 
                 // Provider type dropdown
                 Text("Provider Type", fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                androidx.compose.material3.Menu(
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                    onClick = { /* show dropdown */ }
+                androidx.compose.material3.TextButton(
+                    onClick = { /* TODO: provider type dropdown */ },
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
                 ) {
-                    // Simplified - would use ExposedDropdownMenuBox in real implementation
+                    Text(providerType.value)
                 }
 
                 androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(top = 16.dp))

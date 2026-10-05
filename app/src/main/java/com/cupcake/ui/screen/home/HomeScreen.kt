@@ -6,10 +6,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -25,6 +27,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cupcake.data.model.Conversation
 import com.cupcake.ui.theme.CupCakeTheme
@@ -36,9 +40,10 @@ import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.VideogameAsset
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
-    viewModel: HomeViewModel = viewModel(),
+    viewModel: HomeViewModel = hiltViewModel(),
     onNavigateToChat: (String) -> Unit,
     onNavigateToDevice: (String) -> Unit,
     onNavigateToSettings: () -> Unit,
@@ -55,13 +60,16 @@ fun HomeScreen(
                 title = { Text("CupCake") },
                 actions = {
                     androidx.compose.material3.IconButton(onClick = onNavigateToCharacters) {
-                        Icon(painterResource(androidx.compose.material.icons.Icons.Filled.Psychology), contentDescription = "Characters")
+                        Icon(
+                        imageVector = androidx.compose.material.icons.Icons.Filled.Psychology, contentDescription = "Characters")
                     }
                     androidx.compose.material3.IconButton(onClick = onNavigateToGames) {
-                        Icon(painterResource(androidx.compose.material.icons.Icons.Filled.VideogameAsset), contentDescription = "Games")
+                        Icon(
+                        imageVector = androidx.compose.material.icons.Icons.Filled.VideogameAsset, contentDescription = "Games")
                     }
                     androidx.compose.material3.IconButton(onClick = onNavigateToSettings) {
-                        Icon(painterResource(androidx.compose.material.icons.Icons.Filled.Settings), contentDescription = "Settings")
+                        Icon(
+                        imageVector = androidx.compose.material.icons.Icons.Filled.Settings, contentDescription = "Settings")
                     }
                 },
                 colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
@@ -81,7 +89,7 @@ fun HomeScreen(
                             verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
                             Icon(
-                                painter = painterResource(androidx.compose.material.icons.Icons.Filled.ChatBubbleOutline),
+                                painter = androidx.compose.material.icons.Icons.Filled.ChatBubbleOutline,
                                 contentDescription = null,
                                 modifier = Modifier.size(64.dp),
                                 tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
@@ -97,11 +105,13 @@ fun HomeScreen(
                                     Text("New Chat")
                                 }
                                 androidx.compose.material3.OutlinedButton(onClick = onNavigateToCharacters) {
-                                    Icon(painterResource(androidx.compose.material.icons.Icons.Filled.Psychology), contentDescription = null)
+                                    Icon(
+                        imageVector = androidx.compose.material.icons.Icons.Filled.Psychology, contentDescription = null)
                                     Text("Choose Character")
                                 }
                                 androidx.compose.material3.OutlinedButton(onClick = onNavigateToGames) {
-                                    Icon(painterResource(androidx.compose.material.icons.Icons.Filled.VideogameAsset), contentDescription = null)
+                                    Icon(
+                        imageVector = androidx.compose.material.icons.Icons.Filled.VideogameAsset, contentDescription = null)
                                     Text("Play Games")
                                 }
                             }
@@ -132,7 +142,8 @@ fun HomeScreen(
                         .padding(16.dp)
                         .align(Alignment.BottomEnd)
                 ) {
-                    Icon(painterResource(androidx.compose.material.icons.Icons.Filled.Add), contentDescription = "New chat")
+                    Icon(
+                        imageVector = androidx.compose.material.icons.Icons.Filled.Add, contentDescription = "New chat")
                 }
             }
         }
