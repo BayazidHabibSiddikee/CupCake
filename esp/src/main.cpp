@@ -146,7 +146,15 @@ void handleCommand(const Command& cmd) {
             }
         }
         else if (cmd.action == "write") {
-            // Handle OTA data chunk
+            // Handle OTA data chunk (params.chunk = raw chunk bytes as string)
+            const char* chunk = cmd.params["chunk"] | "";
+            size_t written = ota.write(
+                reinterpret_cast<const uint8_t*>(chunk), strlen(chunk));
+            if (written == strlen(chunk)) {
+                ble.sendResponse(cmd.id, "ok", "Chunk written");
+            } else {
+                ble.sendResponse(cmd.id, "error", "Chunk write failed");
+            }
         }
         else if (cmd.action == "end") {
             if (ota.end()) {

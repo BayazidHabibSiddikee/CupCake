@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-#include "protocol.h"
+#include "comm/protocol.h"
 
 class BLEManager {
 public:
