@@ -158,7 +158,7 @@ class QwenNative private constructor() {
     fun generateStream(
         prompt: String,
         config: GenerateConfig = GenerateConfig()
-    ): ReceiveChannel<String> = Channel<String>().apply {
+    ): ReceiveChannel<String> = Channel<String>(Channel.UNLIMITED).apply {
         CoroutineScope(Dispatchers.IO).launch {
             val deferred = CompletableDeferred<Int>()
 

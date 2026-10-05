@@ -26,24 +26,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.Chat
-import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.automirrored.filled.Send
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MessageInput(
     onSend: (String) -> Unit,
-    enabled: Boolean = true,
-    onAttachImage: (() -> Unit)? = null
+    enabled: Boolean = true
 ) {
     val context = LocalContext.current
     var text by remember { mutableStateOf("") }
@@ -71,17 +67,6 @@ fun MessageInput(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // Attach image button
-        onAttachImage?.let {
-            IconButton(onClick = it, enabled = enabled) {
-                Icon(
-                    imageVector = Icons.Filled.AddPhotoAlternate,
-                    contentDescription = "Attach image",
-                    tint = androidx.compose.material3.MaterialTheme.colorScheme.primary
-                )
-            }
-        }
-
         // Text field
         androidx.compose.material3.TextField(
             value = text,
@@ -106,22 +91,17 @@ fun MessageInput(
                 )
             },
             trailingIcon = {
-                if (text.isNotBlank() && enabled) {
-                    IconButton(onClick = {
+                IconButton(
+                    onClick = {
                         onSend(text.trim())
                         text = ""
-                    }) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.Send,
-                            contentDescription = "Send",
-                            tint = androidx.compose.material3.MaterialTheme.colorScheme.primary
-                        )
-                    }
-                } else {
+                    },
+                    enabled = text.isNotBlank() && enabled
+                ) {
                     Icon(
-                        imageVector = Icons.Filled.Mic,
-                        contentDescription = "Voice input",
-                        tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                        imageVector = Icons.AutoMirrored.Filled.Send,
+                        contentDescription = "Send",
+                        tint = androidx.compose.material3.MaterialTheme.colorScheme.primary
                     )
                 }
             },

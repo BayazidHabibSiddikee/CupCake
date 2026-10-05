@@ -123,7 +123,10 @@ class LlamaEngine private constructor() {
         }
     }
 
-    fun generateStream(prompt: String): ReceiveChannel<String> = Channel<String>().apply {
+    // NOTE: UNLIMITED buffer is required. The native thread emits tokens via
+    // trySend, which silently drops on a rendezvous channel when the consumer
+    // isn't parked yet - on fast devices this drops the whole response.
+    fun generateStream(prompt: String): ReceiveChannel<String> = Channel<String>(Channel.UNLIMITED).apply {
         CoroutineScope(Dispatchers.IO).launch {
             val callback = object : GenerateCallback {
                 override fun onToken(token: String) {

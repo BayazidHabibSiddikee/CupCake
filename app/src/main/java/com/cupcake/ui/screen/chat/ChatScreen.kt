@@ -46,6 +46,7 @@ fun ChatScreen(
     val modelConfig by viewModel.modelConfig.collectAsStateWithLifecycle()
     val systemPrompt by viewModel.systemPrompt.collectAsStateWithLifecycle()
     val modelLoadState by viewModel.modelLoadState.collectAsStateWithLifecycle()
+    val isModelLoading = modelLoadState is ChatViewModel.ModelLoadState.Loading
 
     var scrollToBottom by remember { mutableStateOf(false) }
 
@@ -112,8 +113,7 @@ fun ChatScreen(
                 onSend = { text ->
                     viewModel.sendMessage(text)
                 },
-                enabled = !isGenerating,
-                onAttachImage = { viewModel.onAttachImage() }
+                enabled = !isGenerating && !isModelLoading
             )
         }
     }

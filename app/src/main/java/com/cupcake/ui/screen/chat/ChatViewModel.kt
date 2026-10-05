@@ -322,10 +322,6 @@ Assistant:""".trimIndent()
         Log.d("ChatViewModel", "System prompt clicked")
     }
 
-    fun onAttachImage() {
-        Log.d("ChatViewModel", "Attach image clicked")
-    }
-
     // ESP32 controls
     fun sendFaceExpression(expression: String) {
         espServer.sendFaceExpression(expression)
