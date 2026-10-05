@@ -103,9 +103,9 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             val result = llamaEngine.loadModel(appContext) { copied, total ->
                 val detail = if (total > 0) {
-                    "${copied / 1024 / 1024} / ${total / 1024 / 1024} MB"
+                    "${(copied * 100 / total).toInt()}%"
                 } else {
-                    "${copied / 1024 / 1024} MB"
+                    ""
                 }
                 _modelLoadState.value = ModelLoadState.Loading(detail)
             }
