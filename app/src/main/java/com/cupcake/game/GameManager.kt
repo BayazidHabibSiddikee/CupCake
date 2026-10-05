@@ -279,6 +279,7 @@ class GameManager(private val llamaEngine: LlamaEngine, private val characterMan
             } else {
                 currentGame = game.copy(board = board, currentPlayer = Game.Player.HUMAN, moveHistory = newHistory)
             }
+            onGameStateChanged?.invoke(currentGame)
         }
     }
 
@@ -314,6 +315,9 @@ class GameManager(private val llamaEngine: LlamaEngine, private val characterMan
 
     // Callback for ESP32 reactions
     var onGameReaction: (String, Boolean, Boolean) -> Unit = { _, _, _ -> }
+
+    // Callback for state changes that happen off the calling thread (bot moves)
+    var onGameStateChanged: ((Game.State?) -> Unit)? = null
 
     fun getCurrentState(): Game.State? = currentGame
 

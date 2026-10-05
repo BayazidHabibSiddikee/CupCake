@@ -25,6 +25,14 @@ class GameViewModel @Inject constructor(
     private val _showGameSelector = MutableStateFlow(false)
     val showGameSelector = _showGameSelector.asStateFlow()
 
+    init {
+        gameManager.onGameStateChanged = { state ->
+            _gameState.value = state?.let {
+                com.cupcake.game.GameManager.Result(true, "Bot moved", it)
+            }
+        }
+    }
+
     fun setShowGameSelector(visible: Boolean) {
         _showGameSelector.value = visible
     }
