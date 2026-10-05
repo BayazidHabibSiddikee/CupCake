@@ -208,8 +208,7 @@ class ChatViewModel @Inject constructor(
 
         viewModelScope.launch {
             var fullResponse = ""
-            val character = characterManager.getCurrentCharacter()
-            val prompt = buildPrompt(text, character)
+            val prompt = buildPrompt(text)
 
             try {
                 llamaEngine.generateStream(prompt).consumeEach { token ->
@@ -248,9 +247,11 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    private fun buildPrompt(userInput: String, character: Character?): String {
+    private fun buildPrompt(userInput: String): String {
+        // Each session is locked to one character, so use this session's
+        // character - not the global "current" selection.
         val systemPrompt = characterManager.getSystemPromptForCharacter(
-            character?.id ?: "cute_companion"
+            _currentCharacter.value?.id ?: characterId
         )
         
         // Get recent messages for context
@@ -308,12 +309,6 @@ Assistant:""".trimIndent()
     }
 
     // Character management
-    fun selectCharacter(characterId: String) {
-        if (characterManager.selectCharacter(characterId)) {
-            loadCurrentCharacter()
-        }
-    }
-
     fun getAvailableCharacters(): List<Character> = characterManager.getAllCharacters()
 
     // Energy/Ad
