@@ -65,3 +65,12 @@
 -dontwarn com.github.mikephil.charting.**
 -dontwarn com.google.accompanist.**
 -dontwarn androidx.bluetooth.**
+
+# Ktor Netty engine: optional integrations not bundled on Android
+-dontwarn reactor.**
+-dontwarn io.netty.**
+-dontwarn org.conscrypt.**
+-dontwarn org.bouncycastle.**
+-dontwarn org.openjsse.**
+-dontwarn org.slf4j.**
+-dontwarn java.lang.management.**
