@@ -9,12 +9,16 @@ import io.ktor.server.websocket.*
 import io.ktor.websocket.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import org.json.JSONObject
 import java.net.InetSocketAddress
 
 object EspWebSocketServer {
@@ -25,24 +29,40 @@ object EspWebSocketServer {
 
     private var server: ApplicationEngine? = null
     private var serverScope: CoroutineScope? = null
+    private val ioScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val sessions = mutableMapOf<String, WebSocketSession>()
     private val messageChannel = Channel<IncomingMessage>(100)
     private var onMessageReceived: ((IncomingMessage) -> Unit)? = null
     private var onConnectionChange: ((String, Boolean) -> Unit)? = null
 
+    fun setOnConnectionChangeListener(listener: ((String, Boolean) -> Unit)?) {
+        onConnectionChange = listener
+    }
+
+    fun setOnMessageReceivedListener(listener: ((IncomingMessage) -> Unit)?) {
+        onMessageReceived = listener
+    }
+
+    @Serializable
     data class IncomingMessage(
-        val sessionId: String,
-        val type: String,
-        val payload: String,
+        val sessionId: String = "",
+        val type: String = "",
+        val payload: String = "",
         val timestamp: Long = System.currentTimeMillis()
     )
 
     data class OutgoingMessage(
         val type: String,
-        val payload: Any,
+        val payload: Map<String, Any?> = emptyMap(),
         val timestamp: Long = System.currentTimeMillis()
     ) {
-        fun toJson(): String = json.encodeToString(this)
+        fun toJson(): String = JSONObject(
+            mapOf(
+                "type" to type,
+                "payload" to JSONObject(payload).toString(),
+                "timestamp" to timestamp
+            )
+        ).toString()
     }
 
     // Message types
@@ -115,11 +135,11 @@ object EspWebSocketServer {
         }
     }
 
-    private suspend fun handleWebSocketSession() {
+    private suspend fun DefaultWebSocketSession.handleWebSocketSession() {
         val sessionId = "esp_${System.currentTimeMillis()}"
-        val session = WebSocketSession(sessionId, this@webSocket)
+        val session = WebSocketSession(sessionId, this)
         sessions[sessionId] = session
-        
+
         onConnectionChange?.invoke(sessionId, true)
         Log.i(TAG, "ESP32 connected: $sessionId")
 
@@ -147,8 +167,8 @@ object EspWebSocketServer {
                     is Frame.Close -> {
                         close(CloseReason(CloseReason.Codes.NORMAL, "Client closed"))
                     }
-                    is Frame.Pong -> {
-                        // Heartbeat
+                    else -> {
+                        // Ping/Pong heartbeats ignored
                     }
                 }
             }
@@ -161,28 +181,35 @@ object EspWebSocketServer {
         }
     }
 
-    fun sendToEsp(sessionId: String, type: String, payload: Any): Boolean {
+    fun sendToEsp(
+        sessionId: String,
+        type: String,
+        payload: Map<String, Any?> = emptyMap()
+    ): Boolean {
         val session = sessions[sessionId] ?: return false
         val msg = OutgoingMessage(type, payload).toJson()
-        return try {
-            session.webSocket.send(Frame.Text(msg))
-            true
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to send to $sessionId", e)
-            false
+        ioScope.launch {
+            try {
+                session.webSocket.send(Frame.Text(msg))
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to send to $sessionId", e)
+            }
         }
+        return true
     }
 
-    fun broadcast(type: String, payload: Any): Int {
+    fun broadcast(type: String, payload: Map<String, Any?> = emptyMap()): Int {
         val msg = OutgoingMessage(type, payload).toJson()
         var sent = 0
         sessions.forEach { (id, session) ->
-            try {
-                session.webSocket.send(Frame.Text(msg))
-                sent++
-            } catch (e: Exception) {
-                Log.w(TAG, "Failed to broadcast to $id")
+            ioScope.launch {
+                try {
+                    session.webSocket.send(Frame.Text(msg))
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to broadcast to $id")
+                }
             }
+            sent++
         }
         return sent
     }
@@ -203,10 +230,12 @@ object EspWebSocketServer {
 
     fun sendAudio(audioData: ByteArray) {
         sessions.forEach { (_, session) ->
-            try {
-                session.webSocket.send(Frame.Binary(io.ktor.utils.io.ByteBuffer.wrap(audioData)))
-            } catch (e: Exception) {
-                Log.w(TAG, "Audio send failed")
+            ioScope.launch {
+                try {
+                    session.webSocket.send(Frame.Binary(true, audioData))
+                } catch (e: Exception) {
+                    Log.w(TAG, "Audio send failed")
+                }
             }
         }
     }
@@ -223,9 +252,18 @@ object EspWebSocketServer {
     fun isConnected(sessionId: String): Boolean = sessions.containsKey(sessionId)
 
     fun stop() {
-        sessions.values.forEach { it.webSocket.close(CloseReason(CloseReason.Codes.GOING_AWAY, "Server stopping")) }
+        val active = sessions.values.toList()
         sessions.clear()
-        server?.stop()
+        ioScope.launch {
+            active.forEach {
+                try {
+                    it.webSocket.close(CloseReason(CloseReason.Codes.GOING_AWAY, "Server stopping"))
+                } catch (e: Exception) {
+                    Log.w(TAG, "Error closing session", e)
+                }
+            }
+        }
+        server?.stop(1000, 2000)
         serverScope?.cancel()
         Log.i(TAG, "WebSocket server stopped")
     }

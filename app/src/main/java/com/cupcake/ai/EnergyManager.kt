@@ -6,16 +6,20 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
 import java.io.File
 
 class EnergyManager(private val context: Context) {
 
-    private const val TAG = "EnergyManager"
-    private const val ENERGY_FILE = "energy_state.json"
-    private const val MAX_ENERGY = 30 * 60 * 1000L // 30 minutes in ms
-    private const val AD_REWARD_ENERGY = 30 * 60 * 1000L // 30 minutes per ad
-    private const val ENERGY_PER_MESSAGE = 30 * 1000L // 30 seconds per message
-    private const val ENERGY_PER_GAME = 60 * 1000L // 1 minute per game
+    companion object {
+        private const val TAG = "EnergyManager"
+        private const val ENERGY_FILE = "energy_state.json"
+        const val MAX_ENERGY = 30 * 60 * 1000L // 30 minutes in ms
+        const val AD_REWARD_ENERGY = 30 * 60 * 1000L // 30 minutes per ad
+        const val ENERGY_PER_MESSAGE = 30 * 1000L // 30 seconds per message
+        const val ENERGY_PER_GAME = 60 * 1000L // 1 minute per game
+    }
 
     private val _energy = MutableStateFlow(0L)
     val energy = _energy.asStateFlow()
@@ -116,6 +120,7 @@ class EnergyManager(private val context: Context) {
         return if (_isPro.value) 1f else (_energy.value.toFloat() / MAX_ENERGY).coerceIn(0f, 1f)
     }
 
+    @Serializable
     data class EnergyState(
         val energyRemaining: Long,
         val isPro: Boolean
@@ -125,7 +130,9 @@ class EnergyManager(private val context: Context) {
 // Ad Manager (placeholder for Google AdMob integration)
 class AdManager(private val context: Context) {
 
-    private const val TAG = "AdManager"
+    companion object {
+        private const val TAG = "AdManager"
+    }
 
     interface AdCallback {
         fun onAdLoaded()

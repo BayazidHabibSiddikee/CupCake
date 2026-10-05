@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.cupcake.ai.CharacterManager
 import com.cupcake.ai.EnergyManager
 import com.cupcake.ai.LlamaEngine
+import com.cupcake.data.model.Character
 import com.cupcake.game.GameManager
 import com.cupcake.network.EspWebSocketServer
 import com.cupcake.tts.TtsManager
@@ -13,6 +14,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -38,7 +40,7 @@ class ChatViewModel @Inject constructor(
     private val _currentResponse = MutableStateFlow("")
     val currentResponse = _currentResponse.asStateFlow()
 
-    private val _currentCharacter = MutableStateFlow<CharacterManager.Character?>(null)
+    private val _currentCharacter = MutableStateFlow<Character?>(null)
     val currentCharacter = _currentCharacter.asStateFlow()
 
     private val _energy = MutableStateFlow(0L)
@@ -96,7 +98,7 @@ class ChatViewModel @Inject constructor(
     }
 
     private fun setupEspCallbacks() {
-        espServer.onConnectionChange = { sessionId, connected ->
+        espServer.setOnConnectionChangeListener { sessionId, connected ->
             viewModelScope.launch {
                 _connectedDevices.value = espServer.getConnectedDevices()
             }
@@ -164,7 +166,7 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    private fun buildPrompt(userInput: String, character: CharacterManager.Character?): String {
+    private fun buildPrompt(userInput: String, character: Character?): String {
         val systemPrompt = characterManager.getSystemPromptForCharacter(
             character?.id ?: "cute_companion"
         )
@@ -230,7 +232,7 @@ Assistant:""".trimIndent()
         }
     }
 
-    fun getAvailableCharacters(): List<CharacterManager.Character> = characterManager.getAllCharacters()
+    fun getAvailableCharacters(): List<Character> = characterManager.getAllCharacters()
 
     // Energy/Ad
     fun watchAdForEnergy() {

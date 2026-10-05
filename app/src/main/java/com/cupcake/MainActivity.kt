@@ -3,8 +3,8 @@ package com.cupcake
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.viewModels
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -13,6 +13,7 @@ import com.cupcake.ui.screen.character.CharacterScreen
 import com.cupcake.ui.screen.device.DeviceScreen
 import com.cupcake.ui.screen.game.GameScreen
 import com.cupcake.ui.screen.home.HomeScreen
+import com.cupcake.ui.screen.home.HomeViewModel
 import com.cupcake.ui.screen.settings.SettingsScreen
 import com.cupcake.ui.screen.systemprompt.SystemPromptScreen
 import com.cupcake.ui.theme.CupCakeTheme
@@ -58,7 +59,7 @@ class MainActivity : ComponentActivity() {
                         route = "chat/{conversationId}",
                         arguments = listOf(androidx.navigation.navArgument("conversationId") { type = androidx.navigation.NavType.StringType })
                     ) { backStackEntry ->
-                        val conversationId = backStackEntry.getString()!!
+                        val conversationId = backStackEntry.arguments?.getString("conversationId")!!
                         ChatScreen(conversationId = conversationId)
                     }
                     
@@ -66,7 +67,7 @@ class MainActivity : ComponentActivity() {
                         route = "device/{deviceId}",
                         arguments = listOf(androidx.navigation.navArgument("deviceId") { type = androidx.navigation.NavType.StringType })
                     ) { backStackEntry ->
-                        val deviceId = backStackEntry.getString()!!
+                        val deviceId = backStackEntry.arguments?.getString("deviceId")!!
                         DeviceScreen(deviceId = deviceId)
                     }
                     
@@ -86,7 +87,7 @@ class MainActivity : ComponentActivity() {
                         route = "systemprompt/{promptId?}",
                         arguments = listOf(androidx.navigation.navArgument("promptId") { type = androidx.navigation.NavType.StringType; defaultValue = "" })
                     ) { backStackEntry ->
-                        val promptId = backStackEntry.getString()?.takeIf { it.isNotBlank() }
+                        val promptId = backStackEntry.arguments?.getString("promptId")?.takeIf { it.isNotBlank() }
                         SystemPromptScreen(
                             promptId = promptId,
                             onClose = { navController.popBackStack() }

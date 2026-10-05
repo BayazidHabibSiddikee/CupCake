@@ -1,8 +1,10 @@
 package com.cupcake.game
 
 import com.cupcake.ai.CharacterManager
+import com.cupcake.ai.LlamaEngine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import java.util.Random
 
@@ -126,7 +128,7 @@ object TicTacToeEngine {
 
     private fun getPerfectMove(board: Game.TicTacToeBoard): Int = minimax(board, Game.Player.BOT).position
 
-    private fun getCheatingMove(board: Game.TicTacToeBoard): Int {
+    internal fun getCheatingMove(board: Game.TicTacToeBoard): Int {
         // If human about to win, overwrite their piece
         for (line in WIN_LINES) {
             val cells = line.map { board.get(it) }
@@ -150,7 +152,7 @@ object TicTacToeEngine {
                 val results = mutableListOf<MinimaxResult>()
                 for (i in 0..8) {
                     if (board.get(i) == null) {
-                        val newBoard = board.copy()
+                        val newBoard = board.copy() as Game.TicTacToeBoard
                         newBoard.set(i, player)
                         val nextPlayer = if (player == Game.Player.BOT) Game.Player.HUMAN else Game.Player.BOT
                         results.add(minimax(newBoard, nextPlayer).copy(position = i))
@@ -202,12 +204,12 @@ class GameManager(private val llamaEngine: LlamaEngine, private val characterMan
     }
 
     fun makeHumanMove(position: Int): Game.Result {
-        val game = currentGame ?: return Game.Result(false, "No active game")
-        if (game.status != Game.GameStatus.PLAYING) return Game.Result(false, "Game over")
-        if (game.currentPlayer != Game.Player.HUMAN) return Game.Result(false, "Not your turn")
+        val game = currentGame ?: return Result(false, "No active game")
+        if (game.status != Game.GameStatus.PLAYING) return Result(false, "Game over")
+        if (game.currentPlayer != Game.Player.HUMAN) return Result(false, "Not your turn")
 
-        val board = game.board as? Game.TicTacToeBoard ?: return Game.Result(false, "Invalid board")
-        if (!board.set(position, Game.Player.HUMAN)) return Game.Result(false, "Invalid move")
+        val board = game.board as? Game.TicTacToeBoard ?: return Result(false, "Invalid board")
+        if (!board.set(position, Game.Player.HUMAN)) return Result(false, "Invalid move")
 
         val newMove = Game.Move(Game.Player.HUMAN, position)
         val newHistory = game.moveHistory + newMove
@@ -222,13 +224,13 @@ class GameManager(private val llamaEngine: LlamaEngine, private val characterMan
                 moveHistory = newHistory
             )
             triggerReaction(winner == Game.Player.HUMAN)
-            return Game.Result(true, "Game over", currentGame)
+            return Result(true, "Game over", currentGame)
         }
 
         if (board.isFull()) {
             currentGame = game.copy(board = board, status = Game.GameStatus.DRAW, moveHistory = newHistory)
             triggerReaction(false, isDraw = true)
-            return Game.Result(true, "Draw", currentGame)
+            return Result(true, "Draw", currentGame)
         }
 
         // Bot's turn
@@ -244,7 +246,7 @@ class GameManager(private val llamaEngine: LlamaEngine, private val characterMan
             makeBotMove()
         }
 
-        return Game.Result(true, "Move made", currentGame)
+        return Result(true, "Move made", currentGame)
     }
 
     private fun makeBotMove() {
