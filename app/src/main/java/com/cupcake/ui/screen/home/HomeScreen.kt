@@ -89,7 +89,7 @@ fun HomeScreen(
                             verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
                             Icon(
-                                painter = androidx.compose.material.icons.Icons.Filled.ChatBubbleOutline,
+                                imageVector = Icons.Filled.ChatBubbleOutline,
                                 contentDescription = null,
                                 modifier = Modifier.size(64.dp),
                                 tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant

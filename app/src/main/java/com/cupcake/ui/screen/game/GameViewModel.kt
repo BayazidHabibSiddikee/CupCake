@@ -25,6 +25,10 @@ class GameViewModel @Inject constructor(
     private val _showGameSelector = MutableStateFlow(false)
     val showGameSelector = _showGameSelector.asStateFlow()
 
+    fun setShowGameSelector(visible: Boolean) {
+        _showGameSelector.value = visible
+    }
+
     val selectedDifficulty = MutableStateFlow(com.cupcake.game.TicTacToeEngine.Difficulty.NORMAL)
 
     fun startGame(gameOption: GameOption, difficulty: com.cupcake.game.TicTacToeEngine.Difficulty) {

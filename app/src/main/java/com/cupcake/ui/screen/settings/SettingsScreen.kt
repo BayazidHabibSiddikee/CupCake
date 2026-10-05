@@ -28,7 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -144,13 +144,13 @@ fun SettingsScreen(
                 viewModel.addProvider(name, type, url, apiKey)
                 viewModel.showAddProviderDialog.value = false
             },
-            providerType = selectedProviderType.value,
+            providerType = selectedProviderType,
             onProviderTypeChange = { viewModel.selectedProviderType.value = it },
-            name = newProviderName.value,
+            name = newProviderName,
             onNameChange = { viewModel.newProviderName.value = it },
-            url = newProviderUrl.value,
+            url = newProviderUrl,
             onUrlChange = { viewModel.newProviderUrl.value = it },
-            apiKey = newProviderApiKey.value,
+            apiKey = newProviderApiKey,
             onApiKeyChange = { viewModel.newProviderApiKey.value = it }
         )
     }

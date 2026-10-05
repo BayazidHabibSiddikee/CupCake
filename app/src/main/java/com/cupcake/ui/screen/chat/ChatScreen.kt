@@ -106,7 +106,7 @@ fun ChatHeader(
 ) {
     androidx.compose.material3.Surface(
         modifier = Modifier.fillMaxWidth(),
-        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerLow
+        color = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerLow
     ) {
         Column(
             modifier = Modifier.padding(16.dp),

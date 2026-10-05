@@ -27,7 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -103,7 +103,7 @@ fun CharacterScreen(
                 Button(onClick = { 
                     viewModel.saveCharacter()
                     viewModel.showCreateDialog.value = false
-                }, enabled = newCharName.value.isNotBlank() && newCharPrompt.value.isNotBlank()) {
+                }, enabled = newCharName.isNotBlank() && newCharPrompt.isNotBlank()) {
                     Text(viewModel.editingCharacterId.value?.let { "Save" } ?: "Create")
                 }
             },
@@ -119,7 +119,7 @@ fun CharacterScreen(
             text = {
                 Column(Modifier.padding(16.dp).fillMaxWidth()) {
                     TextField(
-                        value = newCharName.value,
+                        value = newCharName,
                         onValueChange = { viewModel.newCharName.value = it },
                         modifier = Modifier.fillMaxWidth(),
                         label = { Text("Name") },
@@ -130,7 +130,7 @@ fun CharacterScreen(
                     androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(top = 16.dp))
 
                     TextField(
-                        value = newCharPrompt.value,
+                        value = newCharPrompt,
                         onValueChange = { viewModel.newCharPrompt.value = it },
                         modifier = Modifier.fillMaxWidth(),
                         label = { Text("System Prompt") },
@@ -142,7 +142,7 @@ fun CharacterScreen(
                     androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(top = 16.dp))
 
                     TextField(
-                        value = newCharPersonality.value,
+                        value = newCharPersonality,
                         onValueChange = { viewModel.newCharPersonality.value = it },
                         modifier = Modifier.fillMaxWidth(),
                         label = { Text("Personality ID") },

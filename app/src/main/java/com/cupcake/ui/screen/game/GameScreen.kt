@@ -65,7 +65,7 @@ fun GameScreen(
                             Icon(imageVector = androidx.compose.material.icons.Icons.Filled.Close, contentDescription = "End game")
                         }
                     } else {
-                        IconButton(onClick = { viewModel.showGameSelector.value = true }) {
+                        IconButton(onClick = { viewModel.setShowGameSelector(true) }) {
                             Icon(imageVector = androidx.compose.material.icons.Icons.Filled.VideogameAsset, contentDescription = "New game")
                         }
                     }
@@ -129,9 +129,17 @@ fun GameScreen(
                 }
             } else {
                 // Active game screen
-                when (activeGameState.state.gameType) {
+                val boardState = activeGameState.state
+                if (boardState == null) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("No active game", fontSize = 18.sp)
+                    }
+                } else when (boardState.gameType) {
                     com.cupcake.game.Game.GameType.TIC_TAC_TOE -> TicTacToeBoard(
-                        state = activeGameState.state,
+                        state = boardState,
                         onCellClick = { pos -> viewModel.makeMove(pos) },
                         onRestart = { viewModel.restartGame() }
                     )
@@ -140,7 +148,7 @@ fun GameScreen(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("${activeGameState.state.gameType.name} coming soon!", fontSize = 18.sp)
+                            Text("${boardState.gameType.name} coming soon!", fontSize = 18.sp)
                         }
                     }
                 }

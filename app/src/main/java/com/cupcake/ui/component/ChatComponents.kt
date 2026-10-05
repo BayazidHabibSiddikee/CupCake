@@ -133,7 +133,7 @@ fun TypingIndicator() {
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
             animation = tween(600, delayMillis = 0),
-            repeatMode = RepeatMode.REVERSE
+            repeatMode = RepeatMode.Reverse
         ),
         label = "alpha1"
     )
@@ -142,7 +142,7 @@ fun TypingIndicator() {
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
             animation = tween(600, delayMillis = 200),
-            repeatMode = RepeatMode.REVERSE
+            repeatMode = RepeatMode.Reverse
         ),
         label = "alpha2"
     )
@@ -151,7 +151,7 @@ fun TypingIndicator() {
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
             animation = tween(600, delayMillis = 400),
-            repeatMode = RepeatMode.REVERSE
+            repeatMode = RepeatMode.Reverse
         ),
         label = "alpha3"
     )
