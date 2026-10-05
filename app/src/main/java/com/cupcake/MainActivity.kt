@@ -3,7 +3,6 @@ package com.cupcake
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -18,20 +17,16 @@ import com.cupcake.ui.screen.settings.SettingsScreen
 import com.cupcake.ui.screen.systemprompt.SystemPromptScreen
 import com.cupcake.ui.theme.CupCakeTheme
 import dagger.hilt.android.AndroidEntryPoint
-import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
-
-    @Inject
-    lateinit var viewModelFactory: ViewModelProvider.Factory
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             CupCakeTheme {
                 val navController = rememberNavController()
-                val homeViewModel: HomeViewModel = viewModel(factory = viewModelFactory)
+                val homeViewModel: HomeViewModel = viewModel()
                 
                 NavHost(navController, startDestination = "home") {
                     composable("home") {

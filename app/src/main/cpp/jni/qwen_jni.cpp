@@ -75,7 +75,7 @@ private:
 // =============================================================================
 
 JNIEXPORT jint JNICALL
-Java_com_cupcake_native_QwenNative_initModel(
+Java_com_cupcake_jni_QwenNative_initModel(
     JNIEnv* env,
     jobject thiz,
     jstring modelPath,
@@ -116,7 +116,7 @@ Java_com_cupcake_native_QwenNative_initModel(
 }
 
 JNIEXPORT jint JNICALL
-Java_com_cupcake_native_QwenNative_generateStream(
+Java_com_cupcake_jni_QwenNative_generateStream(
     JNIEnv* env,
     jobject thiz,
     jstring prompt,
@@ -154,7 +154,7 @@ Java_com_cupcake_native_QwenNative_generateStream(
 }
 
 JNIEXPORT void JNICALL
-Java_com_cupcake_native_QwenNative_releaseModel(
+Java_com_cupcake_jni_QwenNative_releaseModel(
     JNIEnv* env,
     jobject thiz
 ) {
@@ -168,7 +168,7 @@ Java_com_cupcake_native_QwenNative_releaseModel(
 }
 
 JNIEXPORT jstring JNICALL
-Java_com_cupcake_native_QwenNative_getModelInfo(
+Java_com_cupcake_jni_QwenNative_getModelInfo(
     JNIEnv* env,
     jobject thiz
 ) {
@@ -183,7 +183,7 @@ Java_com_cupcake_native_QwenNative_getModelInfo(
 }
 
 JNIEXPORT jboolean JNICALL
-Java_com_cupcake_native_QwenNative_isModelLoaded(
+Java_com_cupcake_jni_QwenNative_isModelLoaded(
     JNIEnv* env,
     jobject thiz
 ) {

@@ -24,7 +24,11 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${ANDROID_ABI})
 # =============================================================================
 # LLAMA.CPP (Primary inference engine)
 # =============================================================================
-# llama.cpp is added as a subdirectory - it handles its own GGML internally
+# llama.cpp is added as a subdirectory - it handles its own GGML internally.
+# NOTE: ggml backends must be STATIC on Android. Shared ggml .so files fail
+# to link (hidden-visibility symbols such as ggml_aligned_malloc are not
+# exported across the .so boundary). The JNI libs below stay SHARED.
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/third_party/llama.cpp)
 
 # =============================================================================
@@ -77,6 +81,7 @@ add_library(qwen_jni SHARED
 )
 
 target_include_directories(qwen_jni PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/jni
     ${CMAKE_CURRENT_SOURCE_DIR}/qwen
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llama.cpp/include

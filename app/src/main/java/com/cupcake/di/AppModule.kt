@@ -11,7 +11,7 @@ import com.cupcake.domain.repository.ChatRepository
 import com.cupcake.domain.repository.ModelRepository
 import com.cupcake.domain.repository.SystemPromptRepository
 import com.cupcake.game.GameManager
-import com.cupcake.native.QwenNative
+import com.cupcake.jni.QwenNative
 import com.cupcake.network.EspWebSocketServer
 import com.cupcake.tts.TtsManager
 import com.google.common.util.concurrent.ListeningExecutorService

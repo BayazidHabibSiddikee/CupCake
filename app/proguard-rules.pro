@@ -1,8 +1,8 @@
 # ProGuard rules for CupCake
 
 # Keep native JNI interfaces
--keep class com.cupcake.native.** { *; }
--keepclassmembers class com.cupcake.native.** {
+-keep class com.cupcake.jni.** { *; }
+-keepclassmembers class com.cupcake.jni.** {
     native <methods>;
 }
 
@@ -58,7 +58,7 @@
 -mergeinterfacesaggressively
 
 # Don't warn about missing references
--dontwarn com.cupcake.native.**
+-dontwarn com.cupcake.jni.**
 -dontwarn kotlinx.coroutines.**
 -dontwarn kotlinx.serialization.**
 -dontwarn coil.**

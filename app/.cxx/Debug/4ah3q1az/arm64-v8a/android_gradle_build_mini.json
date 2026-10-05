@@ -1,0 +1,69 @@
+{
+  "buildFiles": [
+    "/home/sword/Documents/android/CupCake/app/src/main/cpp/CMakeLists.txt",
+    "/home/sword/Documents/android/CupCake/app/src/main/cpp/third_party/llama.cpp/CMakeLists.txt",
+    "/home/sword/Documents/android/CupCake/app/src/main/cpp/third_party/llama.cpp/cmake/build-info.cmake",
+    "/home/sword/Documents/android/CupCake/app/src/main/cpp/third_party/llama.cpp/cmake/llama-config.cmake.in",
+    "/home/sword/Documents/android/CupCake/app/src/main/cpp/third_party/llama.cpp/ggml/CMakeLists.txt",
+    "/home/sword/Documents/android/CupCake/app/src/main/cpp/third_party/llama.cpp/ggml/src/CMakeLists.txt",
+    "/home/sword/Documents/android/CupCake/app/src/main/cpp/third_party/llama.cpp/ggml/src/ggml-amx/CMakeLists.txt",
+    "/home/sword/Documents/android/CupCake/app/src/main/cpp/third_party/llama.cpp/ggml/src/ggml-cpu/CMakeLists.txt",
+    "/home/sword/Documents/android/CupCake/app/src/main/cpp/third_party/llama.cpp/src/CMakeLists.txt"
+  ],
+  "cleanCommandsComponents": [
+    [
+      "/opt/android-sdk/cmake/3.22.1/bin/ninja",
+      "-C",
+      "/home/sword/Documents/android/CupCake/app/.cxx/Debug/4ah3q1az/arm64-v8a",
+      "clean"
+    ]
+  ],
+  "buildTargetsCommandComponents": [
+    "/opt/android-sdk/cmake/3.22.1/bin/ninja",
+    "-C",
+    "/home/sword/Documents/android/CupCake/app/.cxx/Debug/4ah3q1az/arm64-v8a",
+    "{LIST_OF_TARGETS_TO_BUILD}"
+  ],
+  "libraries": {
+    "ggml::@6fb243c56d1be69d9933": {
+      "artifactName": "ggml",
+      "abi": "arm64-v8a",
+      "output": "/home/sword/Documents/android/CupCake/app/.cxx/Debug/4ah3q1az/arm64-v8a/third_party/llama.cpp/ggml/src/libggml.a",
+      "runtimeFiles": []
+    },
+    "llama::@bf716c64e9230b199072": {
+      "artifactName": "llama",
+      "abi": "arm64-v8a",
+      "output": "/home/sword/Documents/android/CupCake/app/.cxx/Debug/4ah3q1az/arm64-v8a/third_party/llama.cpp/src/libllama.a",
+      "runtimeFiles": []
+    },
+    "qwen_jni::@6890427a1f51a3e7e1df": {
+      "artifactName": "qwen_jni",
+      "abi": "arm64-v8a",
+      "output": "/home/sword/Documents/android/CupCake/app/.cxx/Debug/4ah3q1az/arm64-v8a/arm64-v8a/libqwen_jni.so",
+      "runtimeFiles": [
+        "/opt/android-sdk/ndk/26.1.10909125/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/17/lib/linux/aarch64/libomp.so"
+      ]
+    },
+    "ggml-cpu::@b1633111e5ff0cd3db39": {
+      "artifactName": "ggml-cpu",
+      "abi": "arm64-v8a",
+      "output": "/home/sword/Documents/android/CupCake/app/.cxx/Debug/4ah3q1az/arm64-v8a/third_party/llama.cpp/ggml/src/ggml-cpu/libggml-cpu.a",
+      "runtimeFiles": []
+    },
+    "llama_jni::@6890427a1f51a3e7e1df": {
+      "artifactName": "llama_jni",
+      "abi": "arm64-v8a",
+      "output": "/home/sword/Documents/android/CupCake/app/.cxx/Debug/4ah3q1az/arm64-v8a/arm64-v8a/libllama_jni.so",
+      "runtimeFiles": [
+        "/opt/android-sdk/ndk/26.1.10909125/toolchains/llvm/prebuilt/linux-x86_64/lib/clang/17/lib/linux/aarch64/libomp.so"
+      ]
+    },
+    "ggml-base::@6fb243c56d1be69d9933": {
+      "artifactName": "ggml-base",
+      "abi": "arm64-v8a",
+      "output": "/home/sword/Documents/android/CupCake/app/.cxx/Debug/4ah3q1az/arm64-v8a/third_party/llama.cpp/ggml/src/libggml-base.a",
+      "runtimeFiles": []
+    }
+  }
+}

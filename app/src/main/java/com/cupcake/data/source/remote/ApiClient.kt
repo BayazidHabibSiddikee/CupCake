@@ -5,7 +5,7 @@ import com.cupcake.data.model.ChatMessage
 import com.cupcake.data.model.GenerationRequest
 import com.cupcake.data.model.ModelConfig
 import com.cupcake.data.model.StreamChunk
-import com.cupcake.native.QwenNative
+import com.cupcake.jni.QwenNative
 import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.flow

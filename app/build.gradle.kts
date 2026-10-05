@@ -253,6 +253,5 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
     }
 }
 
-tasks.withType<com.android.build.gradle.internal.tasks.StripDebugSymbolsTask> {
-    isEnabled = false
-}
+// NOTE: do not disable StripDebugSymbolsTask - packageDebug consumes its
+// output, and disabling it silently drops all native libs from the APK.

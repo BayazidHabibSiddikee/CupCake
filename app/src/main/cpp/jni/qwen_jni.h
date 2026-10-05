@@ -11,7 +11,7 @@ extern "C" {
 // Initialize the Qwen model from assets
 // Returns 0 on success, negative on error
 JNIEXPORT jint JNICALL
-Java_com_cupcake_native_QwenNative_initModel(
+Java_com_cupcake_jni_QwenNative_initModel(
     JNIEnv* env,
     jobject thiz,
     jstring modelPath,
@@ -23,7 +23,7 @@ Java_com_cupcake_native_QwenNative_initModel(
 // Generate text stream from prompt
 // Callback: onToken(jstring token), onComplete(jint status)
 JNIEXPORT jint JNICALL
-Java_com_cupcake_native_QwenNative_generateStream(
+Java_com_cupcake_jni_QwenNative_generateStream(
     JNIEnv* env,
     jobject thiz,
     jstring prompt,
@@ -36,21 +36,21 @@ Java_com_cupcake_native_QwenNative_generateStream(
 
 // Release model resources
 JNIEXPORT void JNICALL
-Java_com_cupcake_native_QwenNative_releaseModel(
+Java_com_cupcake_jni_QwenNative_releaseModel(
     JNIEnv* env,
     jobject thiz
 );
 
 // Get model info
 JNIEXPORT jstring JNICALL
-Java_com_cupcake_native_QwenNative_getModelInfo(
+Java_com_cupcake_jni_QwenNative_getModelInfo(
     JNIEnv* env,
     jobject thiz
 );
 
 // Check if model is loaded
 JNIEXPORT jboolean JNICALL
-Java_com_cupcake_native_QwenNative_isModelLoaded(
+Java_com_cupcake_jni_QwenNative_isModelLoaded(
     JNIEnv* env,
     jobject thiz
 );

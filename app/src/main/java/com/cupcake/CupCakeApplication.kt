@@ -6,7 +6,7 @@ import com.cupcake.ai.CharacterManager
 import com.cupcake.ai.EnergyManager
 import com.cupcake.ai.LlamaEngine
 import com.cupcake.data.source.local.AppDatabase
-import com.cupcake.native.QwenNative
+import com.cupcake.jni.QwenNative
 import dagger.hilt.android.HiltAndroidApp
 
 @HiltAndroidApp

@@ -1,0 +1,9 @@
+/home/sword/Documents/android/CupCake/app/src/main/cpp/CMakeLists.txt
+/home/sword/Documents/android/CupCake/app/src/main/cpp/third_party/llama.cpp/CMakeLists.txt
+/home/sword/Documents/android/CupCake/app/src/main/cpp/third_party/llama.cpp/cmake/build-info.cmake
+/home/sword/Documents/android/CupCake/app/src/main/cpp/third_party/llama.cpp/cmake/llama-config.cmake.in
+/home/sword/Documents/android/CupCake/app/src/main/cpp/third_party/llama.cpp/ggml/CMakeLists.txt
+/home/sword/Documents/android/CupCake/app/src/main/cpp/third_party/llama.cpp/ggml/src/CMakeLists.txt
+/home/sword/Documents/android/CupCake/app/src/main/cpp/third_party/llama.cpp/ggml/src/ggml-amx/CMakeLists.txt
+/home/sword/Documents/android/CupCake/app/src/main/cpp/third_party/llama.cpp/ggml/src/ggml-cpu/CMakeLists.txt
+/home/sword/Documents/android/CupCake/app/src/main/cpp/third_party/llama.cpp/src/CMakeLists.txt
