@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Cherry -->
+    <path
+        android:fillColor="@color/cupcake_cherry"
+        android:pathData="M54,22m-8,0a8,8 0,1 1,16 0a8,8 0,1 1,-16 0" />
+    <!-- Frosting -->
+    <path
+        android:fillColor="@color/cupcake_frosting"
+        android:pathData="M28,66 C28,48 40,38 54,38 C68,38 80,48 80,66 Z" />
+    <!-- Cup -->
+    <path
+        android:fillColor="@color/cupcake_cup"
+        android:pathData="M32,66 L42,94 L66,94 L76,66 Z" />
+</vector>

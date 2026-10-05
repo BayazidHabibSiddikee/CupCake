@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <cloud-backup>
+        <!-- Chat DB + preferences are backed up; models and secrets are not. -->
+        <exclude domain="file" path="models/" />
+        <exclude domain="sharedpref" path="secret_prefs" />
+    </cloud-backup>
+</data-extraction-rules>
