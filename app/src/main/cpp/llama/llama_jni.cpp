@@ -85,6 +85,9 @@ Java_com_cupcake_ai_LlamaEngine_setCallback(
     JNIEnv* env, jobject thiz, jobject callback
 ) {
     env->GetJavaVM(&g_jvm);
+    if (g_callback) {
+        env->DeleteGlobalRef(g_callback);
+    }
     g_callback = env->NewGlobalRef(callback);
     jclass cls = env->GetObjectClass(g_callback);
     g_on_token = env->GetMethodID(cls, "onToken", "(Ljava/lang/String;)V");
@@ -106,38 +109,26 @@ Java_com_cupcake_ai_LlamaEngine_setSamplingParams(
     g_sampling_params.seed = seed;
 }
 
-static void emit_token(const std::string& token) {
+static void emit_token(JNIEnv* env, const std::string& token) {
     if (!g_callback || !g_on_token) return;
-    
-    JNIEnv* env;
-    if (g_jvm->AttachCurrentThread(&env, nullptr) != JNI_OK) return;
     
     jstring jtoken = env->NewStringUTF(token.c_str());
     env->CallVoidMethod(g_callback, g_on_token, jtoken);
     env->DeleteLocalRef(jtoken);
-    g_jvm->DetachCurrentThread();
 }
 
-static void emit_complete(int status) {
+static void emit_complete(JNIEnv* env, int status) {
     if (!g_callback || !g_on_complete) return;
     
-    JNIEnv* env;
-    if (g_jvm->AttachCurrentThread(&env, nullptr) != JNI_OK) return;
-    
     env->CallVoidMethod(g_callback, g_on_complete, status);
-    g_jvm->DetachCurrentThread();
 }
 
-static void emit_error(const std::string& error) {
+static void emit_error(JNIEnv* env, const std::string& error) {
     if (!g_callback || !g_on_error) return;
-    
-    JNIEnv* env;
-    if (g_jvm->AttachCurrentThread(&env, nullptr) != JNI_OK) return;
     
     jstring jerror = env->NewStringUTF(error.c_str());
     env->CallVoidMethod(g_callback, g_on_error, jerror);
     env->DeleteLocalRef(jerror);
-    g_jvm->DetachCurrentThread();
 }
 
 extern "C" JNIEXPORT jint JNICALL
@@ -173,6 +164,12 @@ Java_com_cupcake_ai_LlamaEngine_generate(
     
     // Run generation in background thread
     std::thread([=]() {
+        JNIEnv* env;
+        if (g_jvm->AttachCurrentThread(&env, nullptr) != JNI_OK) {
+            g_is_generating = false;
+            return;
+        }
+
         // Build sampler chain (llama.cpp b4122 API): penalties -> top_k -> top_p -> temp -> dist
         llama_sampler* smpl = llama_sampler_chain_init(llama_sampler_chain_default_params());
         llama_sampler_chain_add(smpl,
@@ -200,9 +197,10 @@ Java_com_cupcake_ai_LlamaEngine_generate(
         
         // Process prompt
         if (llama_decode(g_ctx, llama_batch_get_one(g_tokens.data(), (int32_t) g_tokens.size()))) {
-            emit_error("Failed to process prompt");
+            emit_error(env, "Failed to process prompt");
             g_is_generating = false;
             llama_sampler_free(smpl);
+            g_jvm->DetachCurrentThread();
             return;
         }
         
@@ -219,7 +217,7 @@ Java_com_cupcake_ai_LlamaEngine_generate(
             
             // Decode
             if (llama_decode(g_ctx, llama_batch_get_one(&id, 1))) {
-                emit_error("Decode failed");
+                emit_error(env, "Decode failed");
                 break;
             }
             
@@ -228,7 +226,7 @@ Java_com_cupcake_ai_LlamaEngine_generate(
             int len = llama_token_to_piece(g_model, id, buf, sizeof(buf), 0, true);
             if (len > 0) {
                 std::string token_str(buf, len);
-                emit_token(token_str);
+                emit_token(env, token_str);
             }
             
             generated++;
@@ -239,7 +237,8 @@ Java_com_cupcake_ai_LlamaEngine_generate(
         
         llama_sampler_free(smpl);
         g_is_generating = false;
-        emit_complete(0);
+        emit_complete(env, 0);
+        g_jvm->DetachCurrentThread();
     }).detach();
     
     return 0;
