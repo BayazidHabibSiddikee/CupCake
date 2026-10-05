@@ -15,16 +15,20 @@ import com.cupcake.network.EspWebSocketServer
 import com.cupcake.tts.TtsManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import dagger.hilt.android.lifecycle.HiltViewModel
 
 @HiltViewModel
 class ChatViewModel @Inject constructor(
+    @ApplicationContext private val appContext: Context,
     private val llamaEngine: LlamaEngine,
     private val characterManager: CharacterManager,
     private val gameManager: GameManager,
@@ -32,6 +36,16 @@ class ChatViewModel @Inject constructor(
     private val ttsManager: TtsManager,
     private val energyManager: EnergyManager
 ) : ViewModel() {
+
+    sealed interface ModelLoadState {
+        data object Idle : ModelLoadState
+        data object Loading : ModelLoadState
+        data object Ready : ModelLoadState
+        data class Error(val message: String) : ModelLoadState
+    }
+
+    private val _modelLoadState = MutableStateFlow<ModelLoadState>(ModelLoadState.Idle)
+    val modelLoadState = _modelLoadState.asStateFlow()
 
     // UI State
     private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
@@ -72,6 +86,23 @@ class ChatViewModel @Inject constructor(
         setupGameReactions()
         setupEspCallbacks()
         loadCurrentCharacter()
+        ensureModelLoaded()
+    }
+
+    /**
+     * Copies the bundled GGUF from assets on first run (large file, runs
+     * on IO) and initializes the native engine. Safe to call repeatedly.
+     */
+    fun ensureModelLoaded() {
+        if (llamaEngine.isReady() || _modelLoadState.value is ModelLoadState.Loading) return
+        _modelLoadState.value = ModelLoadState.Loading
+        viewModelScope.launch(Dispatchers.IO) {
+            val result = llamaEngine.loadModel(appContext)
+            _modelLoadState.value = result.fold(
+                onSuccess = { ModelLoadState.Ready },
+                onFailure = { ModelLoadState.Error(it.message ?: "Model load failed") }
+            )
+        }
     }
 
     private fun setupObservers() {
@@ -140,6 +171,17 @@ class ChatViewModel @Inject constructor(
         val userMessage = ChatMessage.user(text, currentConversationId)
         addMessage(userMessage)
 
+        if (!llamaEngine.isReady()) {
+            ensureModelLoaded()
+            addMessage(
+                ChatMessage.system(
+                    "⏳ Model is still loading, please wait a moment and try again.",
+                    currentConversationId
+                )
+            )
+            return
+        }
+
         _isGenerating.value = true
         _currentResponse.value = ""
 
@@ -148,9 +190,20 @@ class ChatViewModel @Inject constructor(
             val character = characterManager.getCurrentCharacter()
             val prompt = buildPrompt(text, character)
 
-            llamaEngine.generateStream(prompt).consumeEach { token ->
-                fullResponse += token
-                _currentResponse.value = fullResponse
+            try {
+                llamaEngine.generateStream(prompt).consumeEach { token ->
+                    fullResponse += token
+                    _currentResponse.value = fullResponse
+                }
+            } catch (e: Exception) {
+                Log.e("ChatViewModel", "Generation failed", e)
+                fullResponse = ""
+                addMessage(
+                    ChatMessage.system(
+                        "❌ Generation failed: ${e.message}",
+                        currentConversationId
+                    )
+                )
             }.also {
                 _isGenerating.value = false
                 _currentResponse.value = ""

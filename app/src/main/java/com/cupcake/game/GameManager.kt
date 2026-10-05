@@ -283,6 +283,9 @@ class GameManager(private val llamaEngine: LlamaEngine, private val characterMan
     }
 
     private fun triggerReaction(humanWon: Boolean, isDraw: Boolean = false) {
+        // LLM reactions need a loaded model; the game itself is fully playable
+        // without it.
+        if (!llamaEngine.isReady()) return
         val character = characterManager.getCurrentCharacter()
         val personality = character?.personality ?: "friendly"
 
@@ -293,14 +296,18 @@ class GameManager(private val llamaEngine: LlamaEngine, private val characterMan
         }
 
         CoroutineScope(Dispatchers.IO).launch {
-            val fullPrompt = characterManager.getSystemPromptForCharacter(
-                character?.id ?: "cute_companion",
-                "Game: ${gameType?.name}, Human won: $humanWon, Draw: $isDraw"
-            ) + "\n\nUser: $prompt\nAssistant:"
+            try {
+                val fullPrompt = characterManager.getSystemPromptForCharacter(
+                    character?.id ?: "cute_companion",
+                    "Game: ${gameType?.name}, Human won: $humanWon, Draw: $isDraw"
+                ) + "\n\nUser: $prompt\nAssistant:"
 
-            llamaEngine.generateStream(fullPrompt).consumeEach { token ->
-                // Send to ESP32 for face animation + TTS
-                onGameReaction(token, humanWon, isDraw)
+                llamaEngine.generateStream(fullPrompt).consumeEach { token ->
+                    // Send to ESP32 for face animation + TTS
+                    onGameReaction(token, humanWon, isDraw)
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("GameManager", "Reaction generation failed", e)
             }
         }
     }

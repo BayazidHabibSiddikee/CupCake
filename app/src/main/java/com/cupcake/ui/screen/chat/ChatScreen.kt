@@ -45,6 +45,7 @@ fun ChatScreen(
     val currentResponse by viewModel.currentResponse.collectAsStateWithLifecycle()
     val modelConfig by viewModel.modelConfig.collectAsStateWithLifecycle()
     val systemPrompt by viewModel.systemPrompt.collectAsStateWithLifecycle()
+    val modelLoadState by viewModel.modelLoadState.collectAsStateWithLifecycle()
 
     var scrollToBottom by remember { mutableStateOf(false) }
 
@@ -60,6 +61,27 @@ fun ChatScreen(
                 onModelConfigClick = { viewModel.onModelConfigClick() },
                 onSystemPromptClick = { viewModel.onSystemPromptClick() }
             )
+
+            // Model load status (first run copies ~500MB from assets)
+            when (val state = modelLoadState) {
+                is ChatViewModel.ModelLoadState.Loading -> {
+                    Text(
+                        text = "⏳ Loading on-device model…",
+                        fontSize = 12.sp,
+                        color = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                    )
+                }
+                is ChatViewModel.ModelLoadState.Error -> {
+                    Text(
+                        text = "❌ Model: ${state.message}",
+                        fontSize = 12.sp,
+                        color = androidx.compose.material3.MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                    )
+                }
+                else -> {}
+            }
 
             // Messages list
             LazyColumn(

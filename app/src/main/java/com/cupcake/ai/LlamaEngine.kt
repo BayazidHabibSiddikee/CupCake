@@ -41,7 +41,9 @@ class LlamaEngine private constructor() {
         fun copyModelFromAssets(context: Context, fileName: String): File {
             val modelDir = File(context.filesDir, "models")
             modelDir.mkdirs()
-            val modelFile = File(modelDir, fileName)
+            // fileName may include an assets-relative subdir (e.g. "models/x.gguf");
+            // the destination always uses just the base name to avoid doubled paths.
+            val modelFile = File(modelDir, File(fileName).name)
 
             if (modelFile.exists() && modelFile.length() > 0) {
                 Log.i(TAG, "Model already exists: ${modelFile.length()} bytes")

@@ -82,6 +82,12 @@ android {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
             matchingFallbacks += "release"
+            ndk {
+                // +x86_64 for the emulator (release stays ARM-only for size)
+                abiFilters.add("arm64-v8a")
+                abiFilters.add("armeabi-v7a")
+                abiFilters.add("x86_64")
+            }
         }
     }
 

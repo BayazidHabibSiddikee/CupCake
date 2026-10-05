@@ -36,7 +36,9 @@ class QwenNative private constructor() {
         fun copyModelFromAssets(context: Context, modelFileName: String): File {
             val modelDir = File(context.filesDir, "models")
             modelDir.mkdirs()
-            val modelFile = File(modelDir, modelFileName)
+            // modelFileName may include an assets-relative subdir; the destination
+            // always uses just the base name to avoid doubled paths.
+            val modelFile = File(modelDir, File(modelFileName).name)
 
             if (modelFile.exists() && modelFile.length() > 0) {
                 return modelFile
@@ -54,7 +56,7 @@ class QwenNative private constructor() {
         fun copyTokenizerFromAssets(context: Context, tokenizerFileName: String): File {
             val tokenizerDir = File(context.filesDir, "tokenizer")
             tokenizerDir.mkdirs()
-            val tokenizerFile = File(tokenizerDir, tokenizerFileName)
+            val tokenizerFile = File(tokenizerDir, File(tokenizerFileName).name)
 
             if (tokenizerFile.exists() && tokenizerFile.length() > 0) {
                 return tokenizerFile
