@@ -156,17 +156,15 @@ fun TypingIndicator() {
         label = "alpha3"
     )
 
+    val dotColor = androidx.compose.material3.MaterialTheme.colorScheme.primary
     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         Canvas(modifier = Modifier.size(8.dp)) {
-            val dotColor = androidx.compose.material3.MaterialTheme.colorScheme.primary
             drawCircle(color = dotColor.copy(alpha = alpha1), radius = 4f)
         }
         Canvas(modifier = Modifier.size(8.dp)) {
-            val dotColor = androidx.compose.material3.MaterialTheme.colorScheme.primary
             drawCircle(color = dotColor.copy(alpha = alpha2), radius = 4f)
         }
         Canvas(modifier = Modifier.size(8.dp)) {
-            val dotColor = androidx.compose.material3.MaterialTheme.colorScheme.primary
             drawCircle(color = dotColor.copy(alpha = alpha3), radius = 4f)
         }
     }

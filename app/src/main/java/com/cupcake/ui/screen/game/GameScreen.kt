@@ -98,7 +98,7 @@ fun GameScreen(
                             availableGames.forEach { game ->
                                 GameOptionCard(
                                     game = game,
-                                    onClick = { viewModel.startGame(game, selectedDifficulty.value) }
+                                    onClick = { viewModel.startGame(game, selectedDifficulty) }
                                 )
                             }
                         }
