@@ -67,6 +67,18 @@ sealed interface Game {
         override fun isFull(): Boolean = false
         override fun copy(): Board = this
     }
+
+    // Rock Paper Scissors Board
+    data class RpsBoard(
+        override val size: Int = 2,
+        var humanChoice: Int? = null,
+        var botChoice: Int? = null
+    ) : Board {
+        override fun get(position: Int): Player? = null
+        override fun set(position: Int, player: Player): Boolean = false
+        override fun isFull(): Boolean = humanChoice != null && botChoice != null
+        override fun copy(): Board = this.copy()
+    }
 }
 
 // Tic Tac Toe Engine
@@ -167,6 +179,19 @@ object TicTacToeEngine {
     enum class Difficulty { EASY, NORMAL, HARD, CHEATING }
 }
 
+object RockPaperScissorsEngine {
+    fun getBotMove(): Int = (0..2).random()
+    // 0: Rock, 1: Paper, 2: Scissors
+    fun getWinner(human: Int, bot: Int): Game.Player? {
+        if (human == bot) return null
+        return if ((human == 0 && bot == 2) || (human == 1 && bot == 0) || (human == 2 && bot == 1)) {
+            Game.Player.HUMAN
+        } else {
+            Game.Player.BOT
+        }
+    }
+}
+
 // Game Manager
 class GameManager(private val llamaEngine: LlamaEngine, private val characterManager: CharacterManager) {
 
@@ -193,6 +218,12 @@ class GameManager(private val llamaEngine: LlamaEngine, private val characterMan
                 currentPlayer = Game.Player.HUMAN,
                 status = Game.GameStatus.PLAYING
             )
+            Game.GameType.ROCK_PAPER_SCISSORS -> Game.State(
+                gameType = type,
+                board = Game.RpsBoard(),
+                currentPlayer = Game.Player.HUMAN,
+                status = Game.GameStatus.PLAYING
+            )
             else -> Game.State(
                 gameType = type,
                 board = Game.TicTacToeBoard(), // fallback
@@ -207,6 +238,32 @@ class GameManager(private val llamaEngine: LlamaEngine, private val characterMan
         val game = currentGame ?: return Result(false, "No active game")
         if (game.status != Game.GameStatus.PLAYING) return Result(false, "Game over")
         if (game.currentPlayer != Game.Player.HUMAN) return Result(false, "Not your turn")
+
+        if (game.gameType == Game.GameType.ROCK_PAPER_SCISSORS) {
+            val board = game.board as? Game.RpsBoard ?: return Result(false, "Invalid board")
+            val botMove = RockPaperScissorsEngine.getBotMove()
+            val winner = RockPaperScissorsEngine.getWinner(position, botMove)
+            
+            val newBoard = board.copy() as Game.RpsBoard
+            newBoard.humanChoice = position
+            newBoard.botChoice = botMove
+
+            val newHistory = game.moveHistory + Game.Move(Game.Player.HUMAN, position) + Game.Move(Game.Player.BOT, botMove)
+
+            currentGame = game.copy(
+                board = newBoard,
+                status = when (winner) {
+                    Game.Player.HUMAN -> Game.GameStatus.HUMAN_WON
+                    Game.Player.BOT -> Game.GameStatus.BOT_WON
+                    else -> Game.GameStatus.DRAW
+                },
+                winner = winner,
+                moveHistory = newHistory
+            )
+            triggerReaction(winner == Game.Player.HUMAN, winner == null)
+            onGameStateChanged?.invoke(currentGame)
+            return Result(true, "Game over", currentGame)
+        }
 
         val board = game.board as? Game.TicTacToeBoard ?: return Result(false, "Invalid board")
         if (!board.set(position, Game.Player.HUMAN)) return Result(false, "Invalid move")

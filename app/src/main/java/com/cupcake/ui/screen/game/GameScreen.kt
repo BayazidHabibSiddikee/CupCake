@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -84,7 +86,8 @@ fun GameScreen(
                 ) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        modifier = Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())
                     ) {
                         Text("Choose a Game", fontSize = 24.sp, fontWeight = FontWeight.Bold)
                         Text("Play with your bot companion!", color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)
@@ -143,6 +146,11 @@ fun GameScreen(
                         onCellClick = { pos -> viewModel.makeMove(pos) },
                         onRestart = { viewModel.restartGame() }
                     )
+                    com.cupcake.game.Game.GameType.ROCK_PAPER_SCISSORS -> RpsBoardUI(
+                        state = boardState,
+                        onChoice = { pos -> viewModel.makeMove(pos) },
+                        onRestart = { viewModel.restartGame() }
+                    )
                     else -> {
                         Box(
                             modifier = Modifier.fillMaxSize(),
@@ -153,6 +161,67 @@ fun GameScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun RpsBoardUI(
+    state: com.cupcake.game.Game.State,
+    onChoice: (Int) -> Unit,
+    onRestart: () -> Unit
+) {
+    val board = state.board as? com.cupcake.game.Game.RpsBoard ?: return
+    val choices = listOf("🪨" to "Rock", "📄" to "Paper", "✂️" to "Scissors")
+    
+    Column(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(24.dp)
+    ) {
+        Text(
+            text = when (state.status) {
+                com.cupcake.game.Game.GameStatus.PLAYING -> "Choose your weapon!"
+                com.cupcake.game.Game.GameStatus.HUMAN_WON -> "You won! 🎉"
+                com.cupcake.game.Game.GameStatus.BOT_WON -> "Bot won! 🤖"
+                else -> "Draw! 🤝"
+            },
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold
+        )
+
+        if (state.status == com.cupcake.game.Game.GameStatus.PLAYING) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                choices.forEachIndexed { index, (emoji, _) ->
+                    Button(
+                        onClick = { onChoice(index) },
+                        modifier = Modifier.size(80.dp),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Text(emoji, fontSize = 32.sp)
+                    }
+                }
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("You", fontSize = 16.sp)
+                    Text(choices[board.humanChoice ?: 0].first, fontSize = 48.sp)
+                }
+                Text("VS", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("Bot", fontSize = 16.sp)
+                    Text(choices[board.botChoice ?: 0].first, fontSize = 48.sp)
+                }
+            }
+            Button(onClick = onRestart) { Text("Play Again") }
         }
     }
 }
