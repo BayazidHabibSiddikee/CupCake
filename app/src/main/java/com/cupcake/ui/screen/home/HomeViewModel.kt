@@ -2,32 +2,19 @@ package com.cupcake.ui.screen.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.cupcake.domain.usecase.CreateConversationUseCase
-import com.cupcake.domain.usecase.GetConversationsUseCase
-import com.cupcake.data.model.Conversation
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
+import com.cupcake.ai.CharacterManager
+import com.cupcake.data.model.Character
 import javax.inject.Inject
 import dagger.hilt.android.lifecycle.HiltViewModel
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    private val getConversationsUseCase: GetConversationsUseCase,
-    private val createConversationUseCase: CreateConversationUseCase
+    private val characterManager: CharacterManager
 ) : ViewModel() {
 
-    val conversations: StateFlow<List<Conversation>> = getConversationsUseCase()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    // Each character owns exactly one chat session. The Home screen is a
+    // launcher over these single sessions - no free-form "new conversation".
+    private val characters: List<Character> = characterManager.getAllCharacters()
 
-    val showNewChatDialog = MutableStateFlow(false)
-
-    fun createConversation(title: String) {
-        viewModelScope.launch {
-            createConversationUseCase(title)
-        }
-    }
+    fun listCharacters(): List<Character> = characters
 }

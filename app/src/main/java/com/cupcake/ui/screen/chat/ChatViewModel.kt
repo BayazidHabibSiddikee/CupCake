@@ -16,6 +16,8 @@ import com.cupcake.tts.TtsManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import android.content.Context
+import androidx.lifecycle.SavedStateHandle
+import com.cupcake.chat.ChatSessionStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,6 +31,8 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 @HiltViewModel
 class ChatViewModel @Inject constructor(
     @ApplicationContext private val appContext: Context,
+    private val savedStateHandle: SavedStateHandle,
+    private val sessionStore: ChatSessionStore,
     private val llamaEngine: LlamaEngine,
     private val characterManager: CharacterManager,
     private val gameManager: GameManager,
@@ -36,6 +40,11 @@ class ChatViewModel @Inject constructor(
     private val ttsManager: TtsManager,
     private val energyManager: EnergyManager
 ) : ViewModel() {
+
+    val characterId: String =
+        savedStateHandle.get<String>("characterId") ?: "cute_companion"
+
+    val conversationId: String = sessionStore.conversationIdFor(characterId)
 
     sealed interface ModelLoadState {
         data object Idle : ModelLoadState
@@ -47,9 +56,10 @@ class ChatViewModel @Inject constructor(
     private val _modelLoadState = MutableStateFlow<ModelLoadState>(ModelLoadState.Idle)
     val modelLoadState = _modelLoadState.asStateFlow()
 
-    // UI State
-    private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
-    val messages = _messages.asStateFlow()
+    // UI State - messages live in the shared per-character session store,
+    // so leaving and reopening a character resumes the same session.
+    val messages: kotlinx.coroutines.flow.StateFlow<List<ChatMessage>> =
+        sessionStore.messages(characterId)
 
     private val _isGenerating = MutableStateFlow(false)
     val isGenerating = _isGenerating.asStateFlow()
@@ -78,7 +88,6 @@ class ChatViewModel @Inject constructor(
     private val _gameState = MutableStateFlow<com.cupcake.game.GameManager.Result?>(null)
     val gameState = _gameState.asStateFlow()
 
-    private var currentConversationId = "default"
     private var systemPromptCache = ""
 
     init {
@@ -158,7 +167,8 @@ class ChatViewModel @Inject constructor(
     }
 
     private fun loadCurrentCharacter() {
-        val character = characterManager.getCurrentCharacter()
+        val character = characterManager.getCharacter(characterId)
+            ?: characterManager.getCurrentCharacter()
         _currentCharacter.value = character
         if (character != null) {
             systemPromptCache = characterManager.getSystemPromptForCharacter(character.id)
@@ -173,13 +183,13 @@ class ChatViewModel @Inject constructor(
             addMessage(
                 ChatMessage.system(
                     "⚡ Energy depleted! Watch an ad or upgrade to Pro to continue.",
-                    currentConversationId
+                    conversationId
                 )
             )
             return
         }
 
-        val userMessage = ChatMessage.user(text, currentConversationId)
+        val userMessage = ChatMessage.user(text, conversationId)
         addMessage(userMessage)
 
         if (!llamaEngine.isReady()) {
@@ -187,7 +197,7 @@ class ChatViewModel @Inject constructor(
             addMessage(
                 ChatMessage.system(
                     "⏳ Model is still loading, please wait a moment and try again.",
-                    currentConversationId
+                    conversationId
                 )
             )
             return
@@ -212,7 +222,7 @@ class ChatViewModel @Inject constructor(
                 addMessage(
                     ChatMessage.system(
                         "❌ Generation failed: ${e.message}",
-                        currentConversationId
+                        conversationId
                     )
                 )
             }.also {
@@ -226,7 +236,7 @@ class ChatViewModel @Inject constructor(
                     // Add assistant message
                     val assistantMessage = ChatMessage.assistant(
                         fullResponse.trim(),
-                        currentConversationId,
+                        conversationId,
                         modelUsed = _modelConfig.value.modelName
                     )
                     addMessage(assistantMessage)
@@ -244,7 +254,7 @@ class ChatViewModel @Inject constructor(
         )
         
         // Get recent messages for context
-        val recentMessages = _messages.value.takeLast(6).joinToString("\n") { msg ->
+        val recentMessages = messages.value.takeLast(6).joinToString("\n") { msg ->
             "${msg.role.name}: ${msg.content}"
         }
 
@@ -258,7 +268,7 @@ Assistant:""".trimIndent()
     }
 
     private fun addMessage(message: ChatMessage) {
-        _messages.value = _messages.value + message
+        sessionStore.addMessage(characterId, message)
     }
 
     private fun sendToEspForTts(text: String) {

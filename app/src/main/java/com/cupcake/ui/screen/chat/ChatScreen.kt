@@ -30,7 +30,8 @@ import com.cupcake.ui.theme.CupCakeTheme
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(
-    conversationId: String,
+    characterId: String,
+    onSwitchCharacter: (String) -> Unit,
     viewModel: ChatViewModel = hiltViewModel()
 ) {
     val messages by viewModel.messages.collectAsStateWithLifecycle()
@@ -80,9 +81,9 @@ fun ChatScreen(
             if (showCharacterPicker) {
                 CharacterPickerDialog(
                     characters = viewModel.getAvailableCharacters(),
-                    selectedId = currentCharacter?.id,
-                    onSelect = {
-                        viewModel.selectCharacter(it)
+                    selectedId = viewModel.characterId,
+                    onSelect = { id ->
+                        if (id != viewModel.characterId) onSwitchCharacter(id)
                         showCharacterPicker = false
                     },
                     onDismiss = { showCharacterPicker = false }
@@ -102,7 +103,7 @@ fun ChatScreen(
                 if (currentResponse.isNotEmpty()) {
                     item {
                         ChatMessageItem(
-                            message = ChatMessage.assistant(currentResponse, conversationId),
+                            message = ChatMessage.assistant(currentResponse, viewModel.conversationId),
                             isStreaming = true
                         )
                     }

@@ -45,8 +45,8 @@ class MainActivity : ComponentActivity() {
                     composable("home") {
                         HomeScreen(
                             viewModel = homeViewModel,
-                            onNavigateToChat = { conversationId ->
-                                navController.navigate("chat/$conversationId")
+                            onNavigateToChat = { characterId ->
+                                navController.navigate("chat/$characterId")
                             },
                             onNavigateToDevice = { deviceId ->
                                 navController.navigate("device/$deviceId")
@@ -64,11 +64,18 @@ class MainActivity : ComponentActivity() {
                     }
                     
                     composable(
-                        route = "chat/{conversationId}",
-                        arguments = listOf(androidx.navigation.navArgument("conversationId") { type = androidx.navigation.NavType.StringType })
+                        route = "chat/{characterId}",
+                        arguments = listOf(androidx.navigation.navArgument("characterId") { type = androidx.navigation.NavType.StringType })
                     ) { backStackEntry ->
-                        val conversationId = backStackEntry.arguments?.getString("conversationId")!!
-                        ChatScreen(conversationId = conversationId)
+                        val characterId = backStackEntry.arguments?.getString("characterId")!!
+                        ChatScreen(
+                            characterId = characterId,
+                            onSwitchCharacter = { id ->
+                                navController.navigate("chat/$id") {
+                                    popUpTo("chat/{characterId}") { inclusive = true }
+                                }
+                            }
+                        )
                     }
                     
                     composable(

@@ -7,35 +7,24 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.cupcake.data.model.Conversation
+import com.cupcake.data.model.Character
 import com.cupcake.ui.theme.CupCakeTheme
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Chat
-import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.VideogameAsset
@@ -50,26 +39,24 @@ fun HomeScreen(
     onNavigateToCharacters: () -> Unit,
     onNavigateToGames: () -> Unit
 ) {
-    val conversations by viewModel.conversations.collectAsStateWithLifecycle()
-    val showNewChatDialog by viewModel.showNewChatDialog.collectAsStateWithLifecycle()
-    var newChatTitle by remember { mutableStateOf("") }
+    val characters = viewModel.listCharacters()
 
     CupCakeTheme {
         Column(Modifier.fillMaxSize()) {
             TopAppBar(
                 title = { Text("CupCake") },
                 actions = {
-                    androidx.compose.material3.IconButton(onClick = onNavigateToCharacters) {
-                        Icon(
-                        imageVector = androidx.compose.material.icons.Icons.Filled.Psychology, contentDescription = "Characters")
-                    }
                     androidx.compose.material3.IconButton(onClick = onNavigateToGames) {
                         Icon(
-                        imageVector = androidx.compose.material.icons.Icons.Filled.VideogameAsset, contentDescription = "Games")
+                            imageVector = Icons.Filled.VideogameAsset,
+                            contentDescription = "Games"
+                        )
                     }
                     androidx.compose.material3.IconButton(onClick = onNavigateToSettings) {
                         Icon(
-                        imageVector = androidx.compose.material.icons.Icons.Filled.Settings, contentDescription = "Settings")
+                            imageVector = Icons.Filled.Settings,
+                            contentDescription = "Settings"
+                        )
                     }
                 },
                 colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
@@ -77,148 +64,67 @@ fun HomeScreen(
                 )
             )
 
-            Box(Modifier.fillMaxSize()) {
-                if (conversations.isEmpty()) {
-                    // Empty state
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.ChatBubbleOutline,
-                                contentDescription = null,
-                                modifier = Modifier.size(64.dp),
-                                tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text("No conversations yet", fontSize = 20.sp, fontWeight = FontWeight.Medium)
-                            Text("Start a new chat or connect a device", color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)
-                            
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Button(onClick = { viewModel.showNewChatDialog.value = true }) {
-                                    Text("New Chat")
-                                }
-                                androidx.compose.material3.OutlinedButton(onClick = onNavigateToCharacters) {
-                                    Icon(
-                        imageVector = androidx.compose.material.icons.Icons.Filled.Psychology, contentDescription = null)
-                                    Text("Choose Character")
-                                }
-                                androidx.compose.material3.OutlinedButton(onClick = onNavigateToGames) {
-                                    Icon(
-                        imageVector = androidx.compose.material.icons.Icons.Filled.VideogameAsset, contentDescription = null)
-                                    Text("Play Games")
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    // Conversations list
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(conversations) { conversation ->
-                            ConversationCard(
-                                conversation = conversation,
-                                onClick = { onNavigateToChat(conversation.id) },
-                                onLongClick = { /* show options */ }
-                            )
-                        }
-                    }
-                }
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    "Choose who you're talking to",
+                    style = androidx.compose.material3.MaterialTheme.typography.titleMedium,
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                )
 
-                // FAB for new chat
-                androidx.compose.material3.FloatingActionButton(
-                    onClick = { viewModel.showNewChatDialog.value = true },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                        .align(Alignment.BottomEnd)
+                // One persistent chat session per character.
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Icon(
-                        imageVector = androidx.compose.material.icons.Icons.Filled.Add, contentDescription = "New chat")
+                    items(characters) { character ->
+                        CharacterCard(
+                            character = character,
+                            onClick = { onNavigateToChat(character.id) }
+                        )
+                    }
                 }
             }
-        }
-
-        // New chat dialog
-        if (showNewChatDialog) {
-            androidx.compose.material3.AlertDialog(
-                onDismissRequest = { viewModel.showNewChatDialog.value = false },
-                confirmButton = {
-                    Button(onClick = {
-                        viewModel.createConversation(newChatTitle.ifBlank { "New Chat" })
-                        viewModel.showNewChatDialog.value = false
-                        newChatTitle = ""
-                    }, enabled = newChatTitle.isNotBlank()) {
-                        Text("Create")
-                    }
-                },
-                dismissButton = {
-                    Button(onClick = { viewModel.showNewChatDialog.value = false; newChatTitle = "" }) {
-                        Text("Cancel")
-                    }
-                },
-                title = { Text("New Conversation") },
-                text = {
-                    androidx.compose.material3.TextField(
-                        value = newChatTitle,
-                        onValueChange = { newChatTitle = it },
-                        modifier = Modifier.fillMaxWidth().padding(16.dp),
-                        label = { Text("Title (optional)") },
-                        singleLine = true
-                    )
-                }
-            )
         }
     }
 }
 
 @Composable
-fun ConversationCard(
-    conversation: Conversation,
-    onClick: () -> Unit,
-    onLongClick: () -> Unit
+fun CharacterCard(
+    character: Character,
+    onClick: () -> Unit
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .fillMaxWidth(),
+            .padding(vertical = 0.dp),
         onClick = onClick
     ) {
-        androidx.compose.foundation.layout.Column(
-            modifier = Modifier.padding(16.dp)
+        androidx.compose.foundation.layout.Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            androidx.compose.foundation.layout.Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(conversation.title, fontWeight = FontWeight.Medium, fontSize = 16.sp, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                Text(conversation.updatedAt.toString(), fontSize = 12.sp, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            
-            if (conversation.systemPrompt != null) {
+            Text(
+                text = character.avatar,
+                fontSize = 32.sp,
+                modifier = Modifier.padding(end = 16.dp)
+            )
+            Column {
                 Text(
-                    "📋 ${conversation.systemPrompt!!.name}",
-                    fontSize = 12.sp,
-                    color = androidx.compose.material3.MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(top = 4.dp)
+                    character.name,
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 16.sp
+                )
+                Text(
+                    character.description,
+                    fontSize = 13.sp,
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            
-            Text(
-                "${conversation.messageCount} messages • ${conversation.modelConfig.provider.value}",
-                fontSize = 12.sp,
-                color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp)
-            )
         }
     }
 }
