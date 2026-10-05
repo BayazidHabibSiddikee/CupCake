@@ -29,6 +29,10 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cupcake.game.GameManager
 import com.cupcake.ui.theme.CupCakeTheme
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.VideogameAsset
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -47,7 +51,7 @@ fun GameScreen(
                 title = { Text("Games") },
                 navigationIcon = { 
                     androidx.compose.material3.IconButton(onClick = onClose) { 
-                        Icon(painterResource(androidx.compose.material.icons.Icons.Filled.ArrowBack), contentDescription = "Back") 
+                        Icon(painterResource(androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack), contentDescription = "Back") 
                     } 
                 },
                 actions = {

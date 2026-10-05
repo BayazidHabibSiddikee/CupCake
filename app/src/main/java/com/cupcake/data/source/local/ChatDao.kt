@@ -96,7 +96,7 @@ interface SystemPromptDao {
 @Dao
 interface ModelConfigDao {
     @Query("SELECT * FROM model_configs WHERE conversationId = :conversationId")
-    suspend fun getByConversation(conversationId: String): ModelConfig?
+    suspend fun getByConversation(conversationId: String): ModelConfigWithConversation?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(config: ModelConfigWithConversation)

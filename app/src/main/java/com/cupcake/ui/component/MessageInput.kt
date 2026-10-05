@@ -36,6 +36,11 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddPhotoAlternate
+import androidx.compose.material.icons.filled.Chat
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.automirrored.filled.Send
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -108,7 +113,7 @@ fun MessageInput(
                         text = ""
                     }) {
                         Icon(
-                            painter = painterResource(id = androidx.compose.material.icons.Icons.Filled.Send),
+                            painter = painterResource(id = androidx.compose.material.icons.Icons.AutoMirrored.Filled.Send),
                             contentDescription = "Send",
                             tint = androidx.compose.material3.MaterialTheme.colorScheme.primary
                         )

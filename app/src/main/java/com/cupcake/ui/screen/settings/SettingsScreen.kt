@@ -34,6 +34,16 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cupcake.data.model.ApiProvider
 import com.cupcake.data.model.ModelConfig
 import com.cupcake.ui.theme.CupCakeTheme
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Wifi
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -56,7 +66,7 @@ fun SettingsScreen(
             // Header
             androidx.compose.material3.TopAppBar(
                 title = { Text("Settings") },
-                navigationIcon = { IconButton(onClick = onClose) { Icon(painterResource(androidx.compose.material.icons.Icons.Filled.ArrowBack), contentDescription = "Back") } },
+                navigationIcon = { IconButton(onClick = onClose) { Icon(painterResource(androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack), contentDescription = "Back") } },
                 colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
                     containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerLow
                 )

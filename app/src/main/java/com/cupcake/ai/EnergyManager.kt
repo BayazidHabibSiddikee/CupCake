@@ -58,7 +58,9 @@ class EnergyManager(private val context: Context) {
     private fun saveState() {
         try {
             val state = EnergyState(_energy.value, _isPro.value)
-            energyFile.writeText(kotlinx.serialization.json.Json.encodeToString(state))
+            energyFile.writeText(
+                kotlinx.serialization.json.Json.encodeToString(EnergyState.serializer(), state)
+            )
         } catch (e: Exception) {
             Log.e(TAG, "Failed to save energy state", e)
         }

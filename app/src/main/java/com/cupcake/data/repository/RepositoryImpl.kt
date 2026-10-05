@@ -103,7 +103,7 @@ class ChatRepositoryImpl @Inject constructor(
     ): List<ChatMessage> =
         database.chatMessageDao().getMessagesPaged(conversationId, limit, offset)
 
-    private fun buildMessageList(
+    private suspend fun buildMessageList(
         conversationId: String,
         newMessage: ChatMessage,
         systemPrompt: SystemPrompt?

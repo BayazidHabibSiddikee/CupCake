@@ -4,7 +4,7 @@ import com.cupcake.ai.CharacterManager
 import com.cupcake.ai.LlamaEngine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.launch
 import java.util.Random
 
@@ -203,7 +203,7 @@ class GameManager(private val llamaEngine: LlamaEngine, private val characterMan
         return currentGame!!
     }
 
-    fun makeHumanMove(position: Int): Game.Result {
+    fun makeHumanMove(position: Int): Result {
         val game = currentGame ?: return Result(false, "No active game")
         if (game.status != Game.GameStatus.PLAYING) return Result(false, "Game over")
         if (game.currentPlayer != Game.Player.HUMAN) return Result(false, "Not your turn")
@@ -298,7 +298,7 @@ class GameManager(private val llamaEngine: LlamaEngine, private val characterMan
                 "Game: ${gameType?.name}, Human won: $humanWon, Draw: $isDraw"
             ) + "\n\nUser: $prompt\nAssistant:"
 
-            llamaEngine.generateStream(fullPrompt).collect { token ->
+            llamaEngine.generateStream(fullPrompt).consumeEach { token ->
                 // Send to ESP32 for face animation + TTS
                 onGameReaction(token, humanWon, isDraw)
             }

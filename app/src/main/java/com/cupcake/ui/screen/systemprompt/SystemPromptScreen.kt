@@ -35,6 +35,12 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cupcake.data.model.SystemPrompt
 import com.cupcake.ui.component.ImagePickerSheet
 import com.cupcake.ui.theme.CupCakeTheme
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Save
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -59,7 +65,7 @@ fun SystemPromptScreen(
             // Header
             androidx.compose.material3.TopAppBar(
                 title = { Text(if (promptId == null) "New System Prompt" else "Edit System Prompt") },
-                navigationIcon = { IconButton(onClick = onClose) { Icon(painterResource(androidx.compose.material.icons.Icons.Filled.ArrowBack), contentDescription = "Back") } },
+                navigationIcon = { IconButton(onClick = onClose) { Icon(painterResource(androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack), contentDescription = "Back") } },
                 actions = {
                     if (promptId != null) {
                         IconButton(onClick = { viewModel.showDeleteDialog.value = true }) {

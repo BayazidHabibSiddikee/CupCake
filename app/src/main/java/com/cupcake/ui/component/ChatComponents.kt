@@ -1,5 +1,6 @@
 package com.cupcake.ui.component
 
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,7 +19,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Painter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
@@ -26,6 +26,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cupcake.data.model.ChatMessage
 import com.cupcake.ui.theme.CupCakeTheme
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.SmartToy
 
 @Composable
 fun ChatMessageItem(
@@ -59,10 +62,10 @@ fun ChatMessageItem(
                     horizontalArrangement = Arrangement.Start
                 ) {
                     Icon(
-                        painter = painterResource(id = when {
-                            isSystem -> androidx.compose.material.icons.Icons.Filled.Description
-                            else -> androidx.compose.material.icons.Icons.Filled.SmartToy
-                        }),
+                        imageVector = when {
+                            isSystem -> Icons.Filled.Description
+                            else -> Icons.Filled.SmartToy
+                        },
                         contentDescription = null,
                         tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(16.dp)

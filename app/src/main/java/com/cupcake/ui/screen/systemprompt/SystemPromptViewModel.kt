@@ -11,7 +11,10 @@ import com.cupcake.domain.usecase.GetSystemPromptsUseCase
 import com.cupcake.domain.usecase.SaveSystemPromptUseCase
 import com.cupcake.domain.usecase.UpdateSystemPromptUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -23,20 +26,30 @@ class SystemPromptViewModel @Inject constructor(
     private val savePromptUseCase: SaveSystemPromptUseCase,
     private val updatePromptUseCase: UpdateSystemPromptUseCase,
     private val deletePromptUseCase: DeleteSystemPromptUseCase,
-    private val addImageUseCase: AddImageToPromptUseCase,
-    private val promptId: String?
+    private val addImageUseCase: AddImageToPromptUseCase
 ) : ViewModel() {
 
-    val allPrompts = getPromptsUseCase().asStateFlow(initialValue = emptyList())
+    val allPrompts: StateFlow<List<SystemPrompt>> = getPromptsUseCase()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val prompt = if (promptId != null) {
-        getPromptUseCase(promptId!!).asStateFlow(initialValue = null)
-    } else {
-        MutableStateFlow<SystemPrompt?>(null).asStateFlow()
-    }
+    private val _prompt = MutableStateFlow<SystemPrompt?>(null)
+    val prompt: StateFlow<SystemPrompt?> = _prompt.asStateFlow()
+
+    private var promptId: String? = null
 
     val showDeleteDialog = MutableStateFlow(false)
     val showImagePicker = MutableStateFlow(false)
+
+    fun loadPrompt(id: String?) {
+        promptId = id
+        if (id != null) {
+            viewModelScope.launch {
+                _prompt.value = getPromptUseCase(id)
+            }
+        } else {
+            _prompt.value = null
+        }
+    }
 
     fun save(name: String, text: String) {
         viewModelScope.launch {
@@ -45,16 +58,16 @@ class SystemPromptViewModel @Inject constructor(
                 text = text
             )
             val saved = savePromptUseCase(newPrompt)
-            prompt.value = saved
+            _prompt.value = saved
         }
     }
 
     fun update(name: String, text: String) {
-        prompt.value?.let { current ->
+        _prompt.value?.let { current ->
             viewModelScope.launch {
                 val updated = current.copy(name = name, text = text)
                 updatePromptUseCase(updated)
-                prompt.value = updated
+                _prompt.value = updated
             }
         }
     }
@@ -77,21 +90,21 @@ class SystemPromptViewModel @Inject constructor(
                         description = "Image ${System.currentTimeMillis()}"
                     )
                     val updated = addImageUseCase(id, image)
-                    prompt.value = updated
+                    _prompt.value = updated
                 }
             }
         }
     }
 
     fun removeImage(imageId: String) {
-        prompt.value?.let { current ->
+        _prompt.value?.let { current ->
             val updated = current.copy(
                 images = current.images.filter { it.id != imageId },
                 version = current.version + 1
             )
             viewModelScope.launch {
                 updatePromptUseCase(updated)
-                prompt.value = updated
+                _prompt.value = updated
             }
         }
     }

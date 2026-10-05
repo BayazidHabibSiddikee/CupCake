@@ -3,6 +3,7 @@ package com.cupcake.ui.screen.character
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cupcake.ai.CharacterManager
+import com.cupcake.data.model.Character
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -14,7 +15,8 @@ class CharacterViewModel @Inject constructor(
     private val characterManager: CharacterManager
 ) : ViewModel() {
 
-    val characters = characterManager.getAllCharacters().asStateFlow(initialValue = emptyList())
+    private val _characters = MutableStateFlow(characterManager.getAllCharacters())
+    val characters = _characters.asStateFlow()
 
     val showCreateDialog = MutableStateFlow(false)
     val editingCharacterId = MutableStateFlow<String?>(null)
@@ -22,11 +24,16 @@ class CharacterViewModel @Inject constructor(
     val newCharPrompt = MutableStateFlow("")
     val newCharPersonality = MutableStateFlow("friendly")
 
-    fun selectCharacter(id: String) {
-        characterManager.selectCharacter(id)
+    private fun refresh() {
+        _characters.value = characterManager.getAllCharacters()
     }
 
-    fun editCharacter(character: CharacterManager.Character) {
+    fun selectCharacter(id: String) {
+        characterManager.selectCharacter(id)
+        refresh()
+    }
+
+    fun editCharacter(character: Character) {
         editingCharacterId.value = character.id
         newCharName.value = character.name
         newCharPrompt.value = character.systemPrompt
@@ -36,6 +43,7 @@ class CharacterViewModel @Inject constructor(
 
     fun deleteCharacter(id: String) {
         characterManager.deleteCharacter(id)
+        refresh()
     }
 
     fun saveCharacter() {
@@ -45,7 +53,7 @@ class CharacterViewModel @Inject constructor(
         
         if (name.isBlank() || prompt.isBlank()) return
 
-        val character = CharacterManager.Character(
+        val character = Character(
             id = editingCharacterId.value ?: "custom_${System.currentTimeMillis()}",
             name = name,
             description = "Custom character",
@@ -58,6 +66,7 @@ class CharacterViewModel @Inject constructor(
         )
 
         characterManager.saveCustomCharacter(character)
+        refresh()
         clearForm()
     }
 

@@ -10,7 +10,9 @@ import com.cupcake.domain.usecase.GetApiProvidersUseCase
 import com.cupcake.domain.usecase.TestProviderConnectionUseCase
 import com.cupcake.domain.usecase.UpdateApiProviderUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -24,7 +26,8 @@ class SettingsViewModel @Inject constructor(
     private val testConnectionUseCase: TestProviderConnectionUseCase
 ) : ViewModel() {
 
-    val providers = getProvidersUseCase().asStateFlow(initialValue = emptyList())
+    val providers: StateFlow<List<ApiProvider>> = getProvidersUseCase()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val showAddProviderDialog = MutableStateFlow(false)
     val selectedProviderType = MutableStateFlow(ModelConfig.ModelProvider.CUSTOM_OPENAI)

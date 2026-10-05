@@ -32,6 +32,12 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cupcake.ai.CharacterManager
 import com.cupcake.ui.theme.CupCakeTheme
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Save
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -52,7 +58,7 @@ fun CharacterScreen(
         ) {
             androidx.compose.material3.TopAppBar(
                 title = { Text("Characters") },
-                navigationIcon = { IconButton(onClick = onClose) { Icon(painterResource(androidx.compose.material.icons.Icons.Filled.ArrowBack), contentDescription = "Back") } },
+                navigationIcon = { IconButton(onClick = onClose) { Icon(painterResource(androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack), contentDescription = "Back") } },
                 actions = {
                     IconButton(onClick = { viewModel.showCreateDialog.value = true }) {
                         Icon(painterResource(androidx.compose.material.icons.Icons.Filled.Add), contentDescription = "Create character")

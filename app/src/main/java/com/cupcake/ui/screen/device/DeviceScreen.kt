@@ -18,6 +18,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cupcake.ui.theme.CupCakeTheme
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.DeveloperBoard
 
 @Composable
 fun DeviceScreen(deviceId: String) {
@@ -27,7 +30,7 @@ fun DeviceScreen(deviceId: String) {
                 title = { Text("Device: $deviceId") },
                 navigationIcon = {
                     androidx.compose.material3.IconButton(onClick = { /* navigate back */ }) {
-                        Icon(painterResource(androidx.compose.material.icons.Icons.Filled.ArrowBack), contentDescription = "Back")
+                        Icon(painterResource(androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack), contentDescription = "Back")
                     }
                 },
                 colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(

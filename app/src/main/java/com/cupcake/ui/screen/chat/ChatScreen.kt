@@ -30,6 +30,9 @@ import com.cupcake.ui.component.ChatMessageItem
 import com.cupcake.ui.component.MessageInput
 import com.cupcake.ui.theme.CupCakeTheme
 import kotlinx.coroutines.launch
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Settings
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

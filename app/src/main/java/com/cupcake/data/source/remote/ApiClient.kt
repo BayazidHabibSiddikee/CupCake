@@ -6,8 +6,8 @@ import com.cupcake.data.model.GenerationRequest
 import com.cupcake.data.model.ModelConfig
 import com.cupcake.data.model.StreamChunk
 import com.cupcake.native.QwenNative
+import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.flow.channelFlow
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import okhttp3.MediaType.Companion.toMediaType
@@ -42,7 +42,7 @@ class ApiClient @Inject constructor(
                 topK = config.topK,
                 maxTokens = config.maxTokens
             )
-        ).collect { chunk ->
+        ).consumeEach { chunk ->
             trySend(StreamChunk(
                 id = java.util.UUID.randomUUID().toString(),
                 delta = chunk,

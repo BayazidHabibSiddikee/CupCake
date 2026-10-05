@@ -128,7 +128,7 @@ dependencies {
     val activityCompose = libs.androidx.activity.compose.get()
     val lifecycleViewmodelCompose = libs.androidx.lifecycle.viewmodel.compose.get()
     val lifecycleRuntimeCompose = libs.androidx.lifecycle.runtime.compose.get()
-    val composeUi = libs.androidx.compose.ui.get()
+    val composeUi = libs.androidx.compose.ui.main.get()
     val composeFoundation = libs.androidx.compose.foundation.get()
     val composeAnimation = libs.androidx.compose.animation.get()
     val composeRuntime = libs.androidx.compose.runtime.get()

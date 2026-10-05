@@ -4,8 +4,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cupcake.domain.usecase.CreateConversationUseCase
 import com.cupcake.domain.usecase.GetConversationsUseCase
+import com.cupcake.data.model.Conversation
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -16,7 +20,8 @@ class HomeViewModel @Inject constructor(
     private val createConversationUseCase: CreateConversationUseCase
 ) : ViewModel() {
 
-    val conversations = getConversationsUseCase().asStateFlow(initialValue = emptyList())
+    val conversations: StateFlow<List<Conversation>> = getConversationsUseCase()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val showNewChatDialog = MutableStateFlow(false)
 

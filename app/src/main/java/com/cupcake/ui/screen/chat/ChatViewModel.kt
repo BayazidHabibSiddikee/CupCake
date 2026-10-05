@@ -12,9 +12,9 @@ import com.cupcake.network.EspWebSocketServer
 import com.cupcake.tts.TtsManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -141,7 +141,7 @@ class ChatViewModel @Inject constructor(
             val character = characterManager.getCurrentCharacter()
             val prompt = buildPrompt(text, character)
 
-            llamaEngine.generateStream(prompt).collect { token ->
+            llamaEngine.generateStream(prompt).consumeEach { token ->
                 fullResponse += token
                 _currentResponse.value = fullResponse
             }.also {
