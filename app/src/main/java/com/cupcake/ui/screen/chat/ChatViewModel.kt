@@ -189,9 +189,6 @@ class ChatViewModel @Inject constructor(
             return
         }
 
-        val userMessage = ChatMessage.user(text, conversationId)
-        addMessage(userMessage)
-
         if (!llamaEngine.isReady()) {
             ensureModelLoaded()
             addMessage(
@@ -203,12 +200,15 @@ class ChatViewModel @Inject constructor(
             return
         }
 
+        val userMessage = ChatMessage.user(text, conversationId)
+        addMessage(userMessage)
+
         _isGenerating.value = true
         _currentResponse.value = ""
 
         viewModelScope.launch {
             var fullResponse = ""
-            val prompt = buildPrompt(text)
+            val prompt = buildPrompt()
 
             try {
                 llamaEngine.generateStream(prompt).consumeEach { token ->
@@ -247,25 +247,25 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    private fun buildPrompt(userInput: String): String {
+    private fun buildPrompt(): String {
         // Each session is locked to one character, so use this session's
         // character - not the global "current" selection.
         val systemPrompt = characterManager.getSystemPromptForCharacter(
             _currentCharacter.value?.id ?: characterId
         )
         
+        val builder = StringBuilder()
+        builder.append("<|im_start|>system\n").append(systemPrompt).append("<|im_end|>\n")
+        
         // Get recent messages for context
-        val recentMessages = messages.value.takeLast(6).joinToString("\n") { msg ->
-            "${msg.role.name}: ${msg.content}"
+        val recentMessages = messages.value.takeLast(6)
+        for (msg in recentMessages) {
+            builder.append("<|im_start|>").append(msg.role.value).append("\n")
+                .append(msg.content).append("<|im_end|>\n")
         }
 
-        return """$systemPrompt
-
-Recent conversation:
-$recentMessages
-
-User: $userInput
-Assistant:""".trimIndent()
+        builder.append("<|im_start|>assistant\n")
+        return builder.toString()
     }
 
     private fun addMessage(message: ChatMessage) {
