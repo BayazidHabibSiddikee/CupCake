@@ -87,7 +87,7 @@ fun ChatMessageItem(
                     isUser -> androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer
                     isSystem -> androidx.compose.material3.MaterialTheme.colorScheme.onSecondaryContainer
                     else -> androidx.compose.material3.MaterialTheme.colorScheme.onSurface
-                ),
+                },
                 textAlign = if (isUser) TextAlign.End else TextAlign.Start
             )
 

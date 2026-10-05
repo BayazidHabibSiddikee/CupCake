@@ -48,8 +48,8 @@ fun SystemPromptScreen(
     val showDeleteDialog by viewModel.showDeleteDialog.collectAsStateWithLifecycle()
     val showImagePicker by viewModel.showImagePicker.collectAsStateWithLifecycle()
 
-    var name by remember { mutableStateOf(prompt?.name ?? "") }
-    var text by remember { mutableStateOf(prompt?.text ?? "") }
+    var name by remember { mutableStateOf(prompt?.name ?: "") }
+    var text by remember { mutableStateOf(prompt?.text ?: "") }
 
     CupCakeTheme {
         Column(
@@ -58,7 +58,7 @@ fun SystemPromptScreen(
         ) {
             // Header
             androidx.compose.material3.TopAppBar(
-                title = { Text(promptId == null ? "New System Prompt" : "Edit System Prompt") },
+                title = { Text(if (promptId == null) "New System Prompt" else "Edit System Prompt") },
                 navigationIcon = { IconButton(onClick = onClose) { Icon(painterResource(androidx.compose.material.icons.Icons.Filled.ArrowBack), contentDescription = "Back") } },
                 actions = {
                     if (promptId != null) {
@@ -110,7 +110,7 @@ fun SystemPromptScreen(
 
                 // Images section
                 ImagesSection(
-                    images = prompt?.images ?? emptyList(),
+                    images = prompt?.images ?: emptyList(),
                     onAddImage = { viewModel.showImagePicker.value = true },
                     onRemoveImage = { imageId -> viewModel.removeImage(imageId) }
                 )

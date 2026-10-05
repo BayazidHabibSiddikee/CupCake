@@ -7,7 +7,9 @@ import com.cupcake.data.model.ModelConfig
 import com.cupcake.data.model.StreamChunk
 import com.cupcake.native.QwenNative
 import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -119,7 +121,7 @@ class ApiClient @Inject constructor(
                     val body = response.body?.byteStream()
                             ?: return@channelFlow
 
-                    body.readLines().forEach { line ->
+                    body.bufferedReader().readLines().forEach { line ->
                         if (line.startsWith("data: ")) {
                             val data = line.substring(6)
                             if (data == "[DONE]") {
@@ -187,7 +189,7 @@ class ApiClient @Inject constructor(
                     }
 
                     val body = response.body?.byteStream() ?: return@channelFlow
-                    body.readLines().forEach { line ->
+                    body.bufferedReader().readLines().forEach { line ->
                         try {
                             val json = JSONObject(line)
                             val message = json.getJSONObject("message")

@@ -11,6 +11,7 @@ import com.cupcake.data.model.Conversation
 import com.cupcake.data.model.ModelConfigWithConversation
 import com.cupcake.data.model.SystemPrompt
 import com.cupcake.data.source.local.converters.Converters
+import com.cupcake.data.source.remote.ApiProviderDao
 
 @Database(
     entities = [

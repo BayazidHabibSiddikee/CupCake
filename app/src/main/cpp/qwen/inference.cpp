@@ -145,7 +145,7 @@ int InferenceEngine::generate_stream(const std::string& prompt,
 
     int generated = 0;
     while (generated < max_tokens) {
-        const llama_token id = llama_sampler_sample(smpl, ctx, -1);
+        llama_token id = llama_sampler_sample(smpl, ctx, -1);
         if (llama_token_is_eog(model, id)) {
             break;
         }

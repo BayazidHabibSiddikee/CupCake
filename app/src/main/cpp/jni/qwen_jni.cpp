@@ -187,5 +187,7 @@ Java_com_cupcake_native_QwenNative_isModelLoaded(
     JNIEnv* env,
     jobject thiz
 ) {
+    using namespace cupcake::qwen;
+
     return g_engine != nullptr ? JNI_TRUE : JNI_FALSE;
 }

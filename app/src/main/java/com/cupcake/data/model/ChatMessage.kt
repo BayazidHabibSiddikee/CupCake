@@ -4,8 +4,27 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 import androidx.room.TypeConverters
 import com.cupcake.data.source.local.converters.Converters
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 import java.time.Instant
+
+object InstantSerializer : KSerializer<Instant> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("Instant", PrimitiveKind.LONG)
+
+    override fun serialize(encoder: Encoder, value: Instant) {
+        encoder.encodeLong(value.toEpochMilli())
+    }
+
+    override fun deserialize(decoder: Decoder): Instant {
+        return Instant.ofEpochMilli(decoder.decodeLong())
+    }
+}
 
 @Serializable
 @Entity(tableName = "chat_messages")
@@ -15,6 +34,7 @@ data class ChatMessage(
     val conversationId: String,
     val role: MessageRole,
     val content: String,
+    @Serializable(with = InstantSerializer::class)
     val timestamp: Instant = Instant.now(),
     val modelUsed: String = "",
     val tokenCount: Int = 0,
@@ -56,23 +76,30 @@ data class ChatMessage(
     }
 }
 
+@Entity(tableName = "conversations")
 @Serializable
 data class Conversation(
+    @PrimaryKey
     val id: String = java.util.UUID.randomUUID().toString(),
     val title: String = "New Chat",
     val systemPrompt: SystemPrompt? = null,
     val modelConfig: ModelConfig = ModelConfig.default(),
+    @Serializable(with = InstantSerializer::class)
     val createdAt: Instant = Instant.now(),
+    @Serializable(with = InstantSerializer::class)
     val updatedAt: Instant = Instant.now(),
     val messageCount: Int = 0
 )
 
+@Entity(tableName = "system_prompts")
 @Serializable
 data class SystemPrompt(
+    @PrimaryKey
     val id: String = java.util.UUID.randomUUID().toString(),
     val name: String,
     val text: String,
     val images: List<PromptImage> = emptyList(),
+    @Serializable(with = InstantSerializer::class)
     val createdAt: Instant = Instant.now(),
     val version: Int = 1
 ) {
@@ -98,6 +125,7 @@ data class PromptImage(
     val description: String = "",
     val extractedText: String = "",
     val thumbnailUri: String? = null,
+    @Serializable(with = InstantSerializer::class)
     val uploadedAt: Instant = Instant.now()
 )
 
@@ -142,8 +170,10 @@ data class ModelConfig(
     }
 }
 
+@Entity(tableName = "api_providers")
 @Serializable
 data class ApiProvider(
+    @PrimaryKey
     val id: String = java.util.UUID.randomUUID().toString(),
     val name: String,
     val providerType: ModelConfig.ModelProvider,
@@ -152,6 +182,7 @@ data class ApiProvider(
     val models: List<String> = emptyList(),
     val headers: Map<String, String> = emptyMap(),
     val isEnabled: Boolean = true,
+    @Serializable(with = InstantSerializer::class)
     val createdAt: Instant = Instant.now()
 )
 
@@ -186,3 +217,54 @@ data class StreamChunk(
     val finishReason: String? = null,
     val usage: TokenUsage? = null
 )
+
+@Entity(tableName = "model_configs")
+@Serializable
+data class ModelConfigWithConversation(
+    @PrimaryKey
+    val conversationId: String,
+    val provider: ModelConfig.ModelProvider,
+    val modelName: String,
+    val customEndpoint: String,
+    val apiKey: String,
+    val temperature: Float,
+    val topP: Float,
+    val topK: Int,
+    val maxTokens: Int,
+    val systemPromptId: String?,
+    val useStreaming: Boolean,
+    val timeoutSeconds: Int
+) {
+    fun toModelConfig(): ModelConfig = ModelConfig(
+        provider = provider,
+        modelName = modelName,
+        customEndpoint = customEndpoint,
+        apiKey = apiKey,
+        temperature = temperature,
+        topP = topP,
+        topK = topK,
+        maxTokens = maxTokens,
+        systemPromptId = systemPromptId,
+        useStreaming = useStreaming,
+        timeoutSeconds = timeoutSeconds
+    )
+
+    companion object {
+        fun from(conversationId: String, config: ModelConfig): ModelConfigWithConversation {
+            return ModelConfigWithConversation(
+                conversationId = conversationId,
+                provider = config.provider,
+                modelName = config.modelName,
+                customEndpoint = config.customEndpoint,
+                apiKey = config.apiKey,
+                temperature = config.temperature,
+                topP = config.topP,
+                topK = config.topK,
+                maxTokens = config.maxTokens,
+                systemPromptId = config.systemPromptId,
+                useStreaming = config.useStreaming,
+                timeoutSeconds = config.timeoutSeconds
+            )
+        }
+    }
+}

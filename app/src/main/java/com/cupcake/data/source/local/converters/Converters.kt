@@ -5,8 +5,17 @@ import com.cupcake.data.model.ChatMessage
 import com.cupcake.data.model.ModelConfig
 import com.cupcake.data.model.PromptImage
 import com.cupcake.data.model.SystemPrompt
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encodeToString
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.Json
 import java.time.Instant
 
@@ -44,11 +53,12 @@ class Converters {
 
     @TypeConverter
     fun fromPromptImages(value: String?): List<PromptImage> =
-        value?.let { json.decodeFromString(PromptImage.serializer().list, it) } ?: emptyList()
+        value?.let { json.decodeFromString(ListSerializer(PromptImage.serializer()), it) }
+            ?: emptyList()
 
     @TypeConverter
     fun toPromptImages(images: List<PromptImage>): String =
-        json.encodeToString(PromptImage.serializer().list, images)
+        json.encodeToString(ListSerializer(PromptImage.serializer()), images)
 
     @TypeConverter
     fun fromModelConfig(value: String?): ModelConfig? =
@@ -60,50 +70,60 @@ class Converters {
 
     @TypeConverter
     fun fromMetadata(value: String?): Map<String, Any> =
-        value?.let { json.decodeFromString(MapSerializer(), it) } ?: emptyMap()
+        value?.let { json.decodeFromString(AnyMapSerializer, it) } ?: emptyMap()
 
     @TypeConverter
     fun toMetadata(map: Map<String, Any>): String =
-        json.encodeToString(MapSerializer(), map)
+        json.encodeToString(AnyMapSerializer, map)
+
+    @TypeConverter
+    fun fromStringList(value: String?): List<String> =
+        value?.let { json.decodeFromString(ListSerializer(String.serializer()), it) }
+            ?: emptyList()
+
+    @TypeConverter
+    fun toStringList(list: List<String>): String =
+        json.encodeToString(ListSerializer(String.serializer()), list)
+
+    @TypeConverter
+    fun fromStringMap(value: String?): Map<String, String> =
+        value?.let {
+            json.decodeFromString(
+                MapSerializer(String.serializer(), String.serializer()), it
+            )
+        } ?: emptyMap()
+
+    @TypeConverter
+    fun toStringMap(map: Map<String, String>): String =
+        json.encodeToString(
+            MapSerializer(String.serializer(), String.serializer()), map
+        )
 }
 
-private object MapSerializer : kotlinx.serialization.KSerializer<Map<String, Any>> {
-    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
-        kotlinx.serialization.descriptors.MapSerializer(String.serializer(), AnySerializer()).descriptor
+// Map<String, Any> with all values coerced to String.
+private object AnyMapSerializer : KSerializer<Map<String, Any>> {
+    private val delegate = MapSerializer(String.serializer(), AnySerializer)
 
-    override fun serialize(encoder: kotlinx.serialization.Encoder, value: Map<String, Any>) {
-        val mapEncoder = encoder.encodeMap(descriptor)
-        value.forEach { (key, val) ->
-            mapEncoder.encodeMapKey(key)
-            AnySerializer().serialize(mapEncoder.encodeMapValue(), val)
-        }
-        mapEncoder.finish()
+    override val descriptor: SerialDescriptor = delegate.descriptor
+
+    override fun serialize(encoder: Encoder, value: Map<String, Any>) {
+        delegate.serialize(encoder, value)
     }
 
-    override fun deserialize(decoder: kotlinx.serialization.Decoder): Map<String, Any> {
-        val mapDecoder = decoder.decodeMap(descriptor)
-        val result = mutableMapOf<String, Any>()
-        while (true) {
-            val hasNext = mapDecoder.decodeMapKey()
-            if (!hasNext) break
-            val key = mapDecoder.decodeString()
-            val value = AnySerializer().deserialize(mapDecoder.decodeMapValue())
-            result[key] = value
-        }
-        mapDecoder.finish()
-        return result
+    override fun deserialize(decoder: Decoder): Map<String, Any> {
+        return delegate.deserialize(decoder)
     }
 }
 
-private object AnySerializer : kotlinx.serialization.KSerializer<Any> {
-    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
-        kotlinx.serialization.descriptors.PrimitiveSerialDescriptor("Any", kotlinx.serialization.descriptors.PrimitiveKind.STRING)
+private object AnySerializer : KSerializer<Any> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("Any", PrimitiveKind.STRING)
 
-    override fun serialize(encoder: kotlinx.serialization.Encoder, value: Any) {
+    override fun serialize(encoder: Encoder, value: Any) {
         encoder.encodeString(value.toString())
     }
 
-    override fun deserialize(decoder: kotlinx.serialization.Decoder): Any {
+    override fun deserialize(decoder: Decoder): Any {
         return decoder.decodeString()
     }
 }

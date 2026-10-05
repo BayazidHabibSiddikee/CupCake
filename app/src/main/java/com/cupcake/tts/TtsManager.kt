@@ -43,7 +43,7 @@ class TtsManager(private val context: Context) {
     fun initialize(callback: TtsCallback? = null): Boolean {
         this.callback = callback
         return try {
-            tts = TextToSpeech(context, status -> {
+            tts = TextToSpeech(context, { status ->
                 if (status == TextToSpeech.SUCCESS) {
                     isInitialized = true
                     loadVoices()

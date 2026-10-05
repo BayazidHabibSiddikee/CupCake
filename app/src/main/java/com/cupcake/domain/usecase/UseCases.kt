@@ -1,8 +1,10 @@
 package com.cupcake.domain.usecase
 
+import com.cupcake.data.model.ApiProvider
 import com.cupcake.data.model.ChatMessage
 import com.cupcake.data.model.Conversation
 import com.cupcake.data.model.ModelConfig
+import com.cupcake.data.model.PromptImage
 import com.cupcake.data.model.StreamChunk
 import com.cupcake.data.model.SystemPrompt
 import com.cupcake.domain.repository.ChatRepository
@@ -14,7 +16,7 @@ import javax.inject.Inject
 class CreateConversationUseCase @Inject constructor(
     private val chatRepository: ChatRepository
 ) {
-    operator fun invoke(title: String = "New Chat"): Conversation {
+    suspend operator fun invoke(title: String = "New Chat"): Conversation {
         return chatRepository.createConversation(title)
     }
 }
@@ -28,7 +30,7 @@ class GetConversationsUseCase @Inject constructor(
 class GetConversationUseCase @Inject constructor(
     private val chatRepository: ChatRepository
 ) {
-    operator fun invoke(id: String): Conversation? = chatRepository.getConversation(id)
+    suspend operator fun invoke(id: String): Conversation? = chatRepository.getConversation(id)
 }
 
 class ObserveConversationUseCase @Inject constructor(
@@ -40,20 +42,20 @@ class ObserveConversationUseCase @Inject constructor(
 class UpdateConversationTitleUseCase @Inject constructor(
     private val chatRepository: ChatRepository
 ) {
-    operator fun invoke(id: String, title: String) = chatRepository.updateConversationTitle(id, title)
+    suspend operator fun invoke(id: String, title: String) = chatRepository.updateConversationTitle(id, title)
 }
 
 class DeleteConversationUseCase @Inject constructor(
     private val chatRepository: ChatRepository
 ) {
-    operator fun invoke(id: String) = chatRepository.deleteConversation(id)
+    suspend operator fun invoke(id: String) = chatRepository.deleteConversation(id)
 }
 
 class SendMessageUseCase @Inject constructor(
     private val chatRepository: ChatRepository,
     private val modelRepository: ModelRepository
 ) {
-    operator fun invoke(
+    suspend operator fun invoke(
         conversationId: String,
         message: ChatMessage,
         config: ModelConfig
@@ -65,7 +67,7 @@ class SendMessageUseCase @Inject constructor(
 class SaveAssistantMessageUseCase @Inject constructor(
     private val chatRepository: ChatRepository
 ) {
-    operator fun invoke(
+    suspend operator fun invoke(
         conversationId: String,
         content: String,
         modelUsed: String,
@@ -90,31 +92,31 @@ class GetSystemPromptsUseCase @Inject constructor(
 class GetSystemPromptUseCase @Inject constructor(
     private val promptRepository: SystemPromptRepository
 ) {
-    operator fun invoke(id: String): SystemPrompt? = promptRepository.getPrompt(id)
+    suspend operator fun invoke(id: String): SystemPrompt? = promptRepository.getPrompt(id)
 }
 
 class SaveSystemPromptUseCase @Inject constructor(
     private val promptRepository: SystemPromptRepository
 ) {
-    operator fun invoke(prompt: SystemPrompt): SystemPrompt = promptRepository.savePrompt(prompt)
+    suspend operator fun invoke(prompt: SystemPrompt): SystemPrompt = promptRepository.savePrompt(prompt)
 }
 
 class UpdateSystemPromptUseCase @Inject constructor(
     private val promptRepository: SystemPromptRepository
 ) {
-    operator fun invoke(prompt: SystemPrompt) = promptRepository.updatePrompt(prompt)
+    suspend operator fun invoke(prompt: SystemPrompt) = promptRepository.updatePrompt(prompt)
 }
 
 class DeleteSystemPromptUseCase @Inject constructor(
     private val promptRepository: SystemPromptRepository
 ) {
-    operator fun invoke(id: String) = promptRepository.deletePrompt(id)
+    suspend operator fun invoke(id: String) = promptRepository.deletePrompt(id)
 }
 
 class AddImageToPromptUseCase @Inject constructor(
     private val promptRepository: SystemPromptRepository
 ) {
-    operator fun invoke(promptId: String, image: SystemPromptRepository.PromptImage): SystemPrompt =
+    suspend operator fun invoke(promptId: String, image: PromptImage): SystemPrompt =
         promptRepository.addImageToPrompt(promptId, image)
 }
 
@@ -133,31 +135,31 @@ class GetEnabledProvidersUseCase @Inject constructor(
 class AddApiProviderUseCase @Inject constructor(
     private val modelRepository: ModelRepository
 ) {
-    operator fun invoke(provider: ApiProvider): ApiProvider = modelRepository.addProvider(provider)
+    suspend operator fun invoke(provider: ApiProvider): ApiProvider = modelRepository.addProvider(provider)
 }
 
 class UpdateApiProviderUseCase @Inject constructor(
     private val modelRepository: ModelRepository
 ) {
-    operator fun invoke(provider: ApiProvider) = modelRepository.updateProvider(provider)
+    suspend operator fun invoke(provider: ApiProvider) = modelRepository.updateProvider(provider)
 }
 
 class DeleteApiProviderUseCase @Inject constructor(
     private val modelRepository: ModelRepository
 ) {
-    operator fun invoke(id: String) = modelRepository.deleteProvider(id)
+    suspend operator fun invoke(id: String) = modelRepository.deleteProvider(id)
 }
 
 class TestProviderConnectionUseCase @Inject constructor(
     private val modelRepository: ModelRepository
 ) {
-    operator fun invoke(provider: ApiProvider): Boolean = modelRepository.testConnection(provider)
+    suspend operator fun invoke(provider: ApiProvider): Boolean = modelRepository.testConnection(provider)
 }
 
 class GetProviderModelsUseCase @Inject constructor(
     private val modelRepository: ModelRepository
 ) {
-    operator fun invoke(provider: ApiProvider): List<String> = modelRepository.getModels(provider)
+    suspend operator fun invoke(provider: ApiProvider): List<String> = modelRepository.getModels(provider)
 }
 
 class GetModelConfigUseCase @Inject constructor(
@@ -169,5 +171,5 @@ class GetModelConfigUseCase @Inject constructor(
 class UpdateModelConfigUseCase @Inject constructor(
     private val modelRepository: ModelRepository
 ) {
-    operator fun invoke(conversationId: String, config: ModelConfig) = modelRepository.updateConfig(conversationId, config)
+    suspend operator fun invoke(conversationId: String, config: ModelConfig) = modelRepository.updateConfig(conversationId, config)
 }

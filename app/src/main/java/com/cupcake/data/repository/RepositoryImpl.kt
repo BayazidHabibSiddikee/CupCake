@@ -8,15 +8,18 @@ import com.cupcake.data.model.GenerationResponse
 import com.cupcake.data.model.ModelConfig
 import com.cupcake.data.model.StreamChunk
 import com.cupcake.data.model.SystemPrompt
+import com.cupcake.data.model.ModelConfigWithConversation
+import com.cupcake.data.model.PromptImage
 import com.cupcake.data.source.local.AppDatabase
-import com.cupcake.data.source.local.ChatDao
-import com.cupcake.data.source.remote.ApiProviderDao
+import com.cupcake.data.source.remote.ApiClient
 import com.cupcake.data.source.remote.ApiServices
 import com.cupcake.domain.repository.ChatRepository
 import com.cupcake.domain.repository.ModelRepository
 import com.cupcake.domain.repository.SystemPromptRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 
@@ -25,7 +28,7 @@ class ChatRepositoryImpl @Inject constructor(
     private val apiClient: ApiClient
 ) : ChatRepository {
 
-    override suspend fun createConversation(title: String = "New Chat"): Conversation {
+    override suspend fun createConversation(title: String): Conversation {
         val conversation = Conversation(title = title)
         database.conversationDao().insert(conversation)
         return conversation
@@ -185,12 +188,15 @@ class ModelRepositoryImpl @Inject constructor(
         return apiClient.fetchModels(provider)
     }
 
-    override fun getConfig(conversationId: String): Flow<ModelConfig> =
-        database.modelConfigDao().getByConversation(conversationId)
-            .map { it?.toModelConfig() ?: ModelConfig.default() }
+    override fun getConfig(conversationId: String): Flow<ModelConfig> = flow {
+        emit(
+            database.modelConfigDao().getByConversation(conversationId)
+                ?.toModelConfig() ?: ModelConfig.default()
+        )
+    }
 
     override suspend fun updateConfig(conversationId: String, config: ModelConfig) {
-        val entity = ChatDao.ModelConfigWithConversation.from(conversationId, config)
+        val entity = ModelConfigWithConversation.from(conversationId, config)
         database.modelConfigDao().upsert(entity)
     }
 }

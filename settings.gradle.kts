@@ -13,11 +13,8 @@ dependencyResolutionManagement {
         mavenCentral()
         maven { url = uri("https://jitpack.io") }
     }
-    versionCatalogs {
-        create("libs") {
-            from(files("gradle/libs.versions.toml"))
-        }
-    }
+    // NOTE: the "libs" version catalog is auto-created from
+    // gradle/libs.versions.toml by convention - do not redeclare it here.
 }
 
 rootProject.name = "CupCake"

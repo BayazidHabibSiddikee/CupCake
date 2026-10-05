@@ -1,9 +1,9 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-    id("kotlin-parcelize")
+    id("org.jetbrains.kotlin.plugin.parcelize")
     id("com.google.dagger.hilt.android")
-    id("kotlin-kapt")
+    id("org.jetbrains.kotlin.kapt")
     id("androidx.navigation.safeargs.kotlin")
     id("org.jetbrains.kotlin.plugin.serialization")
 }
@@ -74,14 +74,14 @@ android {
                 "proguard-rules.pro"
             )
             signingConfig = signingConfigs.getByName("release")
-            matchingFallbacks = ["debug"]
+            matchingFallbacks += "debug"
         }
         debug {
             isMinifyEnabled = false
             isDebuggable = true
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
-            matchingFallbacks = ["release"]
+            matchingFallbacks += "release"
         }
     }
 
@@ -117,7 +117,7 @@ android {
 
     externalNativeBuild {
         cmake {
-            path = "src/main/cpp/CMakeLists.txt"
+            path = file("src/main/cpp/CMakeLists.txt")
             version = "3.22.1"
         }
     }
@@ -126,10 +126,16 @@ android {
 dependencies {
     val coreSplashScreen = libs.androidx.core.splashscreen.get()
     val activityCompose = libs.androidx.activity.compose.get()
-    val lifecycleViewmodelCompose = libs.androidx.lifecycle.viewmodelCompose.get()
+    val lifecycleViewmodelCompose = libs.androidx.lifecycle.viewmodel.compose.get()
+    val lifecycleRuntimeCompose = libs.androidx.lifecycle.runtime.compose.get()
+    val composeUi = libs.androidx.compose.ui.get()
+    val composeFoundation = libs.androidx.compose.foundation.get()
+    val composeAnimation = libs.androidx.compose.animation.get()
+    val composeRuntime = libs.androidx.compose.runtime.get()
+    val materialIconsCore = libs.androidx.compose.material.icons.core.get()
     val composeBom = libs.androidx.compose.bom.get()
     val material3 = libs.androidx.compose.material3.get()
-    val materialIcons = libs.androidx.compose.materialIconsExtended.get()
+    val materialIcons = libs.androidx.compose.material.icons.extended.get()
     val navigationCompose = libs.androidx.navigation.compose.get()
     val hilt = libs.hilt.android.get()
     val hiltCompiler = libs.hilt.compiler.get()
@@ -138,17 +144,21 @@ dependencies {
     val roomCompiler = libs.androidx.room.compiler.get()
     val datastore = libs.androidx.datastore.preferences.get()
     val coroutines = libs.kotlinx.coroutines.android.get()
-    val flow = libs.kotlinx.coroutines.flow.get()
+    val flow = libs.kotlinx.coroutines.core.get()
     val serialization = libs.kotlinx.serialization.json.get()
     val coil = libs.coil.compose.get()
+    val retrofit = libs.retrofit.retrofit.get()
+    val retrofitScalars = libs.retrofit.converter.scalars.get()
+    val okhttp = libs.okhttp.okhttp.get()
+    val guava = libs.guava.get()
     val mpAndroidChart = libs.github.mpandroidchart.get()
     val accompanistPermissions = libs.accompanist.permissions.get()
     val accompanistSystemUi = libs.accompanist.systemuicontroller.get()
     val mockk = libs.mockk.get()
     val junit = libs.junit.get()
     val espresso = libs.androidx.espresso.core.get()
-    val composeTest = libs.androidx.compose.uiTestManifest.get()
-    val composeTestJunit4 = libs.androidx.compose.uiTestJunit4.get()
+    val composeTest = libs.androidx.compose.ui.test.manifest.get()
+    val composeTestJunit4 = libs.androidx.compose.ui.test.junit4.get()
     val robolectric = libs.robolectric.get()
     val truth = libs.truth.get()
     val turbine = libs.turbine.get()
@@ -163,9 +173,15 @@ dependencies {
     implementation(coreSplashScreen)
     implementation(activityCompose)
     implementation(lifecycleViewmodelCompose)
+    implementation(lifecycleRuntimeCompose)
 
     implementation(platform(composeBom))
+    implementation(composeUi)
+    implementation(composeFoundation)
+    implementation(composeAnimation)
+    implementation(composeRuntime)
     implementation(material3)
+    implementation(materialIconsCore)
     implementation(materialIcons)
     implementation(navigationCompose)
 
@@ -184,6 +200,11 @@ dependencies {
     implementation(serialization)
 
     implementation(coil)
+
+    implementation(retrofit)
+    implementation(retrofitScalars)
+    implementation(okhttp)
+    implementation(guava)
 
     implementation(mpAndroidChart)
 
@@ -208,8 +229,9 @@ dependencies {
     androidTestImplementation("androidx.test:runner:1.6.0")
     debugImplementation("androidx.fragment:fragment-testing:1.6.2")
 
-    implementation("androidx.bluetooth:bluetooth:1.0.0-alpha02")
-    implementation("androidx.bluetooth:bluetooth-connect:1.0.0-alpha02")
+    // NOTE: androidx.bluetooth removed - artifacts do not exist at the pinned
+    // version and no code imports them yet (ble/ package is empty).
+    // Re-add alongside the BLE GATT client implementation.
 }
 
 kapt {

@@ -5,6 +5,12 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
+import com.cupcake.data.model.ApiProvider
+import com.cupcake.data.model.ChatMessage
+import com.cupcake.data.model.Conversation
+import com.cupcake.data.model.ModelConfig
+import com.cupcake.data.model.ModelConfigWithConversation
+import com.cupcake.data.model.SystemPrompt
 import kotlinx.coroutines.flow.Flow
 import java.time.Instant
 import java.util.UUID
@@ -88,27 +94,6 @@ interface SystemPromptDao {
 }
 
 @Dao
-interface ApiProviderDao {
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insert(provider: ApiProvider)
-
-    @Update
-    suspend fun update(provider: ApiProvider)
-
-    @Query("DELETE FROM api_providers WHERE id = :id")
-    suspend fun delete(id: String)
-
-    @Query("SELECT * FROM api_providers ORDER BY createdAt DESC")
-    fun getAll(): Flow<List<ApiProvider>>
-
-    @Query("SELECT * FROM api_providers WHERE isEnabled = 1")
-    fun getEnabled(): Flow<List<ApiProvider>>
-
-    @Query("SELECT * FROM api_providers WHERE id = :id")
-    suspend fun getById(id: String): ApiProvider?
-}
-
-@Dao
 interface ModelConfigDao {
     @Query("SELECT * FROM model_configs WHERE conversationId = :conversationId")
     suspend fun getByConversation(conversationId: String): ModelConfig?
@@ -118,52 +103,4 @@ interface ModelConfigDao {
 
     @Query("DELETE FROM model_configs WHERE conversationId = :conversationId")
     suspend fun deleteByConversation(conversationId: String)
-}
-
-data class ModelConfigWithConversation(
-    val conversationId: String,
-    val provider: ModelConfig.ModelProvider,
-    val modelName: String,
-    val customEndpoint: String,
-    val apiKey: String,
-    val temperature: Float,
-    val topP: Float,
-    val topK: Int,
-    val maxTokens: Int,
-    val systemPromptId: String?,
-    val useStreaming: Boolean,
-    val timeoutSeconds: Int
-) {
-    fun toModelConfig(): ModelConfig = ModelConfig(
-        provider = provider,
-        modelName = modelName,
-        customEndpoint = customEndpoint,
-        apiKey = apiKey,
-        temperature = temperature,
-        topP = topP,
-        topK = topK,
-        maxTokens = maxTokens,
-        systemPromptId = systemPromptId,
-        useStreaming = useStreaming,
-        timeoutSeconds = timeoutSeconds
-    )
-
-    companion object {
-        fun from(conversationId: String, config: ModelConfig): ModelConfigWithConversation {
-            return ModelConfigWithConversation(
-                conversationId = conversationId,
-                provider = config.provider,
-                modelName = config.modelName,
-                customEndpoint = config.customEndpoint,
-                apiKey = config.apiKey,
-                temperature = config.temperature,
-                topP = config.topP,
-                topK = config.topK,
-                maxTokens = config.maxTokens,
-                systemPromptId = config.systemPromptId,
-                useStreaming = config.useStreaming,
-                timeoutSeconds = config.timeoutSeconds
-            )
-        }
-    }
 }

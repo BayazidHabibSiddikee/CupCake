@@ -4,6 +4,7 @@ import com.cupcake.data.model.ApiProvider
 import com.cupcake.data.model.ChatMessage
 import com.cupcake.data.model.Conversation
 import com.cupcake.data.model.ModelConfig
+import com.cupcake.data.model.PromptImage
 import com.cupcake.data.model.StreamChunk
 import com.cupcake.data.model.SystemPrompt
 import kotlinx.coroutines.flow.Flow
@@ -54,13 +55,3 @@ interface ModelRepository {
     fun getConfig(conversationId: String): Flow<ModelConfig>
     suspend fun updateConfig(conversationId: String, config: ModelConfig)
 }
-
-data class PromptImage(
-    val id: String = java.util.UUID.randomUUID().toString(),
-    val uri: String,
-    val mimeType: String,
-    val description: String = "",
-    val extractedText: String = "",
-    val thumbnailUri: String? = null,
-    val uploadedAt: java.time.Instant = java.time.Instant.now()
-)

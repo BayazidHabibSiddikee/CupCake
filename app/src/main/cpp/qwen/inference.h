@@ -6,8 +6,9 @@
 #include <functional>
 #include <memory>
 
-#include "ggml.h"
-#include "gguf.h"
+// NOTE: no direct ggml/gguf includes here. The implementation
+// (qwen/inference.cpp) goes through the llama.cpp public C API
+// (third_party/llama.cpp/include/llama.h), which is version-pinned.
 
 namespace cupcake {
 namespace qwen {
