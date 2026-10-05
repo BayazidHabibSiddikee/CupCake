@@ -102,17 +102,17 @@ object TicTacToeEngine {
     }
 
     private fun getSmartMove(board: Game.TicTacToeBoard): Int {
+        // Try to win first
+        for (line in WIN_LINES) {
+            val cells = line.map { board.get(it) }
+            if (cells.count { it == Game.Player.BOT } == 2 && cells.count { it == null } == 1) {
+                return line[cells.indexOf(null)]
+            }
+        }
         // Block human win
         for (line in WIN_LINES) {
             val cells = line.map { board.get(it) }
             if (cells.count { it == Game.Player.HUMAN } == 2 && cells.count { it == null } == 1) {
-                return line[cells.indexOf(null)]
-            }
-        }
-        // Try to win
-        for (line in WIN_LINES) {
-            val cells = line.map { board.get(it) }
-            if (cells.count { it == Game.Player.BOT } == 2 && cells.count { it == null } == 1) {
                 return line[cells.indexOf(null)]
             }
         }

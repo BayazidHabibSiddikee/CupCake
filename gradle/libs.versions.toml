@@ -27,7 +27,7 @@ junit = "4.13.2"
 espresso = "3.5.1"
 composeUiTest = "1.5.11"
 robolectric = "4.11"
-truth = "1.5"
+truth = "1.4.5"
 turbine = "1.0.0"
 
 [libraries]
