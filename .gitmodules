@@ -1,0 +1,3 @@
+[submodule "third-party-llama"]
+	path = app/src/main/cpp/third_party/llama.cpp
+	url = https://github.com/ggerganov/llama.cpp.git

@@ -2,6 +2,10 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <thread>
+#include <atomic>
+#include <cstring>
+#include <ctime>
 #include <android/log.h>
 #include "llama.h"
 
@@ -13,7 +17,8 @@
 static llama_context* g_ctx = nullptr;
 static llama_model* g_model = nullptr;
 static std::vector<llama_token> g_tokens;
-static bool g_is_generating = false;
+static std::atomic<bool> g_is_generating{false};
+static std::atomic<bool> g_should_stop{false};
 
 // Sampling parameters
 struct SamplingParams {
@@ -148,7 +153,8 @@ Java_com_cupcake_ai_LlamaEngine_generate(
     }
     
     g_is_generating = true;
-    
+    g_should_stop = false;
+
     const char* prompt_str = env->GetStringUTFChars(prompt, nullptr);
     
     // Tokenize prompt
@@ -167,21 +173,33 @@ Java_com_cupcake_ai_LlamaEngine_generate(
     
     // Run generation in background thread
     std::thread([=]() {
-        llama_sampling_params sparams = llama_sampling_default_params();
-        sparams.temp = g_sampling_params.temp;
-        sparams.top_p = g_sampling_params.top_p;
-        sparams.top_k = g_sampling_params.top_k;
-        sparams.penalty_repeat = g_sampling_params.repeat_penalty;
-        sparams.penalty_last_n = g_sampling_params.repeat_last_n;
-        sparams.seed = g_sampling_params.seed;
-        
-        llama_sampler* smpl = llama_sampler_chain_init(sparams);
+        // Build sampler chain (llama.cpp b4122 API): penalties -> top_k -> top_p -> temp -> dist
+        llama_sampler* smpl = llama_sampler_chain_init(llama_sampler_chain_default_params());
+        llama_sampler_chain_add(smpl,
+            llama_sampler_init_penalties(
+                llama_n_vocab(g_model),
+                llama_token_eos(g_model),
+                -1, // linefeed_id (unused, penalize_nl=false)
+                g_sampling_params.repeat_last_n,
+                g_sampling_params.repeat_penalty,
+                0.0f,  // penalty_freq (disabled)
+                0.0f,  // penalty_present (disabled)
+                false, // penalize_nl
+                false  // ignore_eos
+            ));
+        llama_sampler_chain_add(smpl, llama_sampler_init_top_k(g_sampling_params.top_k));
+        llama_sampler_chain_add(smpl, llama_sampler_init_top_p(g_sampling_params.top_p, 1));
+        llama_sampler_chain_add(smpl, llama_sampler_init_temp(g_sampling_params.temp));
+        const uint32_t seed = g_sampling_params.seed < 0
+            ? (uint32_t) time(nullptr)
+            : (uint32_t) g_sampling_params.seed;
+        llama_sampler_chain_add(smpl, llama_sampler_init_dist(seed));
         
         const int max_tokens = 2048;
         int generated = 0;
         
         // Process prompt
-        if (llama_decode(g_ctx, llama_batch_get_one(g_tokens.data(), g_tokens.size()))) {
+        if (llama_decode(g_ctx, llama_batch_get_one(g_tokens.data(), (int32_t) g_tokens.size()))) {
             emit_error("Failed to process prompt");
             g_is_generating = false;
             llama_sampler_free(smpl);
@@ -189,7 +207,7 @@ Java_com_cupcake_ai_LlamaEngine_generate(
         }
         
         // Generate tokens
-        while (generated < max_tokens && !g_jvm->GetEnv(nullptr, JNI_VERSION_1_6)) {
+        while (generated < max_tokens && !g_should_stop.load()) {
             llama_token id = llama_sampler_sample(smpl, g_ctx, -1);
             
             if (llama_token_is_eog(g_model, id)) {
@@ -216,7 +234,7 @@ Java_com_cupcake_ai_LlamaEngine_generate(
             generated++;
             
             // Accept token for next iteration
-            llama_sampler_accept(smpl, id, true);
+            llama_sampler_accept(smpl, id);
         }
         
         llama_sampler_free(smpl);
@@ -229,6 +247,7 @@ Java_com_cupcake_ai_LlamaEngine_generate(
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_cupcake_ai_LlamaEngine_cancel(JNIEnv* env, jobject thiz) {
+    g_should_stop = true;
     g_is_generating = false;
 }
 
