@@ -1,6 +1,11 @@
 package com.cupcake.ui.component
 
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,6 +20,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -121,32 +127,47 @@ fun ChatMessageItem(
 
 @Composable
 fun TypingIndicator() {
-    val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition()
-    val alpha1 by infiniteTransition.animateFloat(0f, 1f, androidx.compose.animation.core.infiniteRepeatable(
-        animation = androidx.compose.animation.core.tween(600, delayMillis = 0),
-        repeatMode = androidx.compose.animation.core.RepeatMode.REVERSE
-    ))
-    val alpha2 by infiniteTransition.animateFloat(0f, 1f, androidx.compose.animation.core.infiniteRepeatable(
-        animation = androidx.compose.animation.core.tween(600, delayMillis = 200),
-        repeatMode = androidx.compose.animation.core.RepeatMode.REVERSE
-    ))
-    val alpha3 by infiniteTransition.animateFloat(0f, 1f, androidx.compose.animation.core.infiniteRepeatable(
-        animation = androidx.compose.animation.core.tween(600, delayMillis = 400),
-        repeatMode = androidx.compose.animation.core.RepeatMode.REVERSE
-    ))
+    val infiniteTransition = rememberInfiniteTransition(label = "typing")
+    val alpha1 by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(600, delayMillis = 0),
+            repeatMode = RepeatMode.REVERSE
+        ),
+        label = "alpha1"
+    )
+    val alpha2 by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(600, delayMillis = 200),
+            repeatMode = RepeatMode.REVERSE
+        ),
+        label = "alpha2"
+    )
+    val alpha3 by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(600, delayMillis = 400),
+            repeatMode = RepeatMode.REVERSE
+        ),
+        label = "alpha3"
+    )
 
     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        androidx.compose.foundation.Canvas(modifier = Modifier.size(8.dp)) {
-            val color = androidx.compose.material3.MaterialTheme.colorScheme.primary
-            drawCircle(color = color.copy(alpha = alpha1), radius = 4f)
+        Canvas(modifier = Modifier.size(8.dp)) {
+            val dotColor = androidx.compose.material3.MaterialTheme.colorScheme.primary
+            drawCircle(color = dotColor.copy(alpha = alpha1), radius = 4f)
         }
-        androidx.compose.foundation.Canvas(modifier = Modifier.size(8.dp)) {
-            val color = androidx.compose.material3.MaterialTheme.colorScheme.primary
-            drawCircle(color = color.copy(alpha = alpha2), radius = 4f)
+        Canvas(modifier = Modifier.size(8.dp)) {
+            val dotColor = androidx.compose.material3.MaterialTheme.colorScheme.primary
+            drawCircle(color = dotColor.copy(alpha = alpha2), radius = 4f)
         }
-        androidx.compose.foundation.Canvas(modifier = Modifier.size(8.dp)) {
-            val color = androidx.compose.material3.MaterialTheme.colorScheme.primary
-            drawCircle(color = color.copy(alpha = alpha3), radius = 4f)
+        Canvas(modifier = Modifier.size(8.dp)) {
+            val dotColor = androidx.compose.material3.MaterialTheme.colorScheme.primary
+            drawCircle(color = dotColor.copy(alpha = alpha3), radius = 4f)
         }
     }
 }

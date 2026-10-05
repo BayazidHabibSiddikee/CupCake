@@ -16,11 +16,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.material3.TextFieldColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,10 +32,6 @@ import androidx.compose.ui.text.input.KeyboardOptions
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.Chat
@@ -53,15 +49,18 @@ fun MessageInput(
     var text by remember { mutableStateOf("") }
     val coroutineScope = rememberCoroutineScope()
 
-    val textFieldColors = TextFieldDefaults.textFieldColors(
-        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerHigh,
+    val textFieldColors = TextFieldDefaults.colors(
         focusedContainerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerHighest,
         unfocusedContainerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerHigh,
         disabledContainerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainer,
-        textColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
-        placeholderTextColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
-        leadingIconColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
-        trailingIconColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+        focusedTextColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
+        unfocusedTextColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
+        focusedPlaceholderColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+        unfocusedPlaceholderColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+        focusedLeadingIconColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+        unfocusedLeadingIconColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+        focusedTrailingIconColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+        unfocusedTrailingIconColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
         cursorColor = androidx.compose.material3.MaterialTheme.colorScheme.primary
     )
 
@@ -76,7 +75,7 @@ fun MessageInput(
         onAttachImage?.let {
             IconButton(onClick = it, enabled = enabled) {
                 Icon(
-                    painter = painterResource(id = androidx.compose.material.icons.Icons.Filled.AddPhotoAlternate),
+                    imageVector = Icons.Filled.AddPhotoAlternate,
                     contentDescription = "Attach image",
                     tint = androidx.compose.material3.MaterialTheme.colorScheme.primary
                 )
@@ -102,7 +101,7 @@ fun MessageInput(
             placeholder = { Text("Message...") },
             leadingIcon = {
                 Icon(
-                    painter = painterResource(id = androidx.compose.material.icons.Icons.Filled.Chat),
+                    imageVector = Icons.Filled.Chat,
                     contentDescription = null
                 )
             },
@@ -113,14 +112,14 @@ fun MessageInput(
                         text = ""
                     }) {
                         Icon(
-                            painter = painterResource(id = androidx.compose.material.icons.Icons.AutoMirrored.Filled.Send),
+                            imageVector = Icons.AutoMirrored.Filled.Send,
                             contentDescription = "Send",
                             tint = androidx.compose.material3.MaterialTheme.colorScheme.primary
                         )
                     }
                 } else {
                     Icon(
-                        painter = painterResource(id = androidx.compose.material.icons.Icons.Filled.Mic),
+                        imageVector = Icons.Filled.Mic,
                         contentDescription = "Voice input",
                         tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
                     )
