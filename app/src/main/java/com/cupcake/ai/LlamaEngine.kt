@@ -79,7 +79,7 @@ class LlamaEngine private constructor() {
     }
 
     data class Config(
-        val modelFileName: String = "qwen2.5-0.5b-instruct-q4_k_m.gguf",
+        val modelFileName: String = "models/qwen2.5-0.5b-instruct-q4_k_m.gguf",
         val nCtx: Int = 4096,
         val nThreads: Int = 4,
         val nBatch: Int = 512,
