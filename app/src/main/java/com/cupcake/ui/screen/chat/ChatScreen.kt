@@ -66,8 +66,9 @@ fun ChatScreen(
             // Model load status (first run copies ~500MB from assets)
             when (val state = modelLoadState) {
                 is ChatViewModel.ModelLoadState.Loading -> {
+                    val detail = if (state.detail.isNotBlank()) " (${state.detail})" else ""
                     Text(
-                        text = "⏳ Loading on-device model…",
+                        text = "⏳ Loading on-device model…$detail",
                         fontSize = 12.sp,
                         color = androidx.compose.material3.MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)

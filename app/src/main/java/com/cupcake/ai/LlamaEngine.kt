@@ -38,7 +38,11 @@ class LlamaEngine private constructor() {
             Log.i(TAG, "Llama JNI loaded")
         }
 
-        fun copyModelFromAssets(context: Context, fileName: String): File {
+        fun copyModelFromAssets(
+            context: Context,
+            fileName: String,
+            onProgressBytes: ((copiedBytes: Long, totalBytes: Long) -> Unit)? = null
+        ): File {
             val modelDir = File(context.filesDir, "models")
             modelDir.mkdirs()
             // fileName may include an assets-relative subdir (e.g. "models/x.gguf");
@@ -47,15 +51,36 @@ class LlamaEngine private constructor() {
 
             if (modelFile.exists() && modelFile.length() > 0) {
                 Log.i(TAG, "Model already exists: ${modelFile.length()} bytes")
+                onProgressBytes?.invoke(modelFile.length(), modelFile.length())
                 return modelFile
             }
 
-            Log.i(TAG, "Copying model from assets...")
+            // Declared asset length for progress (-1 when unknown/compressed).
+            val totalBytes = try {
+                context.assets.openFd(fileName).use { it.length }
+            } catch (e: Exception) {
+                -1L
+            }
+            Log.i(TAG, "Copying model from assets... (${totalBytes} bytes)")
+            var copiedBytes = 0L
+            var lastReport = 0L
             context.assets.open(fileName).use { input ->
                 FileOutputStream(modelFile).use { output ->
-                    input.copyTo(output)
+                    val buffer = ByteArray(1024 * 1024) // 1MB chunks
+                    while (true) {
+                        val read = input.read(buffer)
+                        if (read <= 0) break
+                        output.write(buffer, 0, read)
+                        copiedBytes += read
+                        // Report at most every 8MB to avoid spamming the UI thread.
+                        if (copiedBytes - lastReport >= 8L * 1024 * 1024) {
+                            lastReport = copiedBytes
+                            onProgressBytes?.invoke(copiedBytes, totalBytes)
+                        }
+                    }
                 }
             }
+            onProgressBytes?.invoke(copiedBytes, totalBytes)
             Log.i(TAG, "Model copied: ${modelFile.length()} bytes")
             return modelFile
         }
@@ -82,7 +107,8 @@ class LlamaEngine private constructor() {
 
     data class Config(
         val modelFileName: String = "models/qwen2.5-0.5b-instruct-q4_k_m.gguf",
-        val nCtx: Int = 4096,
+        // 2048 context is plenty for chat and halves KV-cache + init time on phones.
+        val nCtx: Int = 2048,
         val nThreads: Int = 4,
         val nBatch: Int = 512,
         val temperature: Float = 0.7f,
@@ -95,9 +121,15 @@ class LlamaEngine private constructor() {
 
     private var _isModelLoaded = false
 
-    fun loadModel(context: Context, config: Config = Config()): Result<Unit> {
+    fun loadModel(
+        context: Context,
+        config: Config = Config(),
+        onProgressBytes: ((copiedBytes: Long, totalBytes: Long) -> Unit)? = null
+    ): Result<Unit> {
+        // Already loaded (e.g. warmed at app start) - don't pay init cost again.
+        if (isReady()) return Result.success(Unit)
         return try {
-            val modelFile = copyModelFromAssets(context, config.modelFileName)
+            val modelFile = copyModelFromAssets(context, config.modelFileName, onProgressBytes)
             val result = initModel(
                 modelFile.absolutePath,
                 config.nCtx,

@@ -121,6 +121,12 @@ android {
         jniLibs.pickFirsts.add("libllama_jni.so")
     }
 
+    androidResources {
+        // Keep the GGUF stored (uncompressed) in the APK: faster installs
+        // and assets.openFd() works for progress reporting.
+        noCompress += "gguf"
+    }
+
     externalNativeBuild {
         cmake {
             path = file("src/main/cpp/CMakeLists.txt")

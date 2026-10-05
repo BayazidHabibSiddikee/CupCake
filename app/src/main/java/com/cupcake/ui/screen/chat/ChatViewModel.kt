@@ -39,7 +39,7 @@ class ChatViewModel @Inject constructor(
 
     sealed interface ModelLoadState {
         data object Idle : ModelLoadState
-        data object Loading : ModelLoadState
+        data class Loading(val detail: String = "") : ModelLoadState
         data object Ready : ModelLoadState
         data class Error(val message: String) : ModelLoadState
     }
@@ -94,10 +94,21 @@ class ChatViewModel @Inject constructor(
      * on IO) and initializes the native engine. Safe to call repeatedly.
      */
     fun ensureModelLoaded() {
-        if (llamaEngine.isReady() || _modelLoadState.value is ModelLoadState.Loading) return
-        _modelLoadState.value = ModelLoadState.Loading
+        if (llamaEngine.isReady()) {
+            _modelLoadState.value = ModelLoadState.Ready
+            return
+        }
+        if (_modelLoadState.value is ModelLoadState.Loading) return
+        _modelLoadState.value = ModelLoadState.Loading()
         viewModelScope.launch(Dispatchers.IO) {
-            val result = llamaEngine.loadModel(appContext)
+            val result = llamaEngine.loadModel(appContext) { copied, total ->
+                val detail = if (total > 0) {
+                    "${copied / 1024 / 1024} / ${total / 1024 / 1024} MB"
+                } else {
+                    "${copied / 1024 / 1024} MB"
+                }
+                _modelLoadState.value = ModelLoadState.Loading(detail)
+            }
             _modelLoadState.value = result.fold(
                 onSuccess = { ModelLoadState.Ready },
                 onFailure = { ModelLoadState.Error(it.message ?: "Model load failed") }
