@@ -39,6 +39,32 @@ android {
         vectorDrawables.useSupportLibrary = true
     }
 
+    signingConfigs {
+        create("release") {
+            // Real keystore via env or gradle.properties:
+            //   CUPCAKE_KEYSTORE_PATH / cupcake.keystore.path, etc.
+            // Falls back to the debug keystore so local release builds work
+            // without secrets. Do NOT ship production builds signed this way.
+            val ksPath = System.getenv("CUPCAKE_KEYSTORE_PATH")
+                ?: (project.findProperty("cupcake.keystore.path") as String?).orEmpty()
+            if (ksPath.isNotBlank() && file(ksPath).exists()) {
+                storeFile = file(ksPath)
+                storePassword = System.getenv("CUPCAKE_KEYSTORE_PASSWORD")
+                    ?: (project.findProperty("cupcake.keystore.password") as String?)
+                keyAlias = System.getenv("CUPCAKE_KEY_ALIAS")
+                    ?: (project.findProperty("cupcake.key.alias") as String?)
+                keyPassword = System.getenv("CUPCAKE_KEY_PASSWORD")
+                    ?: (project.findProperty("cupcake.key.password") as String?)
+            } else {
+                val debugKs = signingConfigs.getByName("debug")
+                storeFile = debugKs.storeFile
+                storePassword = debugKs.storePassword
+                keyAlias = debugKs.keyAlias
+                keyPassword = debugKs.keyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true

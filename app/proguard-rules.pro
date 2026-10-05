@@ -6,6 +6,13 @@
     native <methods>;
 }
 
+# Keep llama.cpp JNI engine (loaded as libllama_jni, callbacks via reflection)
+-keep class com.cupcake.ai.LlamaEngine { *; }
+-keep class com.cupcake.ai.LlamaEngine$* { *; }
+-keepclassmembers class com.cupcake.ai.LlamaEngine {
+    native <methods>;
+}
+
 # Keep Hilt generated classes
 -keep class dagger.hilt.** { *; }
 -keepclassmembers class dagger.hilt.** { *; }

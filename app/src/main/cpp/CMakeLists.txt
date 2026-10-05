@@ -68,13 +68,34 @@ target_compile_options(llama_jni PRIVATE
 )
 
 # =============================================================================
-# LEGACY QWEN JNI (Deprecated - kept for compatibility)
+# QWEN JNI (compatibility shim over llama.cpp for com.cupcake.native.QwenNative)
 # =============================================================================
-# add_library(qwen_jni SHARED
-#     jni/qwen_jni.cpp
-#     jni/jni_common.cpp
-# )
-# target_link_libraries(qwen_jni PRIVATE log)
+add_library(qwen_jni SHARED
+    jni/qwen_jni.cpp
+    jni/jni_common.cpp
+    qwen/inference.cpp
+)
+
+target_include_directories(qwen_jni PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/jni
+    ${CMAKE_CURRENT_SOURCE_DIR}/qwen
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llama.cpp/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llama.cpp/ggml/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llama.cpp/ggml/src
+)
+
+target_link_libraries(qwen_jni PRIVATE
+    llama
+    ${CMAKE_DL_LIBS}
+    ${CMAKE_THREAD_LIBS_INIT}
+    log
+    android
+)
+
+target_compile_options(qwen_jni PRIVATE
+    -Wall -Wextra
+    -Wno-unused-parameter
+)
 
 # =============================================================================
 # TESTS
@@ -84,6 +105,6 @@ enable_testing()
 # =============================================================================
 # INSTALL
 # =============================================================================
-install(TARGETS llama_jni
+install(TARGETS llama_jni qwen_jni
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )

@@ -1,7 +1,6 @@
 #include "qwen_jni.h"
 #include "jni_common.h"
 #include "qwen/inference.h"
-#include "utils/logger.h"
 
 #include <string>
 #include <memory>
@@ -179,7 +178,7 @@ Java_com_cupcake_native_QwenNative_getModelInfo(
         return env->NewStringUTF("Model not loaded");
     }
 
-    std::string info = g_engine->get_model_info();
+    std::string info = g_engine->get_model_info_string();
     return env->NewStringUTF(info.c_str());
 }
 
