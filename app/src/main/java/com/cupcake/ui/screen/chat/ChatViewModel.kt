@@ -211,9 +211,10 @@ class ChatViewModel @Inject constructor(
             val prompt = buildPrompt()
 
             try {
+                val personality = currentCharacter.value?.personality ?: ""
                 llamaEngine.generateStream(prompt).consumeEach { token ->
                     fullResponse += token
-                    _currentResponse.value = fullResponse
+                    _currentResponse.value = com.cupcake.ai.BanglishTranslator.translate(fullResponse, personality)
                 }
             } catch (e: Exception) {
                 Log.e("ChatViewModel", "Generation failed", e)
@@ -232,9 +233,13 @@ class ChatViewModel @Inject constructor(
                     // Consume energy
                     energyManager.consumeEnergy()
                     
+                    // Translate output
+                    val personality = currentCharacter.value?.personality ?: ""
+                    val translatedText = com.cupcake.ai.BanglishTranslator.translate(fullResponse.trim(), personality)
+
                     // Add assistant message
                     val assistantMessage = ChatMessage.assistant(
-                        fullResponse.trim(),
+                        translatedText,
                         conversationId,
                         modelUsed = _modelConfig.value.modelName
                     )

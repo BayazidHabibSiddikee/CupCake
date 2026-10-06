@@ -106,7 +106,7 @@ class LlamaEngine private constructor() {
     }
 
     data class Config(
-        val modelFileName: String = "models/qwen2.5-0.5b-instruct-q4_k_m.gguf",
+        val modelFileName: String = "models/qwen2.5-0.5b-instruct-q2_k.gguf",
         // Ultra-fast 512 context for snappy, dumb-but-fast chat on phones.
         val nCtx: Int = 512,
         val nThreads: Int = 6,
