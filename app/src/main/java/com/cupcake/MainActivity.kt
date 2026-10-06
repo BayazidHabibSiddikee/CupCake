@@ -74,7 +74,8 @@ class MainActivity : ComponentActivity() {
                                 navController.navigate("chat/$id") {
                                     popUpTo("chat/{characterId}") { inclusive = true }
                                 }
-                            }
+                            },
+                            onBack = { navController.popBackStack() }
                         )
                     }
                     

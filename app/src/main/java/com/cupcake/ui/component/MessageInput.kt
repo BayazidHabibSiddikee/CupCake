@@ -6,7 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -73,13 +73,21 @@ fun MessageInput(
             onValueChange = { text = it },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(48.dp),
+                .heightIn(min = 48.dp, max = 120.dp),
             enabled = enabled,
             singleLine = false,
             maxLines = 5,
             keyboardOptions = KeyboardOptions(
                 imeAction = ImeAction.Send,
                 keyboardType = androidx.compose.ui.text.input.KeyboardType.Text
+            ),
+            keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                onSend = {
+                    if (text.isNotBlank() && enabled) {
+                        onSend(text.trim())
+                        text = ""
+                    }
+                }
             ),
             visualTransformation = VisualTransformation.None,
             colors = textFieldColors,

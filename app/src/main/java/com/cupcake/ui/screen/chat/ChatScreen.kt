@@ -26,12 +26,17 @@ import com.cupcake.data.model.ChatMessage
 import com.cupcake.ui.component.ChatMessageItem
 import com.cupcake.ui.component.MessageInput
 import com.cupcake.ui.theme.CupCakeTheme
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.PeopleAlt
+import androidx.compose.material.icons.filled.Delete
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(
     characterId: String,
     onSwitchCharacter: (String) -> Unit,
+    onBack: () -> Unit,
     viewModel: ChatViewModel = hiltViewModel()
 ) {
     val messages by viewModel.messages.collectAsStateWithLifecycle()
@@ -43,18 +48,42 @@ fun ChatScreen(
 
     var scrollToBottom by remember { mutableStateOf(false) }
     var showCharacterPicker by remember { mutableStateOf(false) }
+    var showClearChatConfirm by remember { mutableStateOf(false) }
 
     CupCakeTheme {
         Column(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Character header (no model details shown)
+            // Character header
             CharacterHeader(
                 characterName = currentCharacter?.name ?: "Companion",
                 characterAvatar = currentCharacter?.avatar ?: "🤖",
-                onSwitchClick = { showCharacterPicker = true }
+                onSwitchClick = { showCharacterPicker = true },
+                onBackClick = onBack,
+                onClearChatClick = { showClearChatConfirm = true }
             )
+
+            if (showClearChatConfirm) {
+                androidx.compose.material3.AlertDialog(
+                    onDismissRequest = { showClearChatConfirm = false },
+                    title = { Text("Clear Chat?") },
+                    text = { Text("Are you sure you want to clear the entire conversation?") },
+                    confirmButton = {
+                        androidx.compose.material3.TextButton(onClick = {
+                            viewModel.clearChat()
+                            showClearChatConfirm = false
+                        }) {
+                            Text("Clear")
+                        }
+                    },
+                    dismissButton = {
+                        androidx.compose.material3.TextButton(onClick = { showClearChatConfirm = false }) {
+                            Text("Cancel")
+                        }
+                    }
+                )
+            }
 
             // Load status without technical details
             when (val state = modelLoadState) {
@@ -129,7 +158,9 @@ fun ChatScreen(
 fun CharacterHeader(
     characterName: String,
     characterAvatar: String,
-    onSwitchClick: () -> Unit
+    onSwitchClick: () -> Unit,
+    onBackClick: () -> Unit,
+    onClearChatClick: () -> Unit
 ) {
     androidx.compose.material3.Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -138,17 +169,37 @@ fun CharacterHeader(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(horizontal = 4.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "$characterAvatar $characterName",
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Medium
-            )
-            androidx.compose.material3.TextButton(onClick = onSwitchClick) {
-                Text("Switch")
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                androidx.compose.material3.IconButton(onClick = onBackClick) {
+                    androidx.compose.material3.Icon(
+                        imageVector = androidx.compose.material.icons.Icons.Filled.ArrowBack,
+                        contentDescription = "Back"
+                    )
+                }
+                Text(
+                    text = "$characterAvatar $characterName",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(start = 4.dp)
+                )
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                androidx.compose.material3.IconButton(onClick = onSwitchClick) {
+                    androidx.compose.material3.Icon(
+                        imageVector = androidx.compose.material.icons.Icons.Filled.PeopleAlt,
+                        contentDescription = "Switch Character"
+                    )
+                }
+                androidx.compose.material3.IconButton(onClick = onClearChatClick) {
+                    androidx.compose.material3.Icon(
+                        imageVector = androidx.compose.material.icons.Icons.Filled.Delete,
+                        contentDescription = "Clear Chat"
+                    )
+                }
             }
         }
     }

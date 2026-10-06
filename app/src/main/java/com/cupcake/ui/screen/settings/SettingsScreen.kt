@@ -46,6 +46,13 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Wifi
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Wifi
 
@@ -300,11 +307,41 @@ fun AddProviderDialog(
 
                 // Provider type dropdown
                 Text("Provider Type", fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                androidx.compose.material3.TextButton(
-                    onClick = { /* TODO: provider type dropdown */ },
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
-                ) {
-                    Text(providerType.value)
+                
+                var expanded by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+                androidx.compose.foundation.layout.Box(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                    androidx.compose.material3.OutlinedButton(
+                        onClick = { expanded = true },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(providerType.value)
+                        androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
+                        Icon(
+                            imageVector = androidx.compose.material.icons.Icons.Filled.ArrowDropDown,
+                            contentDescription = "Dropdown"
+                        )
+                    }
+                    androidx.compose.material3.DropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false },
+                        modifier = Modifier.fillMaxWidth(0.9f)
+                    ) {
+                        val types = listOf(
+                            ModelConfig.ModelProvider.CUSTOM_OPENAI,
+                            ModelConfig.ModelProvider.CUSTOM_OLLAMA,
+                            ModelConfig.ModelProvider.CUSTOM_VLLM,
+                            ModelConfig.ModelProvider.CUSTOM_OTHER
+                        )
+                        types.forEach { type ->
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text(type.value) },
+                                onClick = {
+                                    onProviderTypeChange(type)
+                                    expanded = false
+                                }
+                            )
+                        }
+                    }
                 }
 
                 androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(top = 16.dp))

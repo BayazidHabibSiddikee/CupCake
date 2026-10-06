@@ -44,20 +44,27 @@ fun ChatMessageItem(
     val isUser = message.role == ChatMessage.MessageRole.USER
     val isSystem = message.role == ChatMessage.MessageRole.SYSTEM
 
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        colors = androidx.compose.material3.CardDefaults.cardColors(
-            containerColor = when {
-                isUser -> androidx.compose.material3.MaterialTheme.colorScheme.primaryContainer
-                isSystem -> androidx.compose.material3.MaterialTheme.colorScheme.secondaryContainer
-                else -> androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerHigh
-            }
-        ),
-        shape = RoundedCornerShape(16.dp)
+    Box(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        contentAlignment = if (isUser) Alignment.CenterEnd else Alignment.CenterStart
     ) {
-        Column(
+        Card(
+            modifier = Modifier.fillMaxWidth(0.85f),
+            colors = androidx.compose.material3.CardDefaults.cardColors(
+                containerColor = when {
+                    isUser -> androidx.compose.material3.MaterialTheme.colorScheme.primaryContainer
+                    isSystem -> androidx.compose.material3.MaterialTheme.colorScheme.secondaryContainer
+                    else -> androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerHigh
+                }
+            ),
+            shape = RoundedCornerShape(
+                topStart = 16.dp,
+                topEnd = 16.dp,
+                bottomStart = if (isUser) 16.dp else 4.dp,
+                bottomEnd = if (isUser) 4.dp else 16.dp
+            )
+        ) {
+            Column(
             modifier = Modifier.padding(16.dp),
             horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
         ) {
@@ -123,6 +130,7 @@ fun ChatMessageItem(
             }
         }
     }
+}
 }
 
 @Composable

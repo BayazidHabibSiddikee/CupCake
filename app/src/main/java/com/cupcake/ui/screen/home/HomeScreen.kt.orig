@@ -28,7 +28,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.VideogameAsset
-import androidx.compose.material.icons.filled.Add
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -43,37 +42,30 @@ fun HomeScreen(
     val characters = viewModel.listCharacters()
 
     CupCakeTheme {
-        androidx.compose.material3.Scaffold(
-            topBar = {
-                TopAppBar(
-                    title = { Text("CupCake") },
-                    actions = {
-                        androidx.compose.material3.IconButton(onClick = onNavigateToGames) {
-                            Icon(
-                                imageVector = Icons.Filled.VideogameAsset,
-                                contentDescription = "Games"
-                            )
-                        }
-                        androidx.compose.material3.IconButton(onClick = onNavigateToSettings) {
-                            Icon(
-                                imageVector = Icons.Filled.Settings,
-                                contentDescription = "Settings"
-                            )
-                        }
-                    },
-                    colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
-                        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerLow
-                    )
+        Column(Modifier.fillMaxSize()) {
+            TopAppBar(
+                title = { Text("CupCake") },
+                actions = {
+                    androidx.compose.material3.IconButton(onClick = onNavigateToGames) {
+                        Icon(
+                            imageVector = Icons.Filled.VideogameAsset,
+                            contentDescription = "Games"
+                        )
+                    }
+                    androidx.compose.material3.IconButton(onClick = onNavigateToSettings) {
+                        Icon(
+                            imageVector = Icons.Filled.Settings,
+                            contentDescription = "Settings"
+                        )
+                    }
+                },
+                colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
+                    containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerLow
                 )
-            },
-            floatingActionButton = {
-                androidx.compose.material3.FloatingActionButton(onClick = onNavigateToCharacters) {
-                    Icon(imageVector = androidx.compose.material.icons.Icons.Filled.Add, contentDescription = "Add Character")
-                }
-            }
-        ) { innerPadding ->
+            )
+
             Column(
-                modifier = Modifier.fillMaxSize().padding(innerPadding),
+                modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
@@ -83,33 +75,17 @@ fun HomeScreen(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
                 )
 
-                if (characters.isEmpty()) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Text("🫥", fontSize = 64.sp)
-                            Text("No characters found", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                            Text(
-                                "Tap the + button to create your\nfirst companion!",
-                                color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                            )
-                        }
-                    }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(characters) { character ->
-                            CharacterCard(
-                                character = character,
-                                onClick = { onNavigateToChat(character.id) }
-                            )
-                        }
+                // One persistent chat session per character.
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(characters) { character ->
+                        CharacterCard(
+                            character = character,
+                            onClick = { onNavigateToChat(character.id) }
+                        )
                     }
                 }
             }

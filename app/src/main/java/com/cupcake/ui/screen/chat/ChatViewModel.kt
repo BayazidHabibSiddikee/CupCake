@@ -316,6 +316,10 @@ class ChatViewModel @Inject constructor(
     // Character management
     fun getAvailableCharacters(): List<Character> = characterManager.getAllCharacters()
 
+    fun clearChat() {
+        sessionStore.clear(characterId)
+    }
+
     // Energy/Ad
     fun watchAdForEnergy() {
         // Trigger ad loading in UI
