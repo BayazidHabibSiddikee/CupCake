@@ -107,9 +107,9 @@ class LlamaEngine private constructor() {
 
     data class Config(
         val modelFileName: String = "models/qwen2.5-0.5b-instruct-q4_k_m.gguf",
-        // 2048 context is plenty for chat and halves KV-cache + init time on phones.
-        val nCtx: Int = 2048,
-        val nThreads: Int = 4,
+        // Ultra-fast 512 context for snappy, dumb-but-fast chat on phones.
+        val nCtx: Int = 512,
+        val nThreads: Int = 6,
         val nBatch: Int = 512,
         val temperature: Float = 0.7f,
         val topP: Float = 0.9f,

@@ -46,7 +46,7 @@ class QwenNative private constructor() {
 
             context.assets.open(modelFileName).use { input ->
                 FileOutputStream(modelFile).use { output ->
-                    input.copyTo(output)
+                    input.copyTo(output, 1024 * 1024)
                 }
             }
             Log.i(TAG, "Copied model to: ${modelFile.absolutePath}")
@@ -64,7 +64,7 @@ class QwenNative private constructor() {
 
             context.assets.open("tokenizer/$tokenizerFileName").use { input ->
                 FileOutputStream(tokenizerFile).use { output ->
-                    input.copyTo(output)
+                    input.copyTo(output, 1024 * 1024)
                 }
             }
             Log.i(TAG, "Copied tokenizer to: ${tokenizerFile.absolutePath}")
@@ -116,9 +116,9 @@ class QwenNative private constructor() {
         val temperature: Float = 0.7f,
         val topP: Float = 0.9f,
         val topK: Int = 40,
-        val maxTokens: Int = 2048,
-        val nThreads: Int = 4,
-        val nCtx: Int = 4096
+        val maxTokens: Int = 128,
+        val nThreads: Int = 6,
+        val nCtx: Int = 512
     )
 
     data class ModelPaths(
