@@ -29,6 +29,7 @@ class SettingsViewModel @Inject constructor(
     val providers: StateFlow<List<ApiProvider>> = getProvidersUseCase()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val editingProviderId = MutableStateFlow<String?>(null)
     val showAddProviderDialog = MutableStateFlow(false)
     val selectedProviderType = MutableStateFlow(ModelConfig.ModelProvider.CUSTOM_OPENAI)
     val newProviderName = MutableStateFlow("")
@@ -48,14 +49,27 @@ class SettingsViewModel @Inject constructor(
 
     fun addProvider(name: String, type: ModelConfig.ModelProvider, url: String, apiKey: String) {
         viewModelScope.launch {
-            val provider = ApiProvider(
-                name = name,
-                providerType = type,
-                baseUrl = url,
-                apiKey = apiKey
-            )
-            addProviderUseCase(provider)
+            val idToEdit = editingProviderId.value
+            if (idToEdit != null) {
+                val provider = ApiProvider(
+                    id = idToEdit,
+                    name = name,
+                    providerType = type,
+                    baseUrl = url,
+                    apiKey = apiKey
+                )
+                updateProviderUseCase(provider)
+            } else {
+                val provider = ApiProvider(
+                    name = name,
+                    providerType = type,
+                    baseUrl = url,
+                    apiKey = apiKey
+                )
+                addProviderUseCase(provider)
+            }
             // Clear form
+            editingProviderId.value = null
             newProviderName.value = ""
             newProviderUrl.value = ""
             newProviderApiKey.value = ""
@@ -63,7 +77,12 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun editProvider(provider: ApiProvider) {
-        // TODO: Navigate to edit screen
+        editingProviderId.value = provider.id
+        selectedProviderType.value = provider.providerType
+        newProviderName.value = provider.name
+        newProviderUrl.value = provider.baseUrl
+        newProviderApiKey.value = provider.apiKey
+        showAddProviderDialog.value = true
     }
 
     fun deleteProvider(id: String) {

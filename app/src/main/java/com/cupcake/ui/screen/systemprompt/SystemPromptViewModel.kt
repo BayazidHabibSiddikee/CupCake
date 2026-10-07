@@ -21,6 +21,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 
 @HiltViewModel
 class SystemPromptViewModel @Inject constructor(
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context,
     private val getPromptUseCase: GetSystemPromptUseCase,
     private val getPromptsUseCase: GetSystemPromptsUseCase,
     private val savePromptUseCase: SaveSystemPromptUseCase,
@@ -84,9 +85,14 @@ class SystemPromptViewModel @Inject constructor(
         promptId?.let { id ->
             viewModelScope.launch {
                 uris.forEach { uri ->
+                    val mimeType = try {
+                        context.contentResolver.getType(android.net.Uri.parse(uri)) ?: "image/*"
+                    } catch (e: Exception) {
+                        "image/*"
+                    }
                     val image = PromptImage(
                         uri = uri,
-                        mimeType = "image/*", // TODO: detect actual mime type
+                        mimeType = mimeType,
                         description = "Image ${System.currentTimeMillis()}"
                     )
                     val updated = addImageUseCase(id, image)

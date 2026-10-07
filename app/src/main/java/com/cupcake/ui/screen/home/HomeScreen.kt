@@ -25,7 +25,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.cupcake.data.model.Character
 import com.cupcake.ui.theme.CupCakeTheme
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.VideogameAsset
 import androidx.compose.material.icons.filled.Add

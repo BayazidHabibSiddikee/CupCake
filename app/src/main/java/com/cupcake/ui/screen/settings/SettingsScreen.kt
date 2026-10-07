@@ -34,7 +34,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.cupcake.data.model.ApiProvider
 import com.cupcake.data.model.ModelConfig
 import com.cupcake.ui.theme.CupCakeTheme
@@ -146,7 +145,7 @@ fun SettingsScreen(
     // Add provider dialog
     if (showAddProviderDialog) {
         AddProviderDialog(
-            onDismiss = { viewModel.showAddProviderDialog.value = false },
+            onDismiss = { viewModel.showAddProviderDialog.value = false; viewModel.editingProviderId.value = null; viewModel.newProviderName.value = ""; viewModel.newProviderUrl.value = ""; viewModel.newProviderApiKey.value = "" },
             onConfirm = { name, type, url, apiKey ->
                 viewModel.addProvider(name, type, url, apiKey)
                 viewModel.showAddProviderDialog.value = false
