@@ -138,7 +138,8 @@ fun ChatScreen(
                     }
                 }
 
-                items(messages.reversed()) { message ->
+                items(count = messages.size) { i ->
+                    val message = messages[messages.lastIndex - i]
                     ChatMessageItem(message = message)
                 }
             }

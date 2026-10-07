@@ -332,7 +332,7 @@ class GameManager(private val llamaEngine: LlamaEngine, private val characterMan
 
         // Bot moves after short delay
         CoroutineScope(Dispatchers.IO).launch {
-            Thread.sleep(500) // Thinking delay
+            kotlinx.coroutines.delay(500) // Thinking delay
             makeBotMove()
         }
 

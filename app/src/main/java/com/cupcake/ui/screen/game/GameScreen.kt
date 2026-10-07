@@ -1,4 +1,5 @@
 package com.cupcake.ui.screen.game
+import androidx.compose.foundation.layout.aspectRatio
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -297,6 +298,7 @@ fun TicTacToeBoard(
                         val pos = row * 3 + col
                         val cell = board.get(pos)
                         TicTacToeCell(
+                            modifier = Modifier.weight(1f).aspectRatio(1f),
                             value = cell?.symbol ?: "",
                             isWinningCell = isWinningCell(board, pos, state.winner),
                             onClick = { 
@@ -321,13 +323,14 @@ fun TicTacToeBoard(
 
 @Composable
 fun TicTacToeCell(
+    modifier: Modifier = Modifier,
     value: String,
     isWinningCell: Boolean = false,
     onClick: () -> Unit
 ) {
     androidx.compose.material3.Button(
         onClick = onClick,
-        modifier = Modifier.size(80.dp),
+        modifier = modifier,
         enabled = value.isEmpty(),
         colors = androidx.compose.material3.ButtonDefaults.buttonColors(
             containerColor = if (isWinningCell)
