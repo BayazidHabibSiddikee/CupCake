@@ -103,6 +103,13 @@ class GameViewModel @Inject constructor(
                 description = "Bot gives wrong answers on purpose",
                 icon = "➕➖✖️➗",
                 personality = "tutor_bot"
+            ),
+            GameOption(
+                type = com.cupcake.game.Game.GameType.CLICKER,
+                name = "Cupcake Clicker",
+                description = "Mindless tapping, sarcastic bot",
+                icon = "🧁",
+                personality = "sarcastic"
             )
         )
     }

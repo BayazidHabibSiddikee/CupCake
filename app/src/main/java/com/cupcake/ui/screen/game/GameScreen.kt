@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -80,53 +81,48 @@ fun GameScreen(
             val activeGameState = gameState
             if (activeGameState == null) {
                 // Game selection screen
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
+                Column(
+                    modifier = Modifier.fillMaxSize().padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                        modifier = Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())
+                    Text("Choose a Game", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                    Text("Play with your bot companion!", color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)
+                    
+                    // Difficulty selector
+                    androidx.compose.material3.Card(
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Choose a Game", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                        Text("Play with your bot companion!", color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)
-                        
-                        androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(top = 16.dp))
-                        
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            availableGames.forEach { game ->
-                                GameOptionCard(
-                                    game = game,
-                                    onClick = { viewModel.startGame(game, selectedDifficulty) }
-                                )
-                            }
-                        }
-                        
-                        androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(top = 16.dp))
-                        
-                        // Difficulty selector
-                        androidx.compose.material3.Card(
-                            modifier = Modifier.padding(16.dp).fillMaxWidth()
-                        ) {
-                            Column(Modifier.padding(16.dp)) {
-                                Text("Difficulty", fontWeight = FontWeight.Medium, fontSize = 16.sp)
-                                androidx.compose.foundation.layout.Row(
-                                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    com.cupcake.game.TicTacToeEngine.Difficulty.entries.forEach { diff ->
-                                        FilterChip(
-                                            selected = (selectedDifficulty == diff),
-                                            onClick = { viewModel.selectedDifficulty.value = diff },
-                                            label = { Text(diff.name) }
-                                        )
-                                    }
+                        Column(Modifier.padding(16.dp)) {
+                            Text("Difficulty", fontWeight = FontWeight.Medium, fontSize = 16.sp)
+                            @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+                            androidx.compose.foundation.layout.FlowRow(
+                                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                com.cupcake.game.TicTacToeEngine.Difficulty.entries.forEach { diff ->
+                                    FilterChip(
+                                        selected = (selectedDifficulty == diff),
+                                        onClick = { viewModel.selectedDifficulty.value = diff },
+                                        label = { Text(diff.name) }
+                                    )
                                 }
                             }
+                        }
+                    }
+
+                    // Games Grid
+                    androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
+                        columns = androidx.compose.foundation.lazy.grid.GridCells.Fixed(2),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        items(availableGames) { game ->
+                            GameOptionCard(
+                                game = game,
+                                onClick = { viewModel.startGame(game, selectedDifficulty) }
+                            )
                         }
                     }
                 }
@@ -150,6 +146,10 @@ fun GameScreen(
                         state = boardState,
                         onChoice = { pos -> viewModel.makeMove(pos) },
                         onRestart = { viewModel.restartGame() }
+                    )
+                    com.cupcake.game.Game.GameType.CLICKER -> ClickerBoardUI(
+                        state = boardState,
+                        onTap = { viewModel.makeMove(0) }
                     )
                     else -> {
                         Box(
@@ -234,7 +234,6 @@ fun GameOptionCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .width(280.dp)
             .padding(16.dp),
         onClick = onClick
     ) {
@@ -365,5 +364,50 @@ private fun isWinningCell(board: com.cupcake.game.Game.TicTacToeBoard, pos: Int,
     )
     return lines.any { line ->
         pos in line && line.all { board.get(it) == winner }
+    }
+}
+
+@Composable
+fun ClickerBoardUI(
+    state: com.cupcake.game.Game.State,
+    onTap: () -> Unit
+) {
+    val board = state.board as? com.cupcake.game.Game.ClickerBoard ?: return
+    
+    Column(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = "Score: ${board.score}",
+            fontSize = 48.sp,
+            fontWeight = FontWeight.Bold,
+            color = androidx.compose.material3.MaterialTheme.colorScheme.primary
+        )
+        
+        androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(top = 32.dp))
+        
+        androidx.compose.material3.Surface(
+            onClick = onTap,
+            shape = androidx.compose.foundation.shape.CircleShape,
+            color = androidx.compose.material3.MaterialTheme.colorScheme.secondaryContainer,
+            modifier = Modifier.size(200.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Text(
+                    text = "🧁",
+                    fontSize = 100.sp
+                )
+            }
+        }
+        
+        androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(top = 32.dp))
+        
+        Text(
+            text = "Tap the cupcake as fast as you can!",
+            fontSize = 16.sp,
+            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }

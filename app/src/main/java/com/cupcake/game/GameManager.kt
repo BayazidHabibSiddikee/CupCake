@@ -18,7 +18,7 @@ sealed interface Game {
         val moveHistory: List<Move> = emptyList()
     ) : Game
 
-    enum class GameType { TIC_TAC_TOE, CHESS, ROCK_PAPER_SCISSORS, GUESS_NUMBER, MATH_QUIZ }
+    enum class GameType { TIC_TAC_TOE, CHESS, ROCK_PAPER_SCISSORS, GUESS_NUMBER, MATH_QUIZ, CLICKER }
 
     enum class Player(val id: Int, val symbol: String) {
         HUMAN(1, "X"), BOT(2, "O")
@@ -38,6 +38,19 @@ sealed interface Game {
         fun set(position: Int, player: Player): Boolean
         fun isFull(): Boolean
         fun copy(): Board
+    }
+
+    data class ClickerBoard(
+        var score: Int = 0
+    ) : Board {
+        override val size: Int = 1
+        override fun get(position: Int): Player? = null
+        override fun set(position: Int, player: Player): Boolean {
+            score++
+            return true
+        }
+        override fun isFull(): Boolean = false
+        override fun copy(): Board = ClickerBoard(score)
     }
 
     // Tic Tac Toe Board
@@ -224,6 +237,12 @@ class GameManager(private val llamaEngine: LlamaEngine, private val characterMan
                 currentPlayer = Game.Player.HUMAN,
                 status = Game.GameStatus.PLAYING
             )
+            Game.GameType.CLICKER -> Game.State(
+                gameType = type,
+                board = Game.ClickerBoard(),
+                currentPlayer = Game.Player.HUMAN,
+                status = Game.GameStatus.PLAYING
+            )
             else -> Game.State(
                 gameType = type,
                 board = Game.TicTacToeBoard(), // fallback
@@ -238,6 +257,20 @@ class GameManager(private val llamaEngine: LlamaEngine, private val characterMan
         val game = currentGame ?: return Result(false, "No active game")
         if (game.status != Game.GameStatus.PLAYING) return Result(false, "Game over")
         if (game.currentPlayer != Game.Player.HUMAN) return Result(false, "Not your turn")
+
+        if (game.gameType == Game.GameType.CLICKER) {
+            val board = game.board as? Game.ClickerBoard ?: return Result(false, "Invalid board")
+            board.set(position, Game.Player.HUMAN)
+            
+            currentGame = game.copy(board = board)
+            onGameStateChanged?.invoke(currentGame)
+            
+            // Trigger sarcastic reaction every 50 taps
+            if (board.score > 0 && board.score % 50 == 0) {
+                triggerClickerReaction(board.score)
+            }
+            return Result(true, "Tap counted", currentGame)
+        }
 
         if (game.gameType == Game.GameType.ROCK_PAPER_SCISSORS) {
             val board = game.board as? Game.RpsBoard ?: return Result(false, "Invalid board")
@@ -337,6 +370,29 @@ class GameManager(private val llamaEngine: LlamaEngine, private val characterMan
                 currentGame = game.copy(board = board, currentPlayer = Game.Player.HUMAN, moveHistory = newHistory)
             }
             onGameStateChanged?.invoke(currentGame)
+        }
+    }
+
+    private fun triggerClickerReaction(score: Int) {
+        if (!llamaEngine.isReady()) return
+        val character = characterManager.getCurrentCharacter()
+        val personality = character?.personality ?: "friendly"
+
+        val prompt = "The human has mindlessly tapped the screen $score times. React with a sarcastic comment about them wasting time. Keep it under 15 words in $personality style."
+
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val fullPrompt = characterManager.getSystemPromptForCharacter(
+                    character?.id ?: "cute_companion",
+                    "Game: CLICKER, Score: $score"
+                ) + "\n\nUser: $prompt\nAssistant:"
+
+                llamaEngine.generateStream(fullPrompt).consumeEach { token ->
+                    onGameReaction(token, false, false)
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("GameManager", "Reaction generation failed", e)
+            }
         }
     }
 
