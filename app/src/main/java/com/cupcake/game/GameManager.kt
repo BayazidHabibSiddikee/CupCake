@@ -391,7 +391,8 @@ class GameManager(private val llamaEngine: LlamaEngine, private val characterMan
                 llamaEngine.generateStream(fullPrompt).consumeEach { token ->
                     fullResponse += token
                 }
-                onGameReaction(fullResponse, false, false)
+                val translated = com.cupcake.ai.BanglishTranslator.translate(fullResponse.trim(), personality)
+                onGameReaction(translated, false, false)
             } catch (e: Exception) {
                 android.util.Log.w("GameManager", "Reaction generation failed", e)
             }
@@ -422,7 +423,8 @@ class GameManager(private val llamaEngine: LlamaEngine, private val characterMan
                 llamaEngine.generateStream(fullPrompt).consumeEach { token ->
                     fullResponse += token
                 }
-                onGameReaction(fullResponse, humanWon, isDraw)
+                val translated = com.cupcake.ai.BanglishTranslator.translate(fullResponse.trim(), personality)
+                onGameReaction(translated, humanWon, isDraw)
             } catch (e: Exception) {
                 android.util.Log.w("GameManager", "Reaction generation failed", e)
             }

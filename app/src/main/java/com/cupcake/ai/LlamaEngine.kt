@@ -8,6 +8,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.launch
 import java.io.File
+import kotlinx.coroutines.sync.Mutex
 import java.io.FileOutputStream
 import java.io.InputStream
 
@@ -158,27 +159,38 @@ class LlamaEngine private constructor() {
     // NOTE: UNLIMITED buffer is required. The native thread emits tokens via
     // trySend, which silently drops on a rendezvous channel when the consumer
     // isn't parked yet - on fast devices this drops the whole response.
+    private val generateMutex = Mutex()
+
     fun generateStream(prompt: String): ReceiveChannel<String> = Channel<String>(Channel.UNLIMITED).apply {
         CoroutineScope(Dispatchers.IO).launch {
-            val callback = object : GenerateCallback {
-                override fun onToken(token: String) {
-                    trySend(token)
-                }
-
-                override fun onComplete(status: Int) {
-                    close()
-                }
-
-                override fun onError(error: String) {
-                    Log.e(TAG, "Generation error: $error")
-                    close(Exception(error))
-                }
+            if (!generateMutex.tryLock()) {
+                Log.w(TAG, "Engine busy, dropping generation request.")
+                close(Exception("Engine busy"))
+                return@launch
             }
+            try {
+                val callback = object : GenerateCallback {
+                    override fun onToken(token: String) {
+                        trySend(token)
+                    }
 
-            setCallback(callback)
-            val result = generate(prompt)
-            if (result != 0) {
-                close(Exception("Generate failed: $result"))
+                    override fun onComplete(status: Int) {
+                        close()
+                    }
+
+                    override fun onError(error: String) {
+                        Log.e(TAG, "Generation error: $error")
+                        close(Exception(error))
+                    }
+                }
+
+                setCallback(callback)
+                val result = generate(prompt)
+                if (result != 0) {
+                    close(Exception("Generate failed: $result"))
+                }
+            } finally {
+                generateMutex.unlock()
             }
         }
     }

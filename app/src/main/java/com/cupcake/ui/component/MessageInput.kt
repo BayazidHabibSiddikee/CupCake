@@ -74,7 +74,7 @@ fun MessageInput(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 48.dp, max = 120.dp),
-            enabled = enabled,
+            enabled = true,
             singleLine = false,
             maxLines = 5,
             keyboardOptions = KeyboardOptions(
