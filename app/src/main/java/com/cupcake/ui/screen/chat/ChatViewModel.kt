@@ -190,6 +190,8 @@ class ChatViewModel @Inject constructor(
         }
 
         // Check energy
+        energyManager.consumeEnergy() // Consume it but don't block if they don't have it (make it simple!)
+        /*
         if (!energyManager.consumeEnergy()) {
             addMessage(
                 ChatMessage.system(
@@ -199,6 +201,7 @@ class ChatViewModel @Inject constructor(
             )
             return
         }
+        */
 
         val userMessage = ChatMessage.user(text, conversationId)
         addMessage(userMessage)

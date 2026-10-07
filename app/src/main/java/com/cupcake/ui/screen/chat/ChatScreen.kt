@@ -152,7 +152,7 @@ fun ChatScreen(
                 onSend = { text ->
                     viewModel.sendMessage(text)
                 },
-                enabled = !isGenerating && !isModelLoading
+                enabled = !isGenerating
             )
         }
     }
