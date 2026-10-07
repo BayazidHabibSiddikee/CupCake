@@ -30,6 +30,9 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.VideogameAsset
 import androidx.compose.material.icons.filled.Add
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.runtime.getValue
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
@@ -40,7 +43,7 @@ fun HomeScreen(
     onNavigateToCharacters: () -> Unit,
     onNavigateToGames: () -> Unit
 ) {
-    val characters = viewModel.listCharacters()
+    val characters by viewModel.characters.collectAsStateWithLifecycle()
 
     CupCakeTheme {
         androidx.compose.material3.Scaffold(
@@ -144,9 +147,11 @@ fun CharacterCard(
                     fontSize = 16.sp
                 )
                 Text(
-                    character.description,
+                    text = character.description,
                     fontSize = 13.sp,
-                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                 )
             }
         }

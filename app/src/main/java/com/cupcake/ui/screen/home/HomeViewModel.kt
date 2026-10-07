@@ -14,7 +14,5 @@ class HomeViewModel @Inject constructor(
 
     // Each character owns exactly one chat session. The Home screen is a
     // launcher over these single sessions - no free-form "new conversation".
-    private val characters: List<Character> = characterManager.getAllCharacters()
-
-    fun listCharacters(): List<Character> = characters
+    val characters = characterManager.charactersFlow
 }

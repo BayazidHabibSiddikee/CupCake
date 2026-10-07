@@ -7,17 +7,28 @@ import kotlinx.serialization.json.Json
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+
 object CharacterManager {
 
     private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
     private val characters = ConcurrentHashMap<String, Character>()
+    private val _charactersFlow = MutableStateFlow<List<Character>>(emptyList())
+    val charactersFlow: StateFlow<List<Character>> = _charactersFlow.asStateFlow()
     private var charactersDir: File? = null
+
+    private fun updateFlow() {
+        _charactersFlow.value = characters.values.toList()
+    }
 
     fun initialize(appFilesDir: File) {
         charactersDir = File(appFilesDir, "characters")
         charactersDir?.mkdirs()
         loadBuiltInCharacters()
         loadCustomCharacters()
+        updateFlow()
     }
 
     private fun loadBuiltInCharacters() {
@@ -106,6 +117,7 @@ object CharacterManager {
         characters.values.forEach { it.isSelected = false }
         character.isSelected = true
         saveCharacter(character)
+        updateFlow()
         return true
     }
 
@@ -113,6 +125,7 @@ object CharacterManager {
         val newChar = character.copy(id = character.id.ifBlank { generateId() })
         characters[newChar.id] = newChar
         saveCharacter(newChar)
+        updateFlow()
         return newChar
     }
 
@@ -128,6 +141,7 @@ object CharacterManager {
         if (character.isBuiltIn) return false
         characters.remove(id)
         File(charactersDir, "$id.json").delete()
+        updateFlow()
         return true
     }
 

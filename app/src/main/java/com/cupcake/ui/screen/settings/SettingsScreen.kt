@@ -212,7 +212,7 @@ fun ProviderCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(provider.name, fontWeight = FontWeight.Medium, fontSize = 16.sp)
                         ProviderTypeBadge(provider.providerType)
