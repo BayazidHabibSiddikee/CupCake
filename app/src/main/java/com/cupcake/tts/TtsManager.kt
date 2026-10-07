@@ -151,25 +151,28 @@ class TtsManager(private val context: Context) {
             // a temp file and emit it in chunks.
             try {
                 val outFile = File.createTempFile(utteranceId, ".wav", context.cacheDir)
-                val params = android.os.Bundle().apply {
-                    putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, utteranceId)
-                }
-                callback?.onStart(utteranceId)
-                val status = tts?.synthesizeToFile(text, params, outFile, utteranceId)
-                if (status == TextToSpeech.SUCCESS && outFile.exists()) {
-                    outFile.inputStream().use { input ->
-                        val buffer = ByteArray(8192)
-                        while (true) {
-                            val read = input.read(buffer)
-                            if (read <= 0) break
-                            onChunk(buffer.copyOf(read))
-                        }
+                try {
+                    val params = android.os.Bundle().apply {
+                        putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, utteranceId)
                     }
-                    close()
-                } else {
-                    close(Exception("TTS synthesis failed: $status"))
+                    callback?.onStart(utteranceId)
+                    val status = tts?.synthesizeToFile(text, params, outFile, utteranceId)
+                    if (status == TextToSpeech.SUCCESS && outFile.exists()) {
+                        outFile.inputStream().use { input ->
+                            val buffer = ByteArray(8192)
+                            while (true) {
+                                val read = input.read(buffer)
+                                if (read <= 0) break
+                                onChunk(buffer.copyOf(read))
+                            }
+                        }
+                        close()
+                    } else {
+                        close(Exception("TTS synthesis failed: $status"))
+                    }
+                } finally {
+                    outFile.delete()
                 }
-                outFile.delete()
             } catch (e: Exception) {
                 close(e)
             }

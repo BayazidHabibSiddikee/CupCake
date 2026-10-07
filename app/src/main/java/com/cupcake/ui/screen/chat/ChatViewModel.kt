@@ -363,7 +363,7 @@ class ChatViewModel @Inject constructor(
     }
 
     override fun onCleared() {
-        espServer.stop()
+        espServer.setOnConnectionChangeListener(null)
         super.onCleared()
     }
 }

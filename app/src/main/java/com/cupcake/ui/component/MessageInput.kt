@@ -41,9 +41,7 @@ fun MessageInput(
     onSend: (String) -> Unit,
     enabled: Boolean = true
 ) {
-    val context = LocalContext.current
     var text by remember { mutableStateOf("") }
-    val coroutineScope = rememberCoroutineScope()
 
     val textFieldColors = TextFieldDefaults.colors(
         focusedContainerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerHighest,
