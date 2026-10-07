@@ -40,8 +40,7 @@ class GameViewModel @Inject constructor(
     val selectedDifficulty = MutableStateFlow(com.cupcake.game.TicTacToeEngine.Difficulty.NORMAL)
 
     fun startGame(gameOption: GameOption, difficulty: com.cupcake.game.TicTacToeEngine.Difficulty) {
-        if (!energyManager.hasEnergy()) return
-        energyManager.consumeEnergy(com.cupcake.ai.EnergyManager.ENERGY_PER_GAME)
+        if (!energyManager.consumeEnergy(com.cupcake.ai.EnergyManager.ENERGY_PER_GAME)) return
         
         val result = gameManager.startGame(gameOption.type, difficulty)
         _gameState.value = com.cupcake.game.GameManager.Result(true, "Game started", result)

@@ -35,19 +35,20 @@ object BanglishTranslator {
         "focus" to "monojog dao"
     )
 
+    private val sarcasticRegexes = sarcasticDict.map { Regex("(?i)\\b${it.key}\\b") to it.value }
+    private val teacherRegexes = teacherDict.map { Regex("(?i)\\b${it.key}\\b") to it.value }
+
     fun translate(text: String, personality: String): String {
         var translated = text
-        val dict = when {
-            personality.contains("sarcastic") || personality.contains("rage") -> sarcasticDict
-            personality.contains("teacher") || personality.contains("tutor") -> teacherDict
-            else -> emptyMap()
+        val dictRegexes = when {
+            personality.contains("sarcastic") || personality.contains("rage") -> sarcasticRegexes
+            personality.contains("teacher") || personality.contains("tutor") -> teacherRegexes
+            else -> emptyList()
         }
         
-        if (dict.isEmpty()) return text
+        if (dictRegexes.isEmpty()) return text
         
-        // Simple word replacement (case insensitive)
-        for ((eng, bangla) in dict) {
-            val regex = Regex("(?i)\\b$eng\\b")
+        for ((regex, bangla) in dictRegexes) {
             translated = translated.replace(regex, bangla)
         }
         return translated

@@ -179,7 +179,7 @@ class ChatViewModel @Inject constructor(
         if (text.isBlank() || _isGenerating.value) return
 
         // Check energy
-        if (!energyManager.hasEnergy()) {
+        if (!energyManager.consumeEnergy()) {
             addMessage(
                 ChatMessage.system(
                     "⚡ Energy depleted! Watch an ad or upgrade to Pro to continue.",
@@ -212,10 +212,16 @@ class ChatViewModel @Inject constructor(
 
             try {
                 val personality = currentCharacter.value?.personality ?: ""
+                var lastUpdateTime = 0L
                 llamaEngine.generateStream(prompt).consumeEach { token ->
                     fullResponse += token
-                    _currentResponse.value = com.cupcake.ai.BanglishTranslator.translate(fullResponse, personality)
+                    val now = System.currentTimeMillis()
+                    if (now - lastUpdateTime > 50) {
+                        _currentResponse.value = com.cupcake.ai.BanglishTranslator.translate(fullResponse, personality)
+                        lastUpdateTime = now
+                    }
                 }
+                _currentResponse.value = com.cupcake.ai.BanglishTranslator.translate(fullResponse, personality)
             } catch (e: Exception) {
                 Log.e("ChatViewModel", "Generation failed", e)
                 fullResponse = ""
@@ -230,9 +236,6 @@ class ChatViewModel @Inject constructor(
                 _currentResponse.value = ""
                 
                 if (fullResponse.isNotBlank()) {
-                    // Consume energy
-                    energyManager.consumeEnergy()
-                    
                     // Translate output
                     val personality = currentCharacter.value?.personality ?: ""
                     val translatedText = com.cupcake.ai.BanglishTranslator.translate(fullResponse.trim(), personality)
@@ -298,8 +301,7 @@ class ChatViewModel @Inject constructor(
 
     // Game controls
     fun startGame(gameType: com.cupcake.game.Game.GameType, difficulty: com.cupcake.game.TicTacToeEngine.Difficulty = com.cupcake.game.TicTacToeEngine.Difficulty.NORMAL) {
-        if (!energyManager.hasEnergy()) return
-        energyManager.consumeEnergy(com.cupcake.ai.EnergyManager.ENERGY_PER_GAME)
+        if (!energyManager.consumeEnergy(com.cupcake.ai.EnergyManager.ENERGY_PER_GAME)) return
         val state = gameManager.startGame(gameType, difficulty)
         _gameState.value = com.cupcake.game.GameManager.Result(true, "Game started", state)
     }

@@ -107,7 +107,7 @@ fun HomeScreen(
                         contentPadding = PaddingValues(16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        items(characters) { character ->
+                        items(characters, key = { it.id }) { character ->
                             CharacterCard(
                                 character = character,
                                 onClick = { onNavigateToChat(character.id) }

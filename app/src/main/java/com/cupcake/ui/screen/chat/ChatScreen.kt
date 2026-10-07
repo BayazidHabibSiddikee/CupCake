@@ -138,7 +138,10 @@ fun ChatScreen(
                     }
                 }
 
-                items(count = messages.size) { i ->
+                items(
+                    count = messages.size,
+                    key = { i -> messages[messages.lastIndex - i].id }
+                ) { i ->
                     val message = messages[messages.lastIndex - i]
                     ChatMessageItem(message = message)
                 }
