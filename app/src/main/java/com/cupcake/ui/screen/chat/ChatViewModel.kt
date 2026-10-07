@@ -178,22 +178,22 @@ class ChatViewModel @Inject constructor(
     fun sendMessage(text: String) {
         if (text.isBlank() || _isGenerating.value) return
 
-        // Check energy
-        if (!energyManager.consumeEnergy()) {
+        if (!llamaEngine.isReady()) {
+            ensureModelLoaded()
             addMessage(
                 ChatMessage.system(
-                    "⚡ Energy depleted! Watch an ad or upgrade to Pro to continue.",
+                    "⏳ Model is still loading, please wait a moment and try again.",
                     conversationId
                 )
             )
             return
         }
 
-        if (!llamaEngine.isReady()) {
-            ensureModelLoaded()
+        // Check energy
+        if (!energyManager.consumeEnergy()) {
             addMessage(
                 ChatMessage.system(
-                    "⏳ Model is still loading, please wait a moment and try again.",
+                    "⚡ Energy depleted! Watch an ad or upgrade to Pro to continue.",
                     conversationId
                 )
             )

@@ -61,8 +61,8 @@ fun SystemPromptScreen(
     val showDeleteDialog by viewModel.showDeleteDialog.collectAsStateWithLifecycle()
     val showImagePicker by viewModel.showImagePicker.collectAsStateWithLifecycle()
 
-    var name by remember { mutableStateOf(prompt?.name ?: "") }
-    var text by remember { mutableStateOf(prompt?.text ?: "") }
+    var name by remember(prompt) { mutableStateOf(prompt?.name ?: "") }
+    var text by remember(prompt) { mutableStateOf(prompt?.text ?: "") }
 
     CupCakeTheme {
         Column(

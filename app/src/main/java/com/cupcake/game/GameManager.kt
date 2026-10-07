@@ -387,9 +387,11 @@ class GameManager(private val llamaEngine: LlamaEngine, private val characterMan
                     "Game: CLICKER, Score: $score"
                 ) + "\n\nUser: $prompt\nAssistant:"
 
+                var fullResponse = ""
                 llamaEngine.generateStream(fullPrompt).consumeEach { token ->
-                    onGameReaction(token, false, false)
+                    fullResponse += token
                 }
+                onGameReaction(fullResponse, false, false)
             } catch (e: Exception) {
                 android.util.Log.w("GameManager", "Reaction generation failed", e)
             }
@@ -416,10 +418,11 @@ class GameManager(private val llamaEngine: LlamaEngine, private val characterMan
                     "Game: ${gameType?.name}, Human won: $humanWon, Draw: $isDraw"
                 ) + "\n\nUser: $prompt\nAssistant:"
 
+                var fullResponse = ""
                 llamaEngine.generateStream(fullPrompt).consumeEach { token ->
-                    // Send to ESP32 for face animation + TTS
-                    onGameReaction(token, humanWon, isDraw)
+                    fullResponse += token
                 }
+                onGameReaction(fullResponse, humanWon, isDraw)
             } catch (e: Exception) {
                 android.util.Log.w("GameManager", "Reaction generation failed", e)
             }
