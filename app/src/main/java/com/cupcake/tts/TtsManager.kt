@@ -51,6 +51,21 @@ class TtsManager(private val context: Context) {
                     isInitialized = true
                     loadVoices()
                     setLanguage(Locale.ENGLISH)
+                    
+                    tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                        override fun onStart(utteranceId: String) {
+                            this@TtsManager.callback?.onStart(utteranceId)
+                        }
+                        override fun onDone(utteranceId: String) {
+                            this@TtsManager.callback?.onDone(utteranceId)
+                            activeStreams[utteranceId]?.invoke(true) // Signal done
+                        }
+                        override fun onError(utteranceId: String) {
+                            this@TtsManager.callback?.onError(utteranceId, -1)
+                            activeStreams[utteranceId]?.invoke(false) // Signal error
+                        }
+                    })
+                    
                     Log.i("TtsManager", "TTS initialized successfully")
                 } else {
                     Log.e("TtsManager", "TTS initialization failed: $status")
@@ -62,6 +77,8 @@ class TtsManager(private val context: Context) {
             false
         }
     }
+
+    private val activeStreams = java.util.concurrent.ConcurrentHashMap<String, (Boolean) -> Unit>()
 
     private fun loadVoices() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
@@ -147,23 +164,39 @@ class TtsManager(private val context: Context) {
             val locale = autoDetectLanguage(text)
             tts?.setLanguage(locale)
 
-            // Android has no public streaming-synthesis API, so synthesize to
-            // a temp file and emit it in chunks.
+            var isDone = false
+            var hasError = false
+            
+            activeStreams[utteranceId] = { success ->
+                if (success) isDone = true else hasError = true
+            }
+
             try {
                 val outFile = File.createTempFile(utteranceId, ".wav", context.cacheDir)
                 try {
                     val params = android.os.Bundle().apply {
                         putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, utteranceId)
                     }
-                    callback?.onStart(utteranceId)
                     val status = tts?.synthesizeToFile(text, params, outFile, utteranceId)
-                    if (status == TextToSpeech.SUCCESS && outFile.exists()) {
+                    if (status == TextToSpeech.SUCCESS) {
+                        // Wait until the file is created by the TTS engine
+                        while (!outFile.exists() && !isDone && !hasError) {
+                            kotlinx.coroutines.delay(10)
+                        }
+                        
                         outFile.inputStream().use { input ->
                             val buffer = ByteArray(8192)
-                            while (true) {
-                                val read = input.read(buffer)
-                                if (read <= 0) break
-                                onChunk(buffer.copyOf(read))
+                            while (!isDone || input.available() > 0) {
+                                val available = input.available()
+                                if (available > 0) {
+                                    val read = input.read(buffer, 0, minOf(buffer.size, available))
+                                    if (read > 0) {
+                                        onChunk(buffer.copyOf(read))
+                                    }
+                                } else {
+                                    if (hasError) break
+                                    kotlinx.coroutines.delay(10) // Wait for more data
+                                }
                             }
                         }
                         close()
@@ -171,9 +204,11 @@ class TtsManager(private val context: Context) {
                         close(Exception("TTS synthesis failed: $status"))
                     }
                 } finally {
+                    activeStreams.remove(utteranceId)
                     outFile.delete()
                 }
             } catch (e: Exception) {
+                activeStreams.remove(utteranceId)
                 close(e)
             }
         }
