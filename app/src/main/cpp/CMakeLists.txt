@@ -29,6 +29,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${ANDROID_ABI})
 # to link (hidden-visibility symbols such as ggml_aligned_malloc are not
 # exported across the .so boundary). The JNI libs below stay SHARED.
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(GGML_VULKAN ON CACHE BOOL "" FORCE)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/third_party/llama.cpp)
 
 # =============================================================================
@@ -64,7 +65,7 @@ target_compile_options(llama_jni PRIVATE
     -DGGML_USE_ACCELERATE=OFF
     -DGGML_USE_METAL=OFF
     -DGGML_USE_CUDA=OFF
-    -DGGML_USE_VULKAN=OFF
+    -DGGML_USE_VULKAN=ON
     -DGGML_USE_SYCL=OFF
     -DGGML_USE_RPC=OFF
     -DGGML_USE_OPENMP=OFF

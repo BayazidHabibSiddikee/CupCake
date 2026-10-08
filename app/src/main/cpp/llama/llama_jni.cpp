@@ -49,7 +49,7 @@ Java_com_cupcake_ai_LlamaEngine_initModel(
     llama_backend_init();
     
     llama_model_params model_params = llama_model_default_params();
-    model_params.n_gpu_layers = 0; // CPU only for now
+    model_params.n_gpu_layers = 99; // Offload fully to GPU
     model_params.use_mmap = true;
     model_params.use_mlock = false;
     
