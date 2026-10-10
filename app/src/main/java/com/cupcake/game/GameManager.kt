@@ -1,7 +1,7 @@
 package com.cupcake.game
 
 import com.cupcake.ai.CharacterManager
-import com.cupcake.ai.LlamaEngine
+import com.cupcake.ai.OllamaEngine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.consumeEach
@@ -90,6 +90,70 @@ sealed interface Game {
         override fun get(position: Int): Player? = null
         override fun set(position: Int, player: Player): Boolean = false
         override fun isFull(): Boolean = humanChoice != null && botChoice != null
+        override fun copy(): Board = this.copy()
+    }
+
+    // Guess Number Board
+    data class GuessNumberBoard(
+        override val size: Int = 100,
+        val targetNumber: Int = (1..100).random(),
+        var guesses: MutableList<Int> = mutableListOf(),
+        var lastGuess: Int? = null,
+        var lastResult: GuessResult? = null
+    ) : Board {
+        override fun get(position: Int): Player? = null
+        override fun set(position: Int, player: Player): Boolean = false
+        override fun isFull(): Boolean = lastResult == GuessResult.CORRECT
+        override fun copy(): Board = GuessNumberBoard(
+            targetNumber = targetNumber,
+            guesses = guesses.toMutableList(),
+            lastGuess = lastGuess,
+            lastResult = lastResult
+        )
+
+        enum class GuessResult { TOO_HIGH, TOO_LOW, CORRECT }
+    }
+
+    // Math Quiz Board
+    data class MathQuizBoard(
+        override val size: Int = 10,
+        var currentQuestion: MathQuestion? = null,
+        var questionsAnswered: Int = 0,
+        var correctAnswers: Int = 0,
+        var wrongAnswers: Int = 0,
+        var currentAnswer: String? = null,
+        var lastResult: Boolean? = null
+    ) : Board {
+        override fun get(position: Int): Player? = null
+        override fun set(position: Int, player: Player): Boolean = false
+        override fun isFull(): Boolean = questionsAnswered >= 10
+        override fun copy(): Board = MathQuizBoard(
+            currentQuestion = currentQuestion,
+            questionsAnswered = questionsAnswered,
+            correctAnswers = correctAnswers,
+            wrongAnswers = wrongAnswers,
+            currentAnswer = currentAnswer,
+            lastResult = lastResult
+        )
+
+        data class MathQuestion(
+            val expression: String,
+            val correctAnswer: Int,
+            val botWrongAnswer: Int
+        )
+    }
+
+    // Chess Board (simplified - using Stockfish later)
+    data class ChessBoard(
+        override val size: Int = 64,
+        private val pieces: Array<String?> = Array(64) { null },
+        var currentFen: String = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+        var gameOver: Boolean = false,
+        var result: String? = null
+    ) : Board {
+        override fun get(position: Int): Player? = null // Simplified
+        override fun set(position: Int, player: Player): Boolean = false
+        override fun isFull(): Boolean = gameOver
         override fun copy(): Board = this.copy()
     }
 }
@@ -205,8 +269,83 @@ object RockPaperScissorsEngine {
     }
 }
 
+object GuessNumberEngine {
+    fun evaluateGuess(board: Game.GuessNumberBoard, guess: Int): Game.GuessNumberBoard.GuessResult {
+        return when {
+            guess < board.targetNumber -> Game.GuessNumberBoard.GuessResult.TOO_LOW
+            guess > board.targetNumber -> Game.GuessNumberBoard.GuessResult.TOO_HIGH
+            else -> Game.GuessNumberBoard.GuessResult.CORRECT
+        }
+    }
+
+    fun getHint(board: Game.GuessNumberBoard): String {
+        val remaining = 100 - board.guesses.size
+        return when {
+            board.guesses.isEmpty() -> "I'm thinking of a number between 1 and 100. You have $remaining guesses!"
+            board.lastResult == Game.GuessNumberBoard.GuessResult.TOO_HIGH -> "Too high! 📉 $remaining guesses left. Range: 1-${board.lastGuess!! - 1}"
+            board.lastResult == Game.GuessNumberBoard.GuessResult.TOO_LOW -> "Too low! 📈 $remaining guesses left. Range: ${board.lastGuess!! + 1}-100"
+            else -> "You got it! 🎉 The number was ${board.targetNumber}"
+        }
+    }
+}
+
+object MathQuizEngine {
+    private val operations = listOf(
+        { a: Int, b: Int -> Pair("${a}+${b}", a + b) },
+        { a: Int, b: Int -> Pair("${a}-${b}", a - b) },
+        { a: Int, b: Int -> Pair("${a}×${b}", a * b) },
+        { a: Int, b: Int ->
+            val dividend = a * b
+            Pair("${dividend}÷${b}", a)
+        }
+    )
+
+    fun generateQuestion(difficulty: Int = 1): Game.MathQuizBoard.MathQuestion {
+        val op = operations.random()
+        val a = when (difficulty) {
+            1 -> (1..10).random()
+            2 -> (1..20).random()
+            3 -> (1..50).random()
+            else -> (1..10).random()
+        }
+        val b = when (difficulty) {
+            1 -> (1..10).random()
+            2 -> (1..20).random()
+            3 -> (1..50).random()
+            else -> (1..10).random()
+        }
+
+        val (expression, correctAnswer) = op(a, b)
+
+        // Bot gives wrong answer on purpose (for the "tutor_bot" personality)
+        val botWrongAnswer = when {
+            correctAnswer > 0 -> correctAnswer + (1..5).random() * (if ((0..1).random() == 0) 1 else -1)
+            correctAnswer < 0 -> correctAnswer - (1..5).random() * (if ((0..1).random() == 0) 1 else -1)
+            else -> (1..10).random() * (if ((0..1).random() == 0) 1 else -1)
+        }
+
+        return Game.MathQuizBoard.MathQuestion(
+            expression = expression,
+            correctAnswer = correctAnswer,
+            botWrongAnswer = botWrongAnswer
+        )
+    }
+
+    fun checkAnswer(board: Game.MathQuizBoard, answer: Int): Boolean {
+        return board.currentQuestion?.correctAnswer == answer
+    }
+
+    fun getBotResponse(isCorrect: Boolean): String {
+        return if (isCorrect) {
+            listOf("Wrong! 😤", "Nope! 🙄", "Incorrect! 😤", "Try again! 😏").random()
+        } else {
+            listOf("Correct! 😒", "Fine, you got it. 🙄", "Ugh, right. 😤", "Lucky guess. 😏").random()
+        }
+    }
+}
+
 // Game Manager
-class GameManager(private val llamaEngine: LlamaEngine, private val characterManager: CharacterManager) {
+class GameManager(private val ollamaEngine: OllamaEngine, private val characterManager: CharacterManager) {
 
     private var currentGame: Game.State? = null
     private var gameType: Game.GameType? = null
@@ -240,6 +379,20 @@ class GameManager(private val llamaEngine: LlamaEngine, private val characterMan
             Game.GameType.CLICKER -> Game.State(
                 gameType = type,
                 board = Game.ClickerBoard(),
+                currentPlayer = Game.Player.HUMAN,
+                status = Game.GameStatus.PLAYING
+            )
+            Game.GameType.GUESS_NUMBER -> Game.State(
+                gameType = type,
+                board = Game.GuessNumberBoard(),
+                currentPlayer = Game.Player.HUMAN,
+                status = Game.GameStatus.PLAYING
+            )
+            Game.GameType.MATH_QUIZ -> Game.State(
+                gameType = type,
+                board = Game.MathQuizBoard().apply {
+                    currentQuestion = MathQuizEngine.generateQuestion(difficulty.ordinal + 1)
+                },
                 currentPlayer = Game.Player.HUMAN,
                 status = Game.GameStatus.PLAYING
             )
@@ -296,6 +449,93 @@ class GameManager(private val llamaEngine: LlamaEngine, private val characterMan
             triggerReaction(winner == Game.Player.HUMAN, winner == null)
             onGameStateChanged?.invoke(currentGame)
             return Result(true, "Game over", currentGame)
+        }
+
+        if (game.gameType == Game.GameType.GUESS_NUMBER) {
+            val board = game.board as? Game.GuessNumberBoard ?: return Result(false, "Invalid board")
+            val guess = position + 1 // position 0-99 maps to guess 1-100
+            if (guess !in 1..100) return Result(false, "Guess must be 1-100")
+            if (board.guesses.contains(guess)) return Result(false, "Already guessed that number")
+
+            val result = GuessNumberEngine.evaluateGuess(board, guess)
+            val newGuesses = board.guesses + guess
+
+            val newBoard = board.copy(
+                guesses = newGuesses.toMutableList(),
+                lastGuess = guess,
+                lastResult = result
+            )
+
+            val newHistory = game.moveHistory + Game.Move(Game.Player.HUMAN, guess)
+
+            val (newStatus, winner) = when (result) {
+                Game.GuessNumberBoard.GuessResult.CORRECT -> {
+                    triggerReaction(true)
+                    Game.GameStatus.HUMAN_WON to Game.Player.HUMAN
+                }
+                Game.GuessNumberBoard.GuessResult.TOO_HIGH, Game.GuessNumberBoard.GuessResult.TOO_LOW -> {
+                    if (newGuesses.size >= 10) {
+                        triggerReaction(false)
+                        Game.GameStatus.BOT_WON to Game.Player.BOT
+                    } else {
+                        Game.GameStatus.PLAYING to null
+                    }
+                }
+            }
+
+            currentGame = game.copy(
+                board = newBoard,
+                status = newStatus,
+                winner = winner,
+                moveHistory = newHistory
+            )
+            onGameStateChanged?.invoke(currentGame)
+            return Result(true, GuessNumberEngine.getHint(newBoard), currentGame)
+        }
+
+        if (game.gameType == Game.GameType.MATH_QUIZ) {
+            val board = game.board as? Game.MathQuizBoard ?: return Result(false, "Invalid board")
+            val question = board.currentQuestion ?: return Result(false, "No active question")
+            
+            val answer = position // position is the answer number
+            val isCorrect = MathQuizEngine.checkAnswer(board, answer)
+            
+            val newQuestionsAnswered = board.questionsAnswered + 1
+            val newCorrectAnswers = board.correctAnswers + if (isCorrect) 1 else 0
+            val newWrongAnswers = board.wrongAnswers + if (!isCorrect) 1 else 0
+            val nextQuestion = MathQuizEngine.generateQuestion(difficulty.ordinal + 1)
+            
+            val botResponse = MathQuizEngine.getBotResponse(isCorrect)
+            triggerGameReaction(botResponse)
+
+            val newBoard = board.copy(
+                questionsAnswered = newQuestionsAnswered,
+                correctAnswers = newCorrectAnswers,
+                wrongAnswers = newWrongAnswers,
+                currentAnswer = answer.toString(),
+                lastResult = isCorrect,
+                currentQuestion = if (newQuestionsAnswered >= 10) null else nextQuestion
+            )
+
+            val newHistory = game.moveHistory + Game.Move(Game.Player.HUMAN, answer)
+
+            val (newStatus, winner) = if (newQuestionsAnswered >= 10) {
+                val humanWon = newCorrectAnswers > newWrongAnswers
+                triggerReaction(humanWon)
+                if (humanWon) Game.GameStatus.HUMAN_WON to Game.Player.HUMAN
+                else Game.GameStatus.BOT_WON to Game.Player.BOT
+            } else {
+                Game.GameStatus.PLAYING to null
+            }
+
+            currentGame = game.copy(
+                board = newBoard,
+                status = newStatus,
+                winner = winner,
+                moveHistory = newHistory
+            )
+            onGameStateChanged?.invoke(currentGame)
+            return Result(true, botResponse, currentGame)
         }
 
         val board = game.board as? Game.TicTacToeBoard ?: return Result(false, "Invalid board")
@@ -374,35 +614,55 @@ class GameManager(private val llamaEngine: LlamaEngine, private val characterMan
     }
 
     private fun triggerClickerReaction(score: Int) {
-        if (!llamaEngine.isReady()) return
+        // Ollama doesn't need local model readiness check
         val character = characterManager.getCurrentCharacter()
         val personality = character?.personality ?: "friendly"
 
         val prompt = "The human has mindlessly tapped the screen $score times. React with a sarcastic comment about them wasting time. Keep it under 15 words in $personality style."
 
         CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val fullPrompt = characterManager.getSystemPromptForCharacter(
-                    character?.id ?: "cute_companion",
-                    "Game: CLICKER, Score: $score"
-                ) + "\n\nUser: $prompt\nAssistant:"
+                try {
+                    val fullPrompt = characterManager.getSystemPromptForCharacter(
+                        character?.id ?: "cute_companion",
+                        "Game: CLICKER, Score: $score"
+                    ) + "\n\nUser: $prompt\nAssistant:"
 
-                var fullResponse = ""
-                llamaEngine.generateStream(fullPrompt).consumeEach { token ->
-                    fullResponse += token
+                    var fullResponse = ""
+                    ollamaEngine.generateStream(
+                        baseUrl = "http://localhost:11434/v1",
+                        config = com.cupcake.data.model.ModelConfig(
+                            provider = com.cupcake.data.model.ModelConfig.ModelProvider.CUSTOM_OLLAMA,
+                            modelName = "qwen2.5-0.5b-instruct",
+                            customEndpoint = "http://localhost:11434/v1",
+                            temperature = 0.7f,
+                            topP = 0.9f,
+                            topK = 40,
+                            maxTokens = 256,
+                            useStreaming = true
+                        ),
+                        messages = listOf(OllamaEngine.OllamaMessage("user", fullPrompt)),
+                        callback = object : OllamaEngine.GenerateCallback {
+                            override fun onToken(token: String) {
+                                fullResponse += token
+                            }
+
+                            override fun onComplete() {
+                                val translated = com.cupcake.ai.BanglishTranslator.translate(fullResponse.trim(), personality)
+                                onGameReaction(translated, false, false)
+                            }
+
+                            override fun onError(error: String) {
+                                android.util.Log.w("GameManager", "Reaction generation failed: $error")
+                            }
+                        }
+                    )
+                } catch (e: Exception) {
+                    android.util.Log.w("GameManager", "Reaction generation failed", e)
                 }
-                val translated = com.cupcake.ai.BanglishTranslator.translate(fullResponse.trim(), personality)
-                onGameReaction(translated, false, false)
-            } catch (e: Exception) {
-                android.util.Log.w("GameManager", "Reaction generation failed", e)
             }
-        }
     }
 
     private fun triggerReaction(humanWon: Boolean, isDraw: Boolean = false) {
-        // LLM reactions need a loaded model; the game itself is fully playable
-        // without it.
-        if (!llamaEngine.isReady()) return
         val character = characterManager.getCurrentCharacter()
         val personality = character?.personality ?: "friendly"
 
@@ -420,11 +680,34 @@ class GameManager(private val llamaEngine: LlamaEngine, private val characterMan
                 ) + "\n\nUser: $prompt\nAssistant:"
 
                 var fullResponse = ""
-                llamaEngine.generateStream(fullPrompt).consumeEach { token ->
-                    fullResponse += token
-                }
-                val translated = com.cupcake.ai.BanglishTranslator.translate(fullResponse.trim(), personality)
-                onGameReaction(translated, humanWon, isDraw)
+                ollamaEngine.generateStream(
+                    baseUrl = "http://localhost:11434/v1",
+                    config = com.cupcake.data.model.ModelConfig(
+                        provider = com.cupcake.data.model.ModelConfig.ModelProvider.CUSTOM_OLLAMA,
+                        modelName = "qwen2:0.5b",
+                        customEndpoint = "http://localhost:11434/v1",
+                        temperature = 0.7f,
+                        topP = 0.9f,
+                        topK = 40,
+                        maxTokens = 256,
+                        useStreaming = true
+                    ),
+                    messages = listOf(OllamaEngine.OllamaMessage("user", fullPrompt)),
+                    callback = object : OllamaEngine.GenerateCallback {
+                        override fun onToken(token: String) {
+                            fullResponse += token
+                        }
+
+                        override fun onComplete() {
+                            val translated = com.cupcake.ai.BanglishTranslator.translate(fullResponse.trim(), personality)
+                            onGameReaction(translated, humanWon, isDraw)
+                        }
+
+                        override fun onError(error: String) {
+                            android.util.Log.w("GameManager", "Reaction generation failed: $error")
+                        }
+                    }
+                )
             } catch (e: Exception) {
                 android.util.Log.w("GameManager", "Reaction generation failed", e)
             }
@@ -433,6 +716,52 @@ class GameManager(private val llamaEngine: LlamaEngine, private val characterMan
 
     // Callback for ESP32 reactions
     var onGameReaction: (String, Boolean, Boolean) -> Unit = { _, _, _ -> }
+
+    private fun triggerGameReaction(message: String) {
+        val character = characterManager.getCurrentCharacter()
+        val personality = character?.personality ?: "friendly"
+        
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val fullPrompt = characterManager.getSystemPromptForCharacter(
+                    character?.id ?: "cute_companion",
+                    "Game: ${gameType?.name}"
+                ) + "\n\nUser: $message\nAssistant:"
+
+                var fullResponse = ""
+                ollamaEngine.generateStream(
+                    baseUrl = "http://localhost:11434/v1",
+                    config = com.cupcake.data.model.ModelConfig(
+                        provider = com.cupcake.data.model.ModelConfig.ModelProvider.CUSTOM_OLLAMA,
+                        modelName = "qwen2.5-0.5b-instruct",
+                        customEndpoint = "http://localhost:11434/v1",
+                        temperature = 0.7f,
+                        topP = 0.9f,
+                        topK = 40,
+                        maxTokens = 256,
+                        useStreaming = true
+                    ),
+                    messages = listOf(OllamaEngine.OllamaMessage("user", fullPrompt)),
+                    callback = object : OllamaEngine.GenerateCallback {
+                        override fun onToken(token: String) {
+                            fullResponse += token
+                        }
+
+                        override fun onComplete() {
+                            val translated = com.cupcake.ai.BanglishTranslator.translate(fullResponse.trim(), personality)
+                            onGameReaction(translated, false, false)
+                        }
+
+                        override fun onError(error: String) {
+                            android.util.Log.w("GameManager", "Reaction generation failed: $error")
+                        }
+                    }
+                )
+            } catch (e: Exception) {
+                android.util.Log.w("GameManager", "Reaction generation failed", e)
+            }
+        }
+    }
 
     // Callback for state changes that happen off the calling thread (bot moves)
     var onGameStateChanged: ((Game.State?) -> Unit)? = null

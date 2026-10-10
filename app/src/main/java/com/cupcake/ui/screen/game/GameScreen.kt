@@ -33,6 +33,11 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.material3.TextField
+import androidx.compose.ui.text.input.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -42,6 +47,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.VideogameAsset
+import androidx.compose.material.icons.filled.Casino
+import androidx.compose.material.icons.filled.Calculate
+import androidx.compose.material.icons.filled.SportsEsports
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -151,6 +159,20 @@ fun GameScreen(
                     com.cupcake.game.Game.GameType.CLICKER -> ClickerBoardUI(
                         state = boardState,
                         onTap = { viewModel.makeMove(0) }
+                    )
+                    com.cupcake.game.Game.GameType.GUESS_NUMBER -> GuessNumberBoardUI(
+                        state = boardState,
+                        onGuess = { pos -> viewModel.makeMove(pos) },
+                        onRestart = { viewModel.restartGame() }
+                    )
+                    com.cupcake.game.Game.GameType.MATH_QUIZ -> MathQuizBoardUI(
+                        state = boardState,
+                        onAnswer = { pos -> viewModel.makeMove(pos) },
+                        onRestart = { viewModel.restartGame() }
+                    )
+                    com.cupcake.game.Game.GameType.CHESS -> ChessBoardUI(
+                        state = boardState,
+                        onRestart = { viewModel.restartGame() }
                     )
                     else -> {
                         Box(
@@ -412,5 +434,279 @@ fun ClickerBoardUI(
             fontSize = 16.sp,
             color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
         )
+    }
+}
+
+@Composable
+fun GuessNumberBoardUI(
+    state: com.cupcake.game.Game.State,
+    onGuess: (Int) -> Unit,
+    onRestart: () -> Unit
+) {
+    val board = state.board as? com.cupcake.game.Game.GuessNumberBoard ?: return
+    var currentGuess by remember { mutableStateOf(0) }
+    
+    Column(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // Status
+        Text(
+            text = when (state.status) {
+                com.cupcake.game.Game.GameStatus.PLAYING -> "Guess the Number!"
+                com.cupcake.game.Game.GameStatus.HUMAN_WON -> "You won! 🎉 Number was ${board.targetNumber}"
+                com.cupcake.game.Game.GameStatus.BOT_WON -> "Out of guesses! 🤖 Number was ${board.targetNumber}"
+                else -> "Game Over"
+            },
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
+            color = when (state.status) {
+                com.cupcake.game.Game.GameStatus.HUMAN_WON -> androidx.compose.material3.MaterialTheme.colorScheme.tertiary
+                com.cupcake.game.Game.GameStatus.BOT_WON -> androidx.compose.material3.MaterialTheme.colorScheme.error
+                else -> androidx.compose.material3.MaterialTheme.colorScheme.onSurface
+            }
+        )
+
+        // Hint
+        val hintText = when {
+            board.guesses.isEmpty() -> "I'm thinking of a number between 1 and 100. You have ${10 - board.guesses.size} guesses!"
+            board.lastResult == com.cupcake.game.Game.GuessNumberBoard.GuessResult.TOO_HIGH -> "Too high! 📉 ${10 - board.guesses.size} guesses left. Range: 1-${(board.lastGuess ?: 100) - 1}"
+            board.lastResult == com.cupcake.game.Game.GuessNumberBoard.GuessResult.TOO_LOW -> "Too low! 📈 ${10 - board.guesses.size} guesses left. Range: ${(board.lastGuess ?: 1) + 1}-100"
+            board.lastResult == com.cupcake.game.Game.GuessNumberBoard.GuessResult.CORRECT -> "You got it! 🎉 The number was ${board.targetNumber}"
+            else -> "Guess a number between 1-100"
+        }
+        Text(
+            text = hintText,
+            fontSize = 16.sp,
+            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().padding(16.dp)
+        )
+
+        // Previous guesses
+        if (board.guesses.isNotEmpty()) {
+            Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Your guesses: ${board.guesses.joinToString(", ")}", fontSize = 14.sp, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+
+        // Number picker (0-99 grid, maps to 1-100)
+        if (state.status == com.cupcake.game.Game.GameStatus.PLAYING) {
+            Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                (0..9).forEach { row ->
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        (0..9).forEach { col ->
+                            val guess = row * 10 + col + 1
+                            val isGuessed = board.guesses.contains(guess)
+                            androidx.compose.material3.Button(
+                                onClick = { 
+                                    if (!isGuessed) onGuess(guess - 1) // Position is 0-indexed
+                                },
+                                modifier = Modifier.weight(1f).height(44.dp),
+                                enabled = !isGuessed,
+                                shape = RoundedCornerShape(8.dp),
+                                colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                                    containerColor = if (isGuessed) 
+                                        androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerHighest
+                                    else 
+                                        androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerHigh
+                                )
+                            ) {
+                                Text(text = "$guess", fontSize = 16.sp, fontWeight = FontWeight.Medium,
+                                    color = if (isGuessed) androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                    else androidx.compose.material3.MaterialTheme.colorScheme.onSurface)
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            Button(onClick = onRestart) { Text("Play Again") }
+        }
+    }
+}
+
+@Composable
+fun MathQuizBoardUI(
+    state: com.cupcake.game.Game.State,
+    onAnswer: (Int) -> Unit,
+    onRestart: () -> Unit
+) {
+    val board = state.board as? com.cupcake.game.Game.MathQuizBoard ?: return
+    var currentAnswer by remember { mutableStateOf("") }
+    var isNegative by remember { mutableStateOf(false) }
+    
+    Column(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(24.dp)
+    ) {
+        // Score
+        Text(
+            text = "Score: ${board.correctAnswers}/${board.questionsAnswered}",
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Medium,
+            color = androidx.compose.material3.MaterialTheme.colorScheme.primary
+        )
+
+        // Current question
+        board.currentQuestion?.let { question ->
+            Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text(
+                    text = "${question.expression} = ?",
+                    fontSize = 48.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                
+                if (state.status == com.cupcake.game.Game.GameStatus.PLAYING) {
+                    // Answer display
+                    androidx.compose.material3.TextField(
+                        value = if (isNegative) "-$currentAnswer" else currentAnswer,
+                        onValueChange = { currentAnswer = it.filter { it.isDigit() } },
+                        modifier = Modifier.fillMaxWidth().width(200.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 32.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center),
+                        readOnly = true
+                    )
+                    
+                    // Number pad
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            androidx.compose.material3.Button(
+                                onClick = { isNegative = !isNegative },
+                                modifier = Modifier.weight(1f).height(56.dp),
+                                shape = RoundedCornerShape(12.dp)
+                            ) { Text(if (isNegative) "+/−" else "−", fontSize = 20.sp) }
+                            (1..3).forEach { digit ->
+                                androidx.compose.material3.Button(
+                                    onClick = { currentAnswer = "$currentAnswer$digit" },
+                                    modifier = Modifier.weight(1f).height(56.dp),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) { Text("$digit", fontSize = 24.sp, fontWeight = FontWeight.Medium) }
+                            }
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            (4..6).forEach { digit ->
+                                androidx.compose.material3.Button(
+                                    onClick = { currentAnswer = "$currentAnswer$digit" },
+                                    modifier = Modifier.weight(1f).height(56.dp),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) { Text("$digit", fontSize = 24.sp, fontWeight = FontWeight.Medium) }
+                            }
+                            androidx.compose.material3.Button(
+                                onClick = { 
+                                    if (currentAnswer.isNotEmpty()) {
+                                        val answer = (if (isNegative) "-$currentAnswer" else currentAnswer).toIntOrNull() ?: 0
+                                        onAnswer(answer)
+                                        currentAnswer = ""
+                                        isNegative = false
+                                    }
+                                },
+                                modifier = Modifier.weight(1f).height(56.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                                    containerColor = androidx.compose.material3.MaterialTheme.colorScheme.tertiaryContainer
+                                )
+                            ) { Text("✓", fontSize = 24.sp) }
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            (7..9).forEach { digit ->
+                                androidx.compose.material3.Button(
+                                    onClick = { currentAnswer = "$currentAnswer$digit" },
+                                    modifier = Modifier.weight(1f).height(56.dp),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) { Text("$digit", fontSize = 24.sp, fontWeight = FontWeight.Medium) }
+                            }
+                            androidx.compose.material3.Button(
+                                onClick = { 
+                                    if (currentAnswer.isNotEmpty()) {
+                                        currentAnswer = currentAnswer.dropLast(1)
+                                    } else if (isNegative) {
+                                        isNegative = false
+                                    }
+                                },
+                                modifier = Modifier.weight(1f).height(56.dp),
+                                shape = RoundedCornerShape(12.dp)
+                            ) { Text("⌫", fontSize = 24.sp) }
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            androidx.compose.material3.Button(
+                                onClick = { currentAnswer = "$currentAnswer0" },
+                                modifier = Modifier.weight(1f).height(56.dp),
+                                shape = RoundedCornerShape(12.dp)
+                            ) { Text("0", fontSize = 24.sp, fontWeight = FontWeight.Medium) }
+                            androidx.compose.material3.Button(
+                                onClick = { currentAnswer = "" },
+                                modifier = Modifier.weight(2f).height(56.dp),
+                                shape = RoundedCornerShape(12.dp)
+                            ) { Text("Clear", fontSize = 18.sp, fontWeight = FontWeight.Medium) }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Feedback
+        board.lastResult?.let { isCorrect ->
+            Text(
+                text = if (isCorrect) "Correct! 😒" else "Wrong! 😤",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Medium,
+                color = if (isCorrect) androidx.compose.material3.MaterialTheme.colorScheme.tertiary else androidx.compose.material3.MaterialTheme.colorScheme.error
+            )
+        }
+
+        // Game over
+        if (state.status != com.cupcake.game.Game.GameStatus.PLAYING) {
+            Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = if (state.status == com.cupcake.game.Game.GameStatus.HUMAN_WON) "You won! 🎉" else "Bot won! 🤖",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text("Correct: ${board.correctAnswers} | Wrong: ${board.wrongAnswers}", fontSize = 16.sp)
+                Button(onClick = onRestart) { Text("Play Again") }
+            }
+        }
+    }
+}
+
+@Composable
+fun ChessBoardUI(
+    state: com.cupcake.game.Game.State,
+    onRestart: () -> Unit
+) {
+    val board = state.board as? com.cupcake.game.Game.ChessBoard ?: return
+    
+    Column(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        androidx.compose.material3.Icon(
+            imageVector = androidx.compose.material.icons.Icons.Filled.SportsEsports,
+            contentDescription = "Chess",
+            modifier = Modifier.size(64.dp),
+            tint = androidx.compose.material3.MaterialTheme.colorScheme.primary
+        )
+        
+        Text(
+            text = "Chess",
+            fontSize = 28.sp,
+            fontWeight = FontWeight.Bold
+        )
+        
+        Text(
+            text = "Chess engine integration coming soon!\nCurrently shows FEN: ${board.currentFen.take(50)}...",
+            fontSize = 16.sp,
+            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().padding(16.dp)
+        )
+        
+        if (state.status != com.cupcake.game.Game.GameStatus.PLAYING) {
+            Button(onClick = onRestart) { Text("Restart") }
+        }
     }
 }
