@@ -3,7 +3,7 @@ package com.cupcake.di
 import android.content.Context
 import com.cupcake.ai.CharacterManager
 import com.cupcake.ai.EnergyManager
-import com.cupcake.ai.LlamaEngine
+import com.cupcake.ai.OllamaEngine
 import com.cupcake.data.source.local.AppDatabase
 import com.cupcake.data.source.remote.ApiClient
 import com.cupcake.data.source.remote.ApiServices
@@ -11,7 +11,7 @@ import com.cupcake.domain.repository.ChatRepository
 import com.cupcake.domain.repository.ModelRepository
 import com.cupcake.domain.repository.SystemPromptRepository
 import com.cupcake.game.GameManager
-import com.cupcake.jni.QwenNative
+import com.cupcake.game.PointsManager
 import com.cupcake.network.EspWebSocketServer
 import com.cupcake.tts.TtsManager
 import com.google.common.util.concurrent.ListeningExecutorService
@@ -38,16 +38,13 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideQwenNative(): QwenNative {
-        return QwenNative.getInstance()
-    }
-
-    @Provides
-    @Singleton
-    fun provideLlamaEngine(@dagger.hilt.android.qualifiers.ApplicationContext context: Context): LlamaEngine {
-        val engine = LlamaEngine.getInstance()
-        LlamaEngine.initialize(context)
-        return engine
+    fun provideOllamaEngine(
+        @dagger.hilt.android.qualifiers.ApplicationContext context: Context,
+        okHttpClient: OkHttpClient
+    ): OllamaEngine {
+        // Initialize the singleton with the Hilt-provided OkHttpClient
+        OllamaEngine.initialize(context, okHttpClient)
+        return OllamaEngine.getInstance()
     }
 
     @Provides
@@ -80,10 +77,17 @@ object AppModule {
     @Provides
     @Singleton
     fun provideGameManager(
-        llamaEngine: LlamaEngine,
-        characterManager: CharacterManager
+        ollamaEngine: OllamaEngine,
+        characterManager: CharacterManager,
+        pointsManager: PointsManager
     ): GameManager {
-        return GameManager(llamaEngine, characterManager)
+        return GameManager(ollamaEngine, characterManager, pointsManager)
+    }
+
+    @Provides
+    @Singleton
+    fun providePointsManager(): PointsManager {
+        return PointsManager()
     }
 
     @Provides
@@ -127,10 +131,9 @@ object AppModule {
     @Provides
     @Singleton
     fun provideApiClient(
-        qwenNative: QwenNative,
         okHttpClient: OkHttpClient
     ): ApiClient {
-        return ApiClient(qwenNative, okHttpClient)
+        return ApiClient(okHttpClient)
     }
 
     @Provides

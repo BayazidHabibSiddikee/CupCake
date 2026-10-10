@@ -18,7 +18,11 @@ sealed interface Game {
         val moveHistory: List<Move> = emptyList()
     ) : Game
 
-    enum class GameType { TIC_TAC_TOE, CHESS, ROCK_PAPER_SCISSORS, GUESS_NUMBER, MATH_QUIZ, CLICKER }
+    enum class GameType { 
+        TIC_TAC_TOE, CHESS, ROCK_PAPER_SCISSORS, GUESS_NUMBER, MATH_QUIZ, CLICKER,
+        MEMORY_MATCH, HANGMAN, WORD_SCRAMBLE, NUMBER_BASE, REACTION_TIME, 
+        TIC_TAC_TOE_4X4, CONNECT_FOUR, MASTERMIND
+    }
 
     enum class Player(val id: Int, val symbol: String) {
         HUMAN(1, "X"), BOT(2, "O")
@@ -37,7 +41,6 @@ sealed interface Game {
         fun get(position: Int): Player?
         fun set(position: Int, player: Player): Boolean
         fun isFull(): Boolean
-        fun copy(): Board
     }
 
     data class ClickerBoard(
@@ -50,7 +53,6 @@ sealed interface Game {
             return true
         }
         override fun isFull(): Boolean = false
-        override fun copy(): Board = ClickerBoard(score)
     }
 
     // Tic Tac Toe Board
@@ -67,19 +69,9 @@ sealed interface Game {
             return false
         }
         override fun isFull(): Boolean = cells.none { it == null }
-        override fun copy(): Board = copy(cells = cells.clone())
     }
 
-    // Chess board (simplified - using Stockfish later)
-    data class ChessBoard(
-        override val size: Int = 64,
-        private val pieces: Array<String?> = Array(64) { null }
-    ) : Board {
-        override fun get(position: Int): Player? = null // Simplified
-        override fun set(position: Int, player: Player): Boolean = false
-        override fun isFull(): Boolean = false
-        override fun copy(): Board = this
-    }
+    
 
     // Rock Paper Scissors Board
     data class RpsBoard(
@@ -90,7 +82,6 @@ sealed interface Game {
         override fun get(position: Int): Player? = null
         override fun set(position: Int, player: Player): Boolean = false
         override fun isFull(): Boolean = humanChoice != null && botChoice != null
-        override fun copy(): Board = this.copy()
     }
 
     // Guess Number Board
@@ -104,12 +95,6 @@ sealed interface Game {
         override fun get(position: Int): Player? = null
         override fun set(position: Int, player: Player): Boolean = false
         override fun isFull(): Boolean = lastResult == GuessResult.CORRECT
-        override fun copy(): Board = GuessNumberBoard(
-            targetNumber = targetNumber,
-            guesses = guesses.toMutableList(),
-            lastGuess = lastGuess,
-            lastResult = lastResult
-        )
 
         enum class GuessResult { TOO_HIGH, TOO_LOW, CORRECT }
     }
@@ -127,14 +112,6 @@ sealed interface Game {
         override fun get(position: Int): Player? = null
         override fun set(position: Int, player: Player): Boolean = false
         override fun isFull(): Boolean = questionsAnswered >= 10
-        override fun copy(): Board = MathQuizBoard(
-            currentQuestion = currentQuestion,
-            questionsAnswered = questionsAnswered,
-            correctAnswers = correctAnswers,
-            wrongAnswers = wrongAnswers,
-            currentAnswer = currentAnswer,
-            lastResult = lastResult
-        )
 
         data class MathQuestion(
             val expression: String,
@@ -143,19 +120,165 @@ sealed interface Game {
         )
     }
 
-    // Chess Board (simplified - using Stockfish later)
-    data class ChessBoard(
-        override val size: Int = 64,
-        private val pieces: Array<String?> = Array(64) { null },
-        var currentFen: String = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
-        var gameOver: Boolean = false,
-        var result: String? = null
+    // Memory Match Board
+    data class MemoryMatchBoard(
+        override val size: Int = 16,
+        val pairs: Int = 8,
+        var cards: List<MemoryCard> = emptyList(),
+        var flippedIndices: MutableList<Int> = mutableListOf(),
+        var matchedPairs: MutableSet<Int> = mutableSetOf(),
+        var moves: Int = 0
     ) : Board {
-        override fun get(position: Int): Player? = null // Simplified
+        override fun get(position: Int): Player? = null
         override fun set(position: Int, player: Player): Boolean = false
-        override fun isFull(): Boolean = gameOver
-        override fun copy(): Board = this.copy()
+        override fun isFull(): Boolean = matchedPairs.size == pairs
+
+        data class MemoryCard(
+            val id: Int,
+            val value: String,
+            var isFlipped: Boolean = false,
+            var isMatched: Boolean = false
+        )
     }
+
+    // Hangman Board
+    data class HangmanBoard(
+        override val size: Int = 26,
+        val word: String = HangmanEngine.WORDS.random().uppercase(),
+        var guessedLetters: MutableSet<Char> = mutableSetOf(),
+        var wrongGuesses: Int = 0,
+        var maxWrongGuesses: Int = 6
+    ) : Board {
+        override fun get(position: Int): Player? = null
+        override fun set(position: Int, player: Player): Boolean = false
+        override fun isFull(): Boolean = wrongGuesses >= maxWrongGuesses || word.all { guessedLetters.contains(it) }
+
+        fun getDisplayWord(): String = word.map { if (guessedLetters.contains(it)) it else '_' }.joinToString(" ")
+        fun getWrongLetters(): String = guessedLetters.filter { it !in word }.joinToString(", ")
+    }
+
+    // Word Scramble Board
+    data class WordScrambleBoard(
+        override val size: Int = 10,
+        val originalWord: String = WordScrambleEngine.WORDS.random().uppercase(),
+        var scrambledWord: String = "",
+        var attempts: Int = 0,
+        var maxAttempts: Int = 3,
+        var solved: Boolean = false
+    ) : Board {
+        override fun get(position: Int): Player? = null
+        override fun set(position: Int, player: Player): Boolean = false
+        override fun isFull(): Boolean = solved || attempts >= maxAttempts
+    }
+
+    // Number Base Conversion Board
+    data class NumberBaseBoard(
+        override val size: Int = 10,
+        var currentNumber: Int = (1..255).random(),
+        var fromBase: Int = 10,
+        var toBase: Int = 2,
+        var userAnswer: String = "",
+        var questionsAnswered: Int = 0,
+        var correctAnswers: Int = 0,
+        var currentQuestion: NumberBaseQuestion? = null
+    ) : Board {
+        override fun get(position: Int): Player? = null
+        override fun set(position: Int, player: Player): Boolean = false
+        override fun isFull(): Boolean = questionsAnswered >= 10
+
+        data class NumberBaseQuestion(
+            val number: Int,
+            val fromBase: Int,
+            val toBase: Int,
+            val correctAnswer: String
+        )
+    }
+
+    // Reaction Time Board
+    data class ReactionTimeBoard(
+        override val size: Int = 5,
+        var rounds: MutableList<ReactionRound> = mutableListOf(),
+        var currentRound: Int = 0,
+        var waitingForTap: Boolean = false,
+        var startTime: Long = 0,
+        var bestTime: Long = Long.MAX_VALUE
+    ) : Board {
+        override fun get(position: Int): Player? = null
+        override fun set(position: Int, player: Player): Boolean = false
+        override fun isFull(): Boolean = rounds.size >= 5
+
+        data class ReactionRound(
+            val roundNumber: Int,
+            val reactionTimeMs: Long,
+            val isValid: Boolean
+        )
+    }
+
+    // Connect Four Board
+    data class ConnectFourBoard(
+        override val size: Int = 42,
+        private val grid: Array<Player?> = Array(42) { null },
+        var currentPlayer: Player = Player.HUMAN,
+        var winner: Player? = null
+    ) : Board {
+        override fun get(position: Int): Player? = grid[position]
+        override fun set(position: Int, player: Player): Boolean {
+            if (position in 0..41 && grid[position] == null) {
+                grid[position] = player
+                return true
+            }
+            return false
+        }
+        override fun isFull(): Boolean = grid.none { it == null } || winner != null
+    }
+
+    // Mastermind Board
+    data class MastermindBoard(
+        override val size: Int = 10,
+        val code: List<Int> = (0..5).map { (0..5).random() }.take(4).toList(),
+        var guesses: MutableList<MastermindGuess> = mutableListOf(),
+        var maxGuesses: Int = 10,
+        var solved: Boolean = false
+    ) : Board {
+        override fun get(position: Int): Player? = null
+        override fun set(position: Int, player: Player): Boolean = false
+        override fun isFull(): Boolean = solved || guesses.size >= maxGuesses
+
+        data class MastermindGuess(
+            val guess: List<Int>,
+            val exactMatches: Int,
+            val colorMatches: Int
+        )
+    }
+
+    // 4x4 Tic Tac Toe Board
+    data class TicTacToe4x4Board(
+        override val size: Int = 16,
+        private val cells: Array<Player?> = Array(16) { null }
+    ) : Board {
+        override fun get(position: Int): Player? = cells[position]
+        override fun set(position: Int, player: Player): Boolean {
+            if (position in 0..15 && cells[position] == null) {
+                cells[position] = player
+                return true
+            }
+            return false
+        }
+        override fun isFull(): Boolean = cells.none { it == null }
+    }
+}
+
+// Chess Board (simplified - using Stockfish later)
+data class ChessBoard(
+    override val size: Int = 64,
+    private val pieces: Array<String?> = Array(64) { null },
+    var currentFen: String = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    var gameOver: Boolean = false,
+    var result: String? = null
+) : Game.Board {
+    override fun get(position: Int): Game.Player? = null // Simplified
+    override fun set(position: Int, player: Game.Player): Boolean = false
+    override fun isFull(): Boolean = gameOver
 }
 
 // Tic Tac Toe Engine
@@ -344,8 +467,367 @@ object MathQuizEngine {
     }
 }
 
+object MemoryMatchEngine {
+    private val CARD_VALUES = listOf("🍎", "🍌", "🍇", "🍓", "🍊", "🍋", "🍉", "🍒", "🥝", "🍑", "🥭", "🍍")
+
+    fun createBoard(pairs: Int = 8): Game.MemoryMatchBoard {
+        val values = CARD_VALUES.shuffled().take(pairs)
+        val cards = (values + values).shuffled().mapIndexed { index, value ->
+            Game.MemoryMatchBoard.MemoryCard(id = index, value = value)
+        }
+        return Game.MemoryMatchBoard(pairs = pairs, cards = cards)
+    }
+
+    fun flipCard(board: Game.MemoryMatchBoard, index: Int): Game.MemoryMatchBoard {
+        if (index !in 0..15) return board
+        val card = board.cards[index]
+        if (card.isFlipped || card.isMatched) return board
+        if (board.flippedIndices.size >= 2) return board
+
+        val newCards = board.cards.toMutableList()
+        newCards[index] = card.copy(isFlipped = true)
+        val newFlipped = board.flippedIndices + index
+        var newMatched = board.matchedPairs
+        var newMoves = board.moves
+
+        if (newFlipped.size == 2) {
+            newMoves++
+            val first = newCards[newFlipped[0]]
+            val second = newCards[newFlipped[1]]
+            if (first.value == second.value) {
+                newCards[newFlipped[0]] = first.copy(isMatched = true)
+                newCards[newFlipped[1]] = second.copy(isMatched = true)
+                newMatched = (newMatched + first.value.hashCode()).toMutableSet()
+            }
+        }
+
+        return board.copy(
+            cards = newCards.toList(),
+            flippedIndices = if (newFlipped.size == 2) mutableListOf() else newFlipped.toMutableList(),
+            matchedPairs = newMatched,
+            moves = newMoves
+        )
+    }
+}
+
+object HangmanEngine {
+    val WORDS = listOf(
+        "CUPCAKE", "ANDROID", "KOTLIN", "COMPOSE", "BLE", "SENSOR", "OLLAMA", "MODEL",
+        "CHATBOT", "NEURAL", "NETWORK", "ALGORITHM", "DATABASE", "CACHE", "MEMORY",
+        "PROCESSOR", "KERNEL", "DRIVER", "FIRMWARE", "HARDWARE", "SOFTWARE", "SERVER",
+        "CLIENT", "NETWORK", "PROTOCOL", "PACKET", "ROUTER", "SWITCH", "FIREWALL"
+    )
+
+    fun guessLetter(board: Game.HangmanBoard, letter: Char): Game.HangmanBoard {
+        val upperLetter = letter.uppercaseChar()
+        if (board.guessedLetters.contains(upperLetter)) return board
+
+        val newGuessed = (board.guessedLetters + upperLetter).toMutableSet()
+        val newWrongGuesses = if (upperLetter !in board.word) board.wrongGuesses + 1 else board.wrongGuesses
+
+        return board.copy(
+            guessedLetters = newGuessed,
+            wrongGuesses = newWrongGuesses
+        )
+    }
+
+    fun getHangmanArt(wrongGuesses: Int): String {
+        return when (wrongGuesses) {
+            0 -> "  +---+\n  |   |\n      |\n      |\n      |\n      |\n========="
+            1 -> "  +---+\n  |   |\n  O   |\n      |\n      |\n      |\n========="
+            2 -> "  +---+\n  |   |\n  O   |\n  |   |\n      |\n      |\n========="
+            3 -> "  +---+\n  |   |\n  O   |\n /|   |\n      |\n      |\n========="
+            4 -> "  +---+\n  |   |\n  O   |\n /|\\  |\n      |\n      |\n========="
+            5 -> "  +---+\n  |   |\n  O   |\n /|\\  |\n /    |\n      |\n========="
+            6 -> "  +---+\n  |   |\n  O   |\n /|\\  |\n / \\  |\n      |\n========="
+            else -> ""
+        }
+    }
+}
+
+object WordScrambleEngine {
+    val WORDS = listOf(
+        "CUPCAKE", "ANDROID", "KOTLIN", "COMPOSE", "BLE", "SENSOR", "OLLAMA", "MODEL",
+        "CHATBOT", "NEURAL", "NETWORK", "ALGORITHM", "DATABASE", "CACHE", "MEMORY",
+        "PROCESSOR", "KERNEL", "DRIVER", "FIRMWARE", "HARDWARE", "SOFTWARE", "SERVER",
+        "CLIENT", "NETWORK", "PROTOCOL", "PACKET", "ROUTER", "SWITCH", "FIREWALL"
+    )
+
+    fun createBoard(): Game.WordScrambleBoard {
+        val word = WORDS.random().uppercase()
+        val scrambled = scramble(word)
+        return Game.WordScrambleBoard(
+            originalWord = word,
+            scrambledWord = scrambled
+        )
+    }
+
+    private fun scramble(word: String): String {
+        val chars = word.toMutableList()
+        do {
+            chars.shuffle()
+        } while (chars.joinToString("") == word)
+        return chars.joinToString("")
+    }
+
+    fun checkAnswer(board: Game.WordScrambleBoard, answer: String): Game.WordScrambleBoard {
+        val upperAnswer = answer.uppercase().trim()
+        val isCorrect = upperAnswer == board.originalWord
+        return board.copy(
+            attempts = board.attempts + 1,
+            solved = isCorrect
+        )
+    }
+}
+
+object NumberBaseEngine {
+    private val BASES = listOf(2, 8, 10, 16)
+    private val BASE_NAMES = mapOf(2 to "Binary", 8 to "Octal", 10 to "Decimal", 16 to "Hexadecimal")
+
+    fun generateQuestion(): Game.NumberBaseBoard.NumberBaseQuestion {
+        val number = (1..255).random()
+        val fromBase = BASES.random()
+        val toBase = BASES.filter { it != fromBase }.random()
+        val correctAnswer = convertBase(number.toString(), fromBase, toBase)
+        return Game.NumberBaseBoard.NumberBaseQuestion(number, fromBase, toBase, correctAnswer.uppercase())
+    }
+
+    private fun convertBase(input: String, fromBase: Int, toBase: Int): String {
+        val decimal = when (fromBase) {
+            2 -> input.toInt(2)
+            8 -> input.toInt(8)
+            10 -> input.toInt()
+            16 -> input.toInt(16)
+            else -> input.toInt()
+        }
+        return when (toBase) {
+            2 -> decimal.toString(2)
+            8 -> decimal.toString(8)
+            10 -> decimal.toString()
+            16 -> decimal.toString(16).uppercase()
+            else -> decimal.toString()
+        }
+    }
+
+    fun checkAnswer(board: Game.NumberBaseBoard, answer: String): Game.NumberBaseBoard {
+        val question = board.currentQuestion ?: return board
+        val isCorrect = answer.trim().uppercase() == question.correctAnswer
+        return board.copy(
+            questionsAnswered = board.questionsAnswered + 1,
+            correctAnswers = board.correctAnswers + if (isCorrect) 1 else 0,
+            userAnswer = answer,
+            currentQuestion = if (board.questionsAnswered + 1 >= 10) null else generateQuestion()
+        )
+    }
+
+    fun getBaseName(base: Int): String = BASE_NAMES[base] ?: base.toString()
+}
+
+object ReactionTimeEngine {
+    fun startRound(board: Game.ReactionTimeBoard): Game.ReactionTimeBoard {
+        val delay = (1000..3000).random()
+        return board.copy(
+            waitingForTap = true,
+            startTime = System.currentTimeMillis() + delay,
+            currentRound = board.currentRound + 1
+        )
+    }
+
+    fun recordTap(board: Game.ReactionTimeBoard): Game.ReactionTimeBoard {
+        val reactionTime = System.currentTimeMillis() - board.startTime
+        val isValid = reactionTime > 100 // Prevent cheating
+        val round = Game.ReactionTimeBoard.ReactionRound(
+            roundNumber = board.currentRound,
+            reactionTimeMs = if (isValid) reactionTime else -1,
+            isValid = isValid
+        )
+        val newBest = if (isValid && reactionTime < board.bestTime) reactionTime else board.bestTime
+        return board.copy(
+            rounds = (board.rounds + round).toMutableList(),
+            waitingForTap = false,
+            bestTime = newBest
+        )
+    }
+}
+
+object ConnectFourEngine {
+    private val ROWS = 6
+    private val COLS = 7
+    private val WIN_LINES = generateWinLines()
+
+    private fun generateWinLines(): List<List<Int>> {
+        val lines = mutableListOf<List<Int>>()
+        // Horizontal
+        for (row in 0..ROWS-1) {
+            for (col in 0..COLS-4) {
+                lines.add((0..3).map { row * COLS + col + it })
+            }
+        }
+        // Vertical
+        for (row in 0..ROWS-4) {
+            for (col in 0..COLS-1) {
+                lines.add((0..3).map { (row + it) * COLS + col })
+            }
+        }
+        // Diagonal down-right
+        for (row in 0..ROWS-4) {
+            for (col in 0..COLS-4) {
+                lines.add((0..3).map { (row + it) * COLS + col + it })
+            }
+        }
+        // Diagonal up-right
+        for (row in 3..ROWS-1) {
+            for (col in 0..COLS-4) {
+                lines.add((0..3).map { (row - it) * COLS + col + it })
+            }
+        }
+        return lines
+    }
+
+    fun checkWinner(board: Game.ConnectFourBoard): Game.Player? {
+        for (line in WIN_LINES) {
+            val p1 = board.get(line[0])
+            val p2 = board.get(line[1])
+            val p3 = board.get(line[2])
+            val p4 = board.get(line[3])
+            if (p1 != null && p1 == p2 && p2 == p3 && p3 == p4) return p1
+        }
+        return null
+    }
+
+    fun getValidMoves(board: Game.ConnectFourBoard): List<Int> {
+        val moves = mutableListOf<Int>()
+        for (col in 0..COLS-1) {
+            for (row in ROWS-1 downTo 0) {
+                val pos = row * COLS + col
+                if (board.get(pos) == null) {
+                    moves.add(pos)
+                    break
+                }
+            }
+        }
+        return moves
+    }
+
+    fun getBestMove(board: Game.ConnectFourBoard): Int {
+        val validMoves = getValidMoves(board)
+        // Try to win
+        for (move in validMoves) {
+            val testBoard = board.copy() as Game.ConnectFourBoard
+            testBoard.set(move, Game.Player.BOT)
+            if (checkWinner(testBoard) == Game.Player.BOT) return move
+        }
+        // Block human
+        for (move in validMoves) {
+            val testBoard = board.copy() as Game.ConnectFourBoard
+            testBoard.set(move, Game.Player.HUMAN)
+            if (checkWinner(testBoard) == Game.Player.HUMAN) return move
+        }
+        // Prefer center columns
+        val centerMoves = validMoves.filter { it % COLS in 2..4 }
+        if (centerMoves.isNotEmpty()) return centerMoves.random()
+        return validMoves.randomOrNull() ?: -1
+    }
+}
+
+object MastermindEngine {
+    private val COLORS = 6
+    private val CODE_LENGTH = 4
+
+    fun generateCode(): List<Int> = (0..CODE_LENGTH-1).map { (0..COLORS-1).random() }
+
+    fun evaluateGuess(code: List<Int>, guess: List<Int>): Pair<Int, Int> {
+        var exactMatches = 0
+        var colorMatches = 0
+        val codeCounts = mutableMapOf<Int, Int>()
+        val guessCounts = mutableMapOf<Int, Int>()
+
+        for (i in 0..CODE_LENGTH-1) {
+            if (code[i] == guess[i]) {
+                exactMatches++
+            } else {
+                codeCounts[code[i]] = codeCounts.getOrDefault(code[i], 0) + 1
+                guessCounts[guess[i]] = guessCounts.getOrDefault(guess[i], 0) + 1
+            }
+        }
+        for ((color, count) in codeCounts) {
+            colorMatches += minOf(count, guessCounts.getOrDefault(color, 0))
+        }
+        return Pair(exactMatches, colorMatches)
+    }
+
+    fun checkWin(board: Game.MastermindBoard, guess: List<Int>): Game.MastermindBoard {
+        val (exact, color) = evaluateGuess(board.code, guess)
+        val newGuess = Game.MastermindBoard.MastermindGuess(guess, exact, color)
+        val newGuesses = (board.guesses + newGuess).toMutableList()
+        val solved = exact == CODE_LENGTH
+        return board.copy(
+            guesses = newGuesses,
+            solved = solved
+        )
+    }
+}
+
+object TicTacToe4x4Engine {
+    private val WIN_LINES = generateWinLines()
+
+    private fun generateWinLines(): List<List<Int>> {
+        val lines = mutableListOf<List<Int>>()
+        // Rows
+        for (row in 0..3) {
+            lines.add((0..3).map { row * 4 + it })
+        }
+        // Cols
+        for (col in 0..3) {
+            lines.add((0..3).map { it * 4 + col })
+        }
+        // Diagonals
+        lines.add(listOf(0, 5, 10, 15))
+        lines.add(listOf(3, 6, 9, 12))
+        return lines
+    }
+
+    fun checkWinner(board: Game.TicTacToe4x4Board): Game.Player? {
+        for (line in WIN_LINES) {
+            val p1 = board.get(line[0])
+            val p2 = board.get(line[1])
+            val p3 = board.get(line[2])
+            val p4 = board.get(line[3])
+            if (p1 != null && p1 == p2 && p2 == p3 && p3 == p4) return p1
+        }
+        return null
+    }
+
+    fun getBestMove(board: Game.TicTacToe4x4Board): Int {
+        val empty = (0..15).filter { board.get(it) == null }
+        // Try to win
+        for (move in empty) {
+            val testBoard = board.copy() as Game.TicTacToe4x4Board
+            testBoard.set(move, Game.Player.BOT)
+            if (checkWinner(testBoard) == Game.Player.BOT) return move
+        }
+        // Block human
+        for (move in empty) {
+            val testBoard = board.copy() as Game.TicTacToe4x4Board
+            testBoard.set(move, Game.Player.HUMAN)
+            if (checkWinner(testBoard) == Game.Player.HUMAN) return move
+        }
+        // Center
+        val center = listOf(5, 6, 9, 10).filter { board.get(it) == null }
+        if (center.isNotEmpty()) return center.random()
+        // Corners
+        val corners = listOf(0, 3, 12, 15).filter { board.get(it) == null }
+        if (corners.isNotEmpty()) return corners.random()
+        return empty.randomOrNull() ?: -1
+    }
+}
+
 // Game Manager
-class GameManager(private val ollamaEngine: OllamaEngine, private val characterManager: CharacterManager) {
+class GameManager(
+    private val ollamaEngine: OllamaEngine,
+    private val characterManager: CharacterManager,
+    private val pointsManager: PointsManager
+) {
 
     private var currentGame: Game.State? = null
     private var gameType: Game.GameType? = null
@@ -366,7 +848,7 @@ class GameManager(private val ollamaEngine: OllamaEngine, private val characterM
             )
             Game.GameType.CHESS -> Game.State(
                 gameType = type,
-                board = Game.ChessBoard(),
+                board = ChessBoard(),
                 currentPlayer = Game.Player.HUMAN,
                 status = Game.GameStatus.PLAYING
             )
@@ -396,6 +878,56 @@ class GameManager(private val ollamaEngine: OllamaEngine, private val characterM
                 currentPlayer = Game.Player.HUMAN,
                 status = Game.GameStatus.PLAYING
             )
+            Game.GameType.MEMORY_MATCH -> Game.State(
+                gameType = type,
+                board = MemoryMatchEngine.createBoard(),
+                currentPlayer = Game.Player.HUMAN,
+                status = Game.GameStatus.PLAYING
+            )
+            Game.GameType.HANGMAN -> Game.State(
+                gameType = type,
+                board = Game.HangmanBoard(),
+                currentPlayer = Game.Player.HUMAN,
+                status = Game.GameStatus.PLAYING
+            )
+            Game.GameType.WORD_SCRAMBLE -> Game.State(
+                gameType = type,
+                board = WordScrambleEngine.createBoard(),
+                currentPlayer = Game.Player.HUMAN,
+                status = Game.GameStatus.PLAYING
+            )
+            Game.GameType.NUMBER_BASE -> Game.State(
+                gameType = type,
+                board = Game.NumberBaseBoard().apply {
+                    currentQuestion = NumberBaseEngine.generateQuestion()
+                },
+                currentPlayer = Game.Player.HUMAN,
+                status = Game.GameStatus.PLAYING
+            )
+            Game.GameType.REACTION_TIME -> Game.State(
+                gameType = type,
+                board = Game.ReactionTimeBoard(),
+                currentPlayer = Game.Player.HUMAN,
+                status = Game.GameStatus.PLAYING
+            )
+            Game.GameType.CONNECT_FOUR -> Game.State(
+                gameType = type,
+                board = Game.ConnectFourBoard(),
+                currentPlayer = Game.Player.HUMAN,
+                status = Game.GameStatus.PLAYING
+            )
+            Game.GameType.MASTERMIND -> Game.State(
+                gameType = type,
+                board = Game.MastermindBoard(),
+                currentPlayer = Game.Player.HUMAN,
+                status = Game.GameStatus.PLAYING
+            )
+            Game.GameType.TIC_TAC_TOE_4X4 -> Game.State(
+                gameType = type,
+                board = Game.TicTacToe4x4Board(),
+                currentPlayer = Game.Player.HUMAN,
+                status = Game.GameStatus.PLAYING
+            )
             else -> Game.State(
                 gameType = type,
                 board = Game.TicTacToeBoard(), // fallback
@@ -418,8 +950,9 @@ class GameManager(private val ollamaEngine: OllamaEngine, private val characterM
             currentGame = game.copy(board = board)
             onGameStateChanged?.invoke(currentGame)
             
-            // Trigger sarcastic reaction every 50 taps
-            if (board.score > 0 && board.score % 50 == 0) {
+            // Award points for milestones
+            if (board.score > 0 && board.score % 100 == 0) {
+                awardGamePoints(game.gameType, true, board.score / 10)
                 triggerClickerReaction(board.score)
             }
             return Result(true, "Tap counted", currentGame)
@@ -447,6 +980,11 @@ class GameManager(private val ollamaEngine: OllamaEngine, private val characterM
                 moveHistory = newHistory
             )
             triggerReaction(winner == Game.Player.HUMAN, winner == null)
+            when (winner) {
+                Game.Player.HUMAN -> awardGamePoints(game.gameType, true, 50)
+                Game.Player.BOT -> awardGamePoints(game.gameType, false, 10)
+                null -> awardGamePoints(game.gameType, false, 25)
+            }
             onGameStateChanged?.invoke(currentGame)
             return Result(true, "Game over", currentGame)
         }
@@ -471,11 +1009,13 @@ class GameManager(private val ollamaEngine: OllamaEngine, private val characterM
             val (newStatus, winner) = when (result) {
                 Game.GuessNumberBoard.GuessResult.CORRECT -> {
                     triggerReaction(true)
+                    awardGamePoints(game.gameType, true, 100 - newGuesses.size * 10)
                     Game.GameStatus.HUMAN_WON to Game.Player.HUMAN
                 }
                 Game.GuessNumberBoard.GuessResult.TOO_HIGH, Game.GuessNumberBoard.GuessResult.TOO_LOW -> {
                     if (newGuesses.size >= 10) {
                         triggerReaction(false)
+                        awardGamePoints(game.gameType, false, 10)
                         Game.GameStatus.BOT_WON to Game.Player.BOT
                     } else {
                         Game.GameStatus.PLAYING to null
@@ -522,8 +1062,13 @@ class GameManager(private val ollamaEngine: OllamaEngine, private val characterM
             val (newStatus, winner) = if (newQuestionsAnswered >= 10) {
                 val humanWon = newCorrectAnswers > newWrongAnswers
                 triggerReaction(humanWon)
-                if (humanWon) Game.GameStatus.HUMAN_WON to Game.Player.HUMAN
-                else Game.GameStatus.BOT_WON to Game.Player.BOT
+                if (humanWon) {
+                    awardGamePoints(game.gameType, true, newCorrectAnswers * 10)
+                    Game.GameStatus.HUMAN_WON to Game.Player.HUMAN
+                } else {
+                    awardGamePoints(game.gameType, false, newCorrectAnswers * 5)
+                    Game.GameStatus.BOT_WON to Game.Player.BOT
+                }
             } else {
                 Game.GameStatus.PLAYING to null
             }
@@ -536,6 +1081,280 @@ class GameManager(private val ollamaEngine: OllamaEngine, private val characterM
             )
             onGameStateChanged?.invoke(currentGame)
             return Result(true, botResponse, currentGame)
+        }
+
+        if (game.gameType == Game.GameType.MEMORY_MATCH) {
+            val board = game.board as? Game.MemoryMatchBoard ?: return Result(false, "Invalid board")
+            val newBoard = MemoryMatchEngine.flipCard(board, position)
+            val newHistory = game.moveHistory + Game.Move(Game.Player.HUMAN, position)
+
+            val (newStatus, winner) = if (newBoard.isFull()) {
+                triggerReaction(true)
+                awardGamePoints(game.gameType, true, 200 - newBoard.moves * 5)
+                Game.GameStatus.HUMAN_WON to Game.Player.HUMAN
+            } else {
+                Game.GameStatus.PLAYING to null
+            }
+
+            currentGame = game.copy(
+                board = newBoard,
+                status = newStatus,
+                winner = winner,
+                moveHistory = newHistory
+            )
+            onGameStateChanged?.invoke(currentGame)
+            return Result(true, "Flipped card ${position + 1}", currentGame)
+        }
+
+        if (game.gameType == Game.GameType.HANGMAN) {
+            val board = game.board as? Game.HangmanBoard ?: return Result(false, "Invalid board")
+            val letter = ('A' + position).toChar()
+            val newBoard = HangmanEngine.guessLetter(board, letter)
+            val newHistory = game.moveHistory + Game.Move(Game.Player.HUMAN, position)
+
+            val (newStatus, winner) = if (newBoard.isFull()) {
+                val won = newBoard.word.all { newBoard.guessedLetters.contains(it) }
+                triggerReaction(won)
+                if (won) {
+                    awardGamePoints(game.gameType, true, 150 - newBoard.wrongGuesses * 20)
+                    Game.GameStatus.HUMAN_WON to Game.Player.HUMAN
+                } else {
+                    awardGamePoints(game.gameType, false, 20)
+                    Game.GameStatus.BOT_WON to Game.Player.BOT
+                }
+            } else {
+                Game.GameStatus.PLAYING to null
+            }
+
+            currentGame = game.copy(
+                board = newBoard,
+                status = newStatus,
+                winner = winner,
+                moveHistory = newHistory
+            )
+            onGameStateChanged?.invoke(currentGame)
+            return Result(true, "Guessed: $letter", currentGame)
+        }
+
+        if (game.gameType == Game.GameType.WORD_SCRAMBLE) {
+            val board = game.board as? Game.WordScrambleBoard ?: return Result(false, "Invalid board")
+            // For word scramble, position maps to a letter selection - simplified for now
+            val newBoard = board.copy(attempts = board.attempts + 1)
+            val newHistory = game.moveHistory + Game.Move(Game.Player.HUMAN, position)
+
+            val (newStatus, winner) = if (newBoard.isFull()) {
+                triggerReaction(newBoard.solved)
+                if (newBoard.solved) {
+                    awardGamePoints(game.gameType, true, 120 - newBoard.attempts * 30)
+                    Game.GameStatus.HUMAN_WON to Game.Player.HUMAN
+                } else {
+                    awardGamePoints(game.gameType, false, 15)
+                    Game.GameStatus.BOT_WON to Game.Player.BOT
+                }
+            } else {
+                Game.GameStatus.PLAYING to null
+            }
+
+            currentGame = game.copy(
+                board = newBoard,
+                status = newStatus,
+                winner = winner,
+                moveHistory = newHistory
+            )
+            onGameStateChanged?.invoke(currentGame)
+            return Result(true, "Attempt ${newBoard.attempts}/${newBoard.maxAttempts}", currentGame)
+        }
+
+        if (game.gameType == Game.GameType.NUMBER_BASE) {
+            val board = game.board as? Game.NumberBaseBoard ?: return Result(false, "Invalid board")
+            // Position maps to a digit/button press - simplified for now
+            val newBoard = board.copy(questionsAnswered = board.questionsAnswered + 1)
+            val newHistory = game.moveHistory + Game.Move(Game.Player.HUMAN, position)
+
+            val (newStatus, winner) = if (newBoard.isFull()) {
+                val humanWon = newBoard.correctAnswers > (newBoard.questionsAnswered - newBoard.correctAnswers)
+                triggerReaction(humanWon)
+                if (humanWon) {
+                    awardGamePoints(game.gameType, true, newBoard.correctAnswers * 20)
+                    Game.GameStatus.HUMAN_WON to Game.Player.HUMAN
+                } else {
+                    awardGamePoints(game.gameType, false, newBoard.correctAnswers * 10)
+                    Game.GameStatus.BOT_WON to Game.Player.BOT
+                }
+            } else {
+                Game.GameStatus.PLAYING to null
+            }
+
+            currentGame = game.copy(
+                board = newBoard,
+                status = newStatus,
+                winner = winner,
+                moveHistory = newHistory
+            )
+            onGameStateChanged?.invoke(currentGame)
+            return Result(true, "Question ${newBoard.questionsAnswered}/10", currentGame)
+        }
+
+        if (game.gameType == Game.GameType.REACTION_TIME) {
+            val board = game.board as? Game.ReactionTimeBoard ?: return Result(false, "Invalid board")
+            var newBoard = board
+            if (!board.waitingForTap) {
+                newBoard = ReactionTimeEngine.startRound(board)
+            } else {
+                newBoard = ReactionTimeEngine.recordTap(board)
+            }
+            val newHistory = game.moveHistory + Game.Move(Game.Player.HUMAN, position)
+
+            val (newStatus, winner) = if (newBoard.isFull()) {
+                triggerReaction(true)
+                val validRounds = newBoard.rounds.filter { it.isValid }
+                val avgTime = if (validRounds.isNotEmpty()) validRounds.map { it.reactionTimeMs.toDouble() }.average() else 0.0
+                val points = maxOf(1, (5000.0 - avgTime).toInt())
+                awardGamePoints(game.gameType, true, points)
+                Game.GameStatus.HUMAN_WON to Game.Player.HUMAN
+            } else {
+                Game.GameStatus.PLAYING to null
+            }
+
+            currentGame = game.copy(
+                board = newBoard,
+                status = newStatus,
+                winner = winner,
+                moveHistory = newHistory
+            )
+            onGameStateChanged?.invoke(currentGame)
+            return Result(true, if (board.waitingForTap) "Reacted!" else "Wait for signal...", currentGame)
+        }
+
+        if (game.gameType == Game.GameType.CONNECT_FOUR) {
+            val board = game.board as? Game.ConnectFourBoard ?: return Result(false, "Invalid board")
+            // Position is column (0-6), find lowest empty row
+            val col = position % 7
+            var row = 5
+            while (row >= 0 && board.get(row * 7 + col) != null) row--
+            if (row < 0) return Result(false, "Column full")
+
+            val movePos = row * 7 + col
+            if (!board.set(movePos, Game.Player.HUMAN)) return Result(false, "Invalid move")
+
+            val newMove = Game.Move(Game.Player.HUMAN, movePos)
+            val newHistory = game.moveHistory + newMove
+
+            val winner = ConnectFourEngine.checkWinner(board)
+            var newStatus = Game.GameStatus.PLAYING
+            var gameWinner: Game.Player? = null
+
+            if (winner != null) {
+                newStatus = if (winner == Game.Player.HUMAN) Game.GameStatus.HUMAN_WON else Game.GameStatus.BOT_WON
+                gameWinner = winner
+                triggerReaction(winner == Game.Player.HUMAN)
+                awardGamePoints(game.gameType, winner == Game.Player.HUMAN, if (winner == Game.Player.HUMAN) 300 else 50)
+            } else if (board.isFull()) {
+                newStatus = Game.GameStatus.DRAW
+                triggerReaction(false, isDraw = true)
+                awardGamePoints(game.gameType, false, 100)
+            } else {
+                // Bot's turn
+                val botMove = ConnectFourEngine.getBestMove(board)
+                if (botMove >= 0) {
+                    board.set(botMove, Game.Player.BOT)
+                    val botMoveObj = Game.Move(Game.Player.BOT, botMove)
+                    val botWinner = ConnectFourEngine.checkWinner(board)
+                    if (botWinner != null) {
+                        newStatus = if (botWinner == Game.Player.HUMAN) Game.GameStatus.HUMAN_WON else Game.GameStatus.BOT_WON
+                        gameWinner = botWinner
+                        triggerReaction(botWinner == Game.Player.HUMAN)
+                        awardGamePoints(game.gameType, botWinner == Game.Player.HUMAN, if (botWinner == Game.Player.HUMAN) 300 else 50)
+                    } else if (board.isFull()) {
+                        newStatus = Game.GameStatus.DRAW
+                        triggerReaction(false, isDraw = true)
+                        awardGamePoints(game.gameType, false, 100)
+                    }
+                }
+            }
+
+            currentGame = game.copy(
+                board = board,
+                currentPlayer = Game.Player.HUMAN,
+                status = newStatus,
+                winner = gameWinner,
+                moveHistory = newHistory
+            )
+            onGameStateChanged?.invoke(currentGame)
+            return Result(true, "Dropped in column ${col + 1}", currentGame)
+        }
+
+        if (game.gameType == Game.GameType.MASTERMIND) {
+            val board = game.board as? Game.MastermindBoard ?: return Result(false, "Invalid board")
+            // Simplified: position maps to a color guess
+            val guess = (0..3).map { (position + it) % 6 }
+            val newBoard = MastermindEngine.checkWin(board, guess)
+            val newHistory = game.moveHistory + Game.Move(Game.Player.HUMAN, position)
+
+            val (newStatus, winner) = if (newBoard.isFull()) {
+                val won = newBoard.solved
+                triggerReaction(won)
+                if (won) {
+                    awardGamePoints(game.gameType, true, 400 - newBoard.guesses.size * 30)
+                    Game.GameStatus.HUMAN_WON to Game.Player.HUMAN
+                } else {
+                    awardGamePoints(game.gameType, false, 25)
+                    Game.GameStatus.BOT_WON to Game.Player.BOT
+                }
+            } else {
+                Game.GameStatus.PLAYING to null
+            }
+
+            currentGame = game.copy(
+                board = newBoard,
+                status = newStatus,
+                winner = winner,
+                moveHistory = newHistory
+            )
+            onGameStateChanged?.invoke(currentGame)
+            return Result(true, "Guess submitted", currentGame)
+        }
+
+        if (game.gameType == Game.GameType.TIC_TAC_TOE_4X4) {
+            val board = game.board as? Game.TicTacToe4x4Board ?: return Result(false, "Invalid board")
+            if (!board.set(position, Game.Player.HUMAN)) return Result(false, "Invalid move")
+
+            val newMove = Game.Move(Game.Player.HUMAN, position)
+            val newHistory = game.moveHistory + newMove
+
+            val winner = TicTacToe4x4Engine.checkWinner(board)
+            if (winner != null) {
+                currentGame = game.copy(
+                    board = board,
+                    status = if (winner == Game.Player.HUMAN) Game.GameStatus.HUMAN_WON else Game.GameStatus.BOT_WON,
+                    winner = winner,
+                    moveHistory = newHistory
+                )
+                triggerReaction(winner == Game.Player.HUMAN)
+                awardGamePoints(game.gameType, winner == Game.Player.HUMAN, if (winner == Game.Player.HUMAN) 200 else 30)
+                return Result(true, "Game over", currentGame)
+            }
+
+            if (board.isFull()) {
+                currentGame = game.copy(board = board, status = Game.GameStatus.DRAW, moveHistory = newHistory)
+                triggerReaction(false, isDraw = true)
+                awardGamePoints(game.gameType, false, 75)
+                return Result(true, "Draw", currentGame)
+            }
+
+            // Bot's turn
+            currentGame = game.copy(
+                board = board,
+                currentPlayer = Game.Player.BOT,
+                moveHistory = newHistory
+            )
+
+            CoroutineScope(Dispatchers.IO).launch {
+                kotlinx.coroutines.delay(500)
+                makeBotMove4x4()
+            }
+
+            return Result(true, "Move made", currentGame)
         }
 
         val board = game.board as? Game.TicTacToeBoard ?: return Result(false, "Invalid board")
@@ -554,12 +1373,14 @@ class GameManager(private val ollamaEngine: OllamaEngine, private val characterM
                 moveHistory = newHistory
             )
             triggerReaction(winner == Game.Player.HUMAN)
+            awardGamePoints(game.gameType, winner == Game.Player.HUMAN, if (winner == Game.Player.HUMAN) 100 else 20)
             return Result(true, "Game over", currentGame)
         }
 
         if (board.isFull()) {
             currentGame = game.copy(board = board, status = Game.GameStatus.DRAW, moveHistory = newHistory)
             triggerReaction(false, isDraw = true)
+            awardGamePoints(game.gameType, false, 50)
             return Result(true, "Draw", currentGame)
         }
 
@@ -603,9 +1424,42 @@ class GameManager(private val ollamaEngine: OllamaEngine, private val characterM
                     moveHistory = newHistory
                 )
                 triggerReaction(winner == Game.Player.HUMAN)
+                awardGamePoints(game.gameType, winner == Game.Player.HUMAN, if (winner == Game.Player.HUMAN) 100 else 20)
             } else if (board.isFull()) {
                 currentGame = game.copy(board = board, currentPlayer = Game.Player.HUMAN, status = Game.GameStatus.DRAW, moveHistory = newHistory)
                 triggerReaction(false, isDraw = true)
+                awardGamePoints(game.gameType, false, 50)
+            } else {
+                currentGame = game.copy(board = board, currentPlayer = Game.Player.HUMAN, moveHistory = newHistory)
+            }
+            onGameStateChanged?.invoke(currentGame)
+        }
+    }
+
+    private fun makeBotMove4x4() {
+        val game = currentGame ?: return
+        val board = game.board as? Game.TicTacToe4x4Board ?: return
+
+        val move = TicTacToe4x4Engine.getBestMove(board)
+        if (move >= 0 && board.set(move, Game.Player.BOT)) {
+            val newMove = Game.Move(Game.Player.BOT, move)
+            val newHistory = game.moveHistory + newMove
+
+            val winner = TicTacToe4x4Engine.checkWinner(board)
+            if (winner != null) {
+                currentGame = game.copy(
+                    board = board,
+                    currentPlayer = Game.Player.HUMAN,
+                    status = if (winner == Game.Player.HUMAN) Game.GameStatus.HUMAN_WON else Game.GameStatus.BOT_WON,
+                    winner = winner,
+                    moveHistory = newHistory
+                )
+                triggerReaction(winner == Game.Player.HUMAN)
+                awardGamePoints(game.gameType, winner == Game.Player.HUMAN, if (winner == Game.Player.HUMAN) 200 else 30)
+            } else if (board.isFull()) {
+                currentGame = game.copy(board = board, currentPlayer = Game.Player.HUMAN, status = Game.GameStatus.DRAW, moveHistory = newHistory)
+                triggerReaction(false, isDraw = true)
+                awardGamePoints(game.gameType, false, 75)
             } else {
                 currentGame = game.copy(board = board, currentPlayer = Game.Player.HUMAN, moveHistory = newHistory)
             }
@@ -761,6 +1615,10 @@ class GameManager(private val ollamaEngine: OllamaEngine, private val characterM
                 android.util.Log.w("GameManager", "Reaction generation failed", e)
             }
         }
+    }
+
+    private fun awardGamePoints(gameType: Game.GameType, won: Boolean, basePoints: Int) {
+        pointsManager.awardPoints(basePoints, gameType, won)
     }
 
     // Callback for state changes that happen off the calling thread (bot moves)

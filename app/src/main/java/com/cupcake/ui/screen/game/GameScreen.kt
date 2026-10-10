@@ -1,6 +1,4 @@
 package com.cupcake.ui.screen.game
-import androidx.compose.foundation.layout.aspectRatio
-
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,6 +8,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
@@ -21,6 +21,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -31,16 +32,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.material3.TextField
-import androidx.compose.ui.text.input.KeyboardOptions
-import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.cupcake.game.ChessBoard
 import com.cupcake.game.GameManager
 import com.cupcake.ui.theme.CupCakeTheme
 import androidx.compose.material.icons.Icons
@@ -565,7 +564,6 @@ fun MathQuizBoardUI(
                         value = if (isNegative) "-$currentAnswer" else currentAnswer,
                         onValueChange = { currentAnswer = it.filter { it.isDigit() } },
                         modifier = Modifier.fillMaxWidth().width(200.dp),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         textStyle = androidx.compose.ui.text.TextStyle(fontSize = 32.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center),
                         readOnly = true
                     )
@@ -632,7 +630,7 @@ fun MathQuizBoardUI(
                         }
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             androidx.compose.material3.Button(
-                                onClick = { currentAnswer = "$currentAnswer0" },
+                                onClick = { currentAnswer = "${currentAnswer}0" },
                                 modifier = Modifier.weight(1f).height(56.dp),
                                 shape = RoundedCornerShape(12.dp)
                             ) { Text("0", fontSize = 24.sp, fontWeight = FontWeight.Medium) }
@@ -677,7 +675,7 @@ fun ChessBoardUI(
     state: com.cupcake.game.Game.State,
     onRestart: () -> Unit
 ) {
-    val board = state.board as? com.cupcake.game.Game.ChessBoard ?: return
+    val board = state.board as? ChessBoard ?: return
     
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
