@@ -6,15 +6,17 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Build types
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
-endif()
+set(CMAKE_BUILD_TYPE Release)
+set(CMAKE_C_FLAGS_DEBUG "-O3 -DNDEBUG")
+set(CMAKE_CXX_FLAGS_DEBUG "-O3 -DNDEBUG")
+set(CMAKE_C_FLAGS_RELEASE "-O3 -DNDEBUG")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
 
 # Android-specific settings
 if(ANDROID)
     set(CMAKE_ANDROID_NDK_TOOLCHAIN_VERSION "clang")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fvisibility=hidden -fvisibility-inlines-hidden")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fvisibility=hidden")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -DNDEBUG -fvisibility=hidden -fvisibility-inlines-hidden")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -DNDEBUG -fvisibility=hidden")
 endif()
 
 # Output directories
@@ -59,6 +61,8 @@ target_link_libraries(llama_jni PRIVATE
 )
 
 target_compile_options(llama_jni PRIVATE
+    -O3
+    -DNDEBUG
     -Wall -Wextra -Wpedantic
     -Wno-unused-parameter
     -DGGML_USE_ACCELERATE=OFF

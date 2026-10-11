@@ -28,6 +28,7 @@ struct SamplingParams {
     float repeat_penalty = 1.1f;
     int repeat_last_n = 64;
     int seed = -1;
+    int max_tokens = 128;
 };
 
 static SamplingParams g_sampling_params;
@@ -99,7 +100,7 @@ extern "C" JNIEXPORT void JNICALL
 Java_com_cupcake_ai_LlamaEngine_setSamplingParams(
     JNIEnv* env, jobject thiz,
     jfloat temp, jfloat top_p, jint top_k,
-    jfloat repeat_penalty, jint repeat_last_n, jint seed
+    jfloat repeat_penalty, jint repeat_last_n, jint seed, jint max_tokens
 ) {
     g_sampling_params.temp = temp;
     g_sampling_params.top_p = top_p;
@@ -107,6 +108,7 @@ Java_com_cupcake_ai_LlamaEngine_setSamplingParams(
     g_sampling_params.repeat_penalty = repeat_penalty;
     g_sampling_params.repeat_last_n = repeat_last_n;
     g_sampling_params.seed = seed;
+    g_sampling_params.max_tokens = max_tokens > 0 ? max_tokens : 128;
 }
 
 static void emit_token(JNIEnv* env, const std::string& token) {
@@ -192,7 +194,10 @@ Java_com_cupcake_ai_LlamaEngine_generate(
             : (uint32_t) g_sampling_params.seed;
         llama_sampler_chain_add(smpl, llama_sampler_init_dist(seed));
         
-        const int max_tokens = 2048;
+        // Clear previous KV cache so positions don't conflict or overflow
+        llama_kv_cache_clear(g_ctx);
+
+        const int max_tokens = g_sampling_params.max_tokens > 0 ? g_sampling_params.max_tokens : 128;
         int generated = 0;
         
         // Process prompt
@@ -212,6 +217,19 @@ Java_com_cupcake_ai_LlamaEngine_generate(
                 break;
             }
             
+            // Convert token to string first to check for stop sequences like <|im_end|>
+            char buf[256];
+            int len = llama_token_to_piece(g_model, id, buf, sizeof(buf), 0, true);
+            if (len > 0) {
+                std::string token_str(buf, len);
+                if (token_str.find("<|im_end|>") != std::string::npos ||
+                    token_str.find("<|endoftext|>") != std::string::npos ||
+                    token_str.find("<|im_start|>") != std::string::npos) {
+                    break;
+                }
+                emit_token(env, token_str);
+            }
+            
             // Add to context
             g_tokens.push_back(id);
             
@@ -219,14 +237,6 @@ Java_com_cupcake_ai_LlamaEngine_generate(
             if (llama_decode(g_ctx, llama_batch_get_one(&id, 1))) {
                 emit_error(env, "Decode failed");
                 break;
-            }
-            
-            // Convert token to string
-            char buf[256];
-            int len = llama_token_to_piece(g_model, id, buf, sizeof(buf), 0, true);
-            if (len > 0) {
-                std::string token_str(buf, len);
-                emit_token(env, token_str);
             }
             
             generated++;

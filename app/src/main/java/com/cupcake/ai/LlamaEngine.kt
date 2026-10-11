@@ -92,7 +92,7 @@ class LlamaEngine private constructor() {
     external fun setCallback(callback: GenerateCallback)
     external fun setSamplingParams(
         temp: Float, topP: Float, topK: Int,
-        repeatPenalty: Float, repeatLastN: Int, seed: Int
+        repeatPenalty: Float, repeatLastN: Int, seed: Int, maxTokens: Int
     )
     external fun generate(prompt: String): Int
     external fun cancel()
@@ -110,8 +110,9 @@ class LlamaEngine private constructor() {
         val modelFileName: String = "models/smollm-135m-instruct-q4_k_m.gguf",
         // Ultra-fast 512 context for snappy, dumb-but-fast chat on phones.
         val nCtx: Int = 512,
-        val nThreads: Int = 6,
+        val nThreads: Int = 4, // 4 threads: optimal for mobile 2 big + 2 little cores
         val nBatch: Int = 512,
+        val maxTokens: Int = 128,
         val temperature: Float = 0.7f,
         val topP: Float = 0.9f,
         val topK: Int = 40,
@@ -145,7 +146,8 @@ class LlamaEngine private constructor() {
                     config.topK,
                     config.repeatPenalty,
                     config.repeatLastN,
-                    config.seed
+                    config.seed,
+                    config.maxTokens
                 )
                 Result.success(Unit)
             } else {

@@ -26,6 +26,19 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         vectorDrawables.useSupportLibrary = true
+
+        externalNativeBuild {
+            cmake {
+                arguments.add("-DCMAKE_BUILD_TYPE=Release")
+                arguments.add("-DANDROID_ARM_NEON=TRUE")
+                arguments.add("-DGGML_OPENMP=OFF")
+                arguments.add("-DGGML_LLAMAFILE=OFF")
+                cppFlags.add("-O3")
+                cppFlags.add("-DNDEBUG")
+                cFlags.add("-O3")
+                cFlags.add("-DNDEBUG")
+            }
+        }
     }
 
     signingConfigs {

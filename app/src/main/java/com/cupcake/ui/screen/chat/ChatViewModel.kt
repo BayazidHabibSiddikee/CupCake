@@ -120,6 +120,7 @@ class ChatViewModel @Inject constructor(
                         context = appContext,
                         config = LlamaEngine.Config(
                             modelFileName = "models/${config.modelName}",
+                            maxTokens = config.maxTokens,
                             temperature = config.temperature,
                             topP = config.topP,
                             topK = config.topK
