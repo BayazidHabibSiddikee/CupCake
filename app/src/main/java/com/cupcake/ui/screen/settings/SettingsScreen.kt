@@ -89,10 +89,10 @@ fun SettingsScreen(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Default local model section
+                // Default Ollama model section
                 ProviderSection(
-                    title = "Local Model",
-                    subtitle = "Qwen runs on-device (offline)",
+                    title = "Ollama (Local Server)",
+                    subtitle = "smollm / qwen2:0.5b via Ollama",
                     isEnabled = true,
                     onClick = { viewModel.selectLocalModel() }
                 )
@@ -326,10 +326,7 @@ fun AddProviderDialog(
                         modifier = Modifier.fillMaxWidth(0.9f)
                     ) {
                         val types = listOf(
-                            ModelConfig.ModelProvider.CUSTOM_OPENAI,
-                            ModelConfig.ModelProvider.CUSTOM_OLLAMA,
-                            ModelConfig.ModelProvider.CUSTOM_VLLM,
-                            ModelConfig.ModelProvider.CUSTOM_OTHER
+                            ModelConfig.ModelProvider.CUSTOM_OLLAMA
                         )
                         types.forEach { type ->
                             androidx.compose.material3.DropdownMenuItem(
@@ -350,7 +347,7 @@ fun AddProviderDialog(
                     onValueChange = onUrlChange,
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text("Base URL") },
-                    placeholder = { Text("https://api.openai.com/v1 or http://localhost:11434/v1") },
+                    placeholder = { Text("http://localhost:11434/v1 (Ollama default)") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
                 )

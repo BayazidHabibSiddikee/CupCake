@@ -31,7 +31,7 @@ class SettingsViewModel @Inject constructor(
 
     val editingProviderId = MutableStateFlow<String?>(null)
     val showAddProviderDialog = MutableStateFlow(false)
-    val selectedProviderType = MutableStateFlow(ModelConfig.ModelProvider.CUSTOM_OPENAI)
+    val selectedProviderType = MutableStateFlow(ModelConfig.ModelProvider.CUSTOM_OLLAMA)
     val newProviderName = MutableStateFlow("")
     val newProviderUrl = MutableStateFlow("")
     val newProviderApiKey = MutableStateFlow("")

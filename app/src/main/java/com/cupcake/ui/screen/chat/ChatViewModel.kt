@@ -5,7 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cupcake.ai.CharacterManager
 import com.cupcake.ai.EnergyManager
-import com.cupcake.ai.LlamaEngine
+import com.cupcake.ai.OllamaEngine
 import com.cupcake.data.model.Character
 import com.cupcake.data.model.ChatMessage
 import com.cupcake.data.model.ModelConfig
@@ -33,7 +33,7 @@ class ChatViewModel @Inject constructor(
     @ApplicationContext private val appContext: Context,
     private val savedStateHandle: SavedStateHandle,
     private val sessionStore: ChatSessionStore,
-    private val llamaEngine: LlamaEngine,
+    private val ollamaEngine: OllamaEngine,
     private val characterManager: CharacterManager,
     private val gameManager: GameManager,
     private val espServer: EspWebSocketServer,
@@ -99,29 +99,22 @@ class ChatViewModel @Inject constructor(
     }
 
     /**
-     * Copies the bundled GGUF from assets on first run (large file, runs
-     * on IO) and initializes the native engine. Safe to call repeatedly.
+     * Checks Ollama server connection. Safe to call repeatedly.
      */
     fun ensureModelLoaded() {
-        if (llamaEngine.isReady()) {
-            _modelLoadState.value = ModelLoadState.Ready
-            return
-        }
-        if (_modelLoadState.value is ModelLoadState.Loading) return
-        _modelLoadState.value = ModelLoadState.Loading()
+        _modelLoadState.value = ModelLoadState.Loading("Connecting to Ollama...")
         viewModelScope.launch(Dispatchers.IO) {
-            val result = llamaEngine.loadModel(appContext) { copied, total ->
-                val detail = if (total > 0) {
-                    "${(copied * 100 / total).toInt()}%"
-                } else {
-                    ""
-                }
-                _modelLoadState.value = ModelLoadState.Loading(detail)
+            val baseUrl = _modelConfig.value.effectiveEndpoint()
+            val result = ollamaEngine.checkConnection(baseUrl)
+            result.consumeEach { connectionResult ->
+                _modelLoadState.value = connectionResult.fold(
+                    onSuccess = { connected ->
+                        if (connected) ModelLoadState.Ready
+                        else ModelLoadState.Error("Cannot connect to Ollama at $baseUrl")
+                    },
+                    onFailure = { ModelLoadState.Error(it.message ?: "Connection failed") }
+                )
             }
-            _modelLoadState.value = result.fold(
-                onSuccess = { ModelLoadState.Ready },
-                onFailure = { ModelLoadState.Error(it.message ?: "Model load failed") }
-            )
         }
     }
 
@@ -175,10 +168,34 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    private fun buildOllamaMessages(): List<OllamaEngine.OllamaMessage> {
+        val messageList = mutableListOf<OllamaEngine.OllamaMessage>()
+        
+        // Add system prompt if available
+        val systemPrompt = _systemPrompt.value?.fullPrompt() ?: systemPromptCache
+        if (systemPrompt.isNotBlank()) {
+            messageList.add(OllamaEngine.OllamaMessage(role = "system", content = systemPrompt))
+        }
+        
+        // Add conversation messages
+        val conversationMessages = messages.value
+        for (msg in conversationMessages) {
+            val role = when (msg.role) {
+                ChatMessage.MessageRole.USER -> "user"
+                ChatMessage.MessageRole.ASSISTANT -> "assistant"
+                ChatMessage.MessageRole.SYSTEM -> "system"
+                ChatMessage.MessageRole.TOOL -> "tool"
+            }
+            messageList.add(OllamaEngine.OllamaMessage(role = role, content = msg.content))
+        }
+        
+        return messageList
+    }
+
     fun sendMessage(text: String) {
         if (text.isBlank() || _isGenerating.value) return
 
-        if (!llamaEngine.isReady()) {
+        if (!ollamaEngine.isReady()) {
             ensureModelLoaded()
             addMessage(
                 ChatMessage.system(
@@ -209,22 +226,37 @@ class ChatViewModel @Inject constructor(
         _isGenerating.value = true
         _currentResponse.value = ""
 
-        viewModelScope.launch {
+viewModelScope.launch {
             var fullResponse = ""
-            val prompt = buildPrompt()
+            val config = _modelConfig.value
+            val endpoint = config.effectiveEndpoint()
 
             try {
                 val personality = currentCharacter.value?.personality ?: ""
-                var lastUpdateTime = 0L
-                llamaEngine.generateStream(prompt).consumeEach { token ->
-                    fullResponse += token
-                    val now = System.currentTimeMillis()
-                    if (now - lastUpdateTime > 50) {
-                        _currentResponse.value = com.cupcake.ai.BanglishTranslator.translate(fullResponse, personality)
-                        lastUpdateTime = now
+                
+                // Build messages for Ollama format
+                val messages = buildOllamaMessages()
+                
+                ollamaEngine.generateStream(
+                    baseUrl = endpoint,
+                    config = config,
+                    messages = messages,
+                    callback = object : OllamaEngine.GenerateCallback {
+                        override fun onToken(token: String) {
+                            fullResponse += token
+                            _currentResponse.value = fullResponse
+                        }
+
+                        override fun onComplete() {
+                            _currentResponse.value = com.cupcake.ai.BanglishTranslator.translate(fullResponse, personality)
+                        }
+
+                        override fun onError(error: String) {
+                            Log.e("ChatViewModel", "Generation failed: $error")
+                            fullResponse = ""
+                        }
                     }
-                }
-                _currentResponse.value = com.cupcake.ai.BanglishTranslator.translate(fullResponse, personality)
+                )
             } catch (e: Exception) {
                 Log.e("ChatViewModel", "Generation failed", e)
                 fullResponse = ""
@@ -237,7 +269,7 @@ class ChatViewModel @Inject constructor(
             }.also {
                 _isGenerating.value = false
                 _currentResponse.value = ""
-                
+
                 if (fullResponse.isNotBlank()) {
                     // Translate output
                     val personality = currentCharacter.value?.personality ?: ""
@@ -250,7 +282,7 @@ class ChatViewModel @Inject constructor(
                         modelUsed = _modelConfig.value.modelName
                     )
                     addMessage(assistantMessage)
-                    
+
                     // Send to ESP32 for TTS
                     sendToEspForTts(fullResponse.trim())
                 }

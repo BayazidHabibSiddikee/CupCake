@@ -3,10 +3,7 @@ package com.cupcake
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -16,6 +13,7 @@ import com.cupcake.ui.screen.device.DeviceScreen
 import com.cupcake.ui.screen.game.GameScreen
 import com.cupcake.ui.screen.home.HomeScreen
 import com.cupcake.ui.screen.home.HomeViewModel
+import com.cupcake.ui.screen.points.PointsScreen
 import com.cupcake.ui.screen.settings.SettingsScreen
 import com.cupcake.ui.screen.systemprompt.SystemPromptScreen
 import com.cupcake.ui.theme.CupCakeTheme
@@ -26,16 +24,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Warm up the on-device model in the background so chat is ready
-        // faster. ChatViewModel skips reloading if this already finished.
-        lifecycleScope.launch(Dispatchers.IO) {
-            try {
-                com.cupcake.ai.LlamaEngine.initialize(applicationContext)
-                com.cupcake.ai.LlamaEngine.getInstance().loadModel(applicationContext)
-            } catch (e: Exception) {
-                android.util.Log.w("MainActivity", "Model warm-up failed", e)
-            }
-        }
         setContent {
             CupCakeTheme {
                 val navController = rememberNavController()
@@ -59,6 +47,9 @@ class MainActivity : ComponentActivity() {
                             },
                             onNavigateToGames = {
                                 navController.navigate("games")
+                            },
+                            onNavigateToPoints = {
+                                navController.navigate("points")
                             }
                         )
                     }
@@ -97,6 +88,10 @@ class MainActivity : ComponentActivity() {
                     
                     composable("games") {
                         GameScreen(onClose = { navController.popBackStack() })
+                    }
+                    
+                    composable("points") {
+                        PointsScreen(onClose = { navController.popBackStack() })
                     }
                     
                     composable(

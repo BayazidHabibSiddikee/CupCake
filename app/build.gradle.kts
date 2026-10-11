@@ -1,9 +1,14 @@
+import java.security.MessageDigest
+import java.net.URL
+import java.io.FileOutputStream
+import org.gradle.api.GradleException
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.parcelize")
     id("com.google.dagger.hilt.android")
-    id("org.jetbrains.kotlin.kapt")
+    id("com.google.devtools.ksp")
     id("androidx.navigation.safeargs.kotlin")
     id("org.jetbrains.kotlin.plugin.serialization")
 }
@@ -19,22 +24,6 @@ android {
         versionCode = 1
         versionName = "1.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-
-        externalNativeBuild {
-            cmake {
-                cppFlags.add("-std=c++17")
-                cppFlags.add("-frtti")
-                cppFlags.add("-fexceptions")
-                cppFlags.add("-DLLAMA_LOG_LEVEL=2")
-                arguments.add("-DANDROID_STL=c++_shared")
-                arguments.add("-DANDROID_ARM_NEON=TRUE")
-            }
-        }
-
-        ndk {
-            abiFilters.add("arm64-v8a")
-            abiFilters.add("armeabi-v7a")
-        }
 
         vectorDrawables.useSupportLibrary = true
     }
@@ -82,12 +71,6 @@ android {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
             matchingFallbacks += "release"
-            ndk {
-                // +x86_64 for the emulator (release stays ARM-only for size)
-                abiFilters.add("arm64-v8a")
-                abiFilters.add("armeabi-v7a")
-                abiFilters.add("x86_64")
-            }
         }
     }
 
@@ -99,16 +82,16 @@ android {
     kotlinOptions {
         jvmTarget = "17"
         freeCompilerArgs += listOf(
-            "-Xopt-in=kotlin.RequiresOptIn",
-            "-Xopt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",
-            "-Xopt-in=androidx.lifecycle.ExperimentalLifecycleApi"
+            "-opt-in=kotlin.RequiresOptIn",
+            "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",
+            "-opt-in=androidx.lifecycle.ExperimentalLifecycleApi"
         )
     }
 
     buildFeatures {
         compose = true
         viewBinding = true
-        dataBinding = true
+        dataBinding = false
     }
 
     composeOptions {
@@ -117,22 +100,90 @@ android {
 
     packagingOptions {
         resources.excludes.add("META-INF/*")
-        jniLibs.pickFirsts.add("libc++_shared.so")
-        jniLibs.pickFirsts.add("libllama_jni.so")
     }
+}
 
-    androidResources {
-        // Keep the GGUF stored (uncompressed) in the APK: faster installs
-        // and assets.openFd() works for progress reporting.
-        noCompress += "gguf"
-    }
+// Download and verify Ollama binary at configure time
+tasks.register("downloadOllamaBinary") {
+    doLast {
+        val binaryDir = project.file("src/main/assets/ollama")
+        binaryDir.mkdirs()
 
-    externalNativeBuild {
-        cmake {
-            path = file("src/main/cpp/CMakeLists.txt")
-            version = "3.22.1"
+        val binaryFile = project.file("$binaryDir/ollama")
+        val expectedSha256 = project.property("ollamaBinarySha256") as String
+
+        if (!binaryFile.exists() || !verifySha256(binaryFile, expectedSha256)) {
+            val url = project.property("ollamaBinaryUrl") as String
+            downloadAndVerify(url, binaryFile, expectedSha256)
+            // Make executable
+            binaryFile.setExecutable(true, false)
         }
     }
+}
+
+tasks.named("preBuild").configure { dependsOn("downloadOllamaBinary") }
+
+fun verifySha256(file: File, expected: String): Boolean {
+    val digest = MessageDigest.getInstance("SHA-256")
+    val bytes = file.readBytes()
+    val actual = digest.digest(bytes).joinToString("") { "%02x".format(it) }
+    return actual == expected.lowercase()
+}
+
+fun downloadAndVerify(urlString: String, dest: File, expectedSha256: String) {
+    val url = URL(urlString)
+    val connection = url.openConnection()
+    connection.connectTimeout = 30000
+    connection.readTimeout = 120000
+    
+    val input = connection.getInputStream()
+    val output = FileOutputStream(dest)
+    val buffer = ByteArray(8192)
+    var bytesRead: Int
+    while (input.read(buffer).also { bytesRead = it } != -1) {
+        output.write(buffer, 0, bytesRead)
+    }
+    output.close()
+    input.close()
+    
+    // If it's a .tgz or .tar.zst, extract the ollama binary
+    if (urlString.endsWith(".tgz") || urlString.endsWith(".tar.gz") || urlString.endsWith(".tar.zst")) {
+        extractOllamaFromTgz(dest, dest.parentFile!!, dest)
+    }
+    // If it's a raw binary (no extension), just make it executable
+    else {
+        // Raw binary, nothing to extract
+    }
+    
+    if (!verifySha256(dest, expectedSha256)) {
+        throw GradleException("SHA-256 mismatch for downloaded Ollama binary")
+    }
+}
+
+fun extractOllamaFromTgz(tgzFile: File, outputDir: File, dest: File) {
+    // Determine extraction command based on file extension
+    val cmd = if (tgzFile.name.endsWith(".tar.zst")) {
+        // Use Python for .zst files (more portable)
+        listOf("python3", "-c", "import tarfile, zstandard, sys; d = zstandard.ZstdDecompressor(); tar = tarfile.open(fileobj=d.stream_reader(open('${tgzFile.absolutePath}', 'rb'))); tar.extractall('${outputDir.absolutePath}')")
+    } else {
+        // Use tar for .tgz/.tar.gz files
+        listOf("tar", "-xzf", tgzFile.absolutePath, "-C", outputDir.absolutePath)
+    }
+    val process = ProcessBuilder(*cmd.toTypedArray()).start()
+    val exitCode = process.waitFor()
+    if (exitCode != 0) {
+        throw GradleException("Failed to extract Ollama binary from ${tgzFile.name}: exit code $exitCode")
+    }
+    // The binary should be at outputDir/ollama
+    val extractedBinary = project.file("$outputDir/ollama")
+    if (extractedBinary.exists()) {
+        // Move to expected location if needed
+        if (!dest.exists() || dest != extractedBinary) {
+            extractedBinary.renameTo(dest)
+        }
+    }
+    // Clean up archive
+    tgzFile.delete()
 }
 
 dependencies {
@@ -159,6 +210,7 @@ dependencies {
     val coroutines = libs.kotlinx.coroutines.android.get()
     val flow = libs.kotlinx.coroutines.core.get()
     val serialization = libs.kotlinx.serialization.json.get()
+    val serializationCore = libs.kotlinx.serialization.core.get()
     val coil = libs.coil.compose.get()
     val retrofit = libs.retrofit.retrofit.get()
     val retrofitScalars = libs.retrofit.converter.scalars.get()
@@ -176,12 +228,14 @@ dependencies {
     val truth = libs.truth.get()
     val turbine = libs.turbine.get()
 
-    // Ktor for WebSocket server
-    val ktorVersion = "2.3.9"
-    implementation("io.ktor:ktor-server-core:$ktorVersion")
-    implementation("io.ktor:ktor-server-netty:$ktorVersion")
-    implementation("io.ktor:ktor-server-websockets:$ktorVersion")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
+    // OkHttp SSE for streaming (used by OllamaEngine)
+    implementation("com.squareup.okhttp3:okhttp-sse:4.12.0")
+
+    // Ktor server for ESP WebSocket
+    implementation("io.ktor:ktor-server-core:2.3.8")
+    implementation("io.ktor:ktor-server-netty:2.3.8")
+    implementation("io.ktor:ktor-server-websockets:2.3.8")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.8")
 
     implementation(coreSplashScreen)
     implementation(activityCompose)
@@ -200,11 +254,11 @@ dependencies {
 
     implementation(hilt)
     implementation(hiltNavigationCompose)
-    kapt(hiltCompiler)
+    ksp(hiltCompiler)
 
     implementation(room)
     implementation(roomKtx)
-    kapt(roomCompiler)
+    ksp(roomCompiler)
 
     implementation(datastore)
 
@@ -212,6 +266,7 @@ dependencies {
     implementation(flow)
 
     implementation(serialization)
+    implementation(serializationCore)
 
     implementation(coil)
 
@@ -248,19 +303,12 @@ dependencies {
     // Re-add alongside the BLE GATT client implementation.
 }
 
-kapt {
-    correctErrorTypes = true
-    javacOptions {
-        option("-Xlint:unchecked")
-    }
-}
-
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
     kotlinOptions {
         freeCompilerArgs += listOf(
-            "-Xopt-in=kotlin.RequiresOptIn",
-            "-Xopt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",
-            "-Xopt-in=androidx.lifecycle.ExperimentalLifecycleApi"
+            "-opt-in=kotlin.RequiresOptIn",
+            "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",
+            "-opt-in=androidx.lifecycle.ExperimentalLifecycleApi"
         )
     }
 }

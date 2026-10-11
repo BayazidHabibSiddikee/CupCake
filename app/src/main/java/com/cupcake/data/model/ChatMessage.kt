@@ -13,28 +13,14 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import java.time.Instant
 
-object InstantSerializer : KSerializer<Instant> {
-    override val descriptor: SerialDescriptor =
-        PrimitiveSerialDescriptor("Instant", PrimitiveKind.LONG)
-
-    override fun serialize(encoder: Encoder, value: Instant) {
-        encoder.encodeLong(value.toEpochMilli())
-    }
-
-    override fun deserialize(decoder: Decoder): Instant {
-        return Instant.ofEpochMilli(decoder.decodeLong())
-    }
-}
-
-@Serializable
 @Entity(tableName = "chat_messages")
+@TypeConverters(Converters::class)
 data class ChatMessage(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
     val conversationId: String,
     val role: MessageRole,
     val content: String,
-    @Serializable(with = InstantSerializer::class)
     val timestamp: Instant = Instant.now(),
     val modelUsed: String = "",
     val tokenCount: Int = 0,
@@ -77,29 +63,26 @@ data class ChatMessage(
 }
 
 @Entity(tableName = "conversations")
-@Serializable
+@TypeConverters(Converters::class)
 data class Conversation(
     @PrimaryKey
     val id: String = java.util.UUID.randomUUID().toString(),
     val title: String = "New Chat",
     val systemPrompt: SystemPrompt? = null,
     val modelConfig: ModelConfig = ModelConfig.default(),
-    @Serializable(with = InstantSerializer::class)
     val createdAt: Instant = Instant.now(),
-    @Serializable(with = InstantSerializer::class)
     val updatedAt: Instant = Instant.now(),
     val messageCount: Int = 0
 )
 
 @Entity(tableName = "system_prompts")
-@Serializable
+@TypeConverters(Converters::class)
 data class SystemPrompt(
     @PrimaryKey
     val id: String = java.util.UUID.randomUUID().toString(),
     val name: String,
     val text: String,
     val images: List<PromptImage> = emptyList(),
-    @Serializable(with = InstantSerializer::class)
     val createdAt: Instant = Instant.now(),
     val version: Int = 1
 ) {
@@ -117,7 +100,6 @@ data class SystemPrompt(
     }
 }
 
-@Serializable
 data class PromptImage(
     val id: String = java.util.UUID.randomUUID().toString(),
     val uri: String, // content:// or file://
@@ -125,14 +107,25 @@ data class PromptImage(
     val description: String = "",
     val extractedText: String = "",
     val thumbnailUri: String? = null,
-    @Serializable(with = InstantSerializer::class)
     val uploadedAt: Instant = Instant.now()
 )
 
-@Serializable
+// Custom serializer for Instant (epoch millis as Long)
+object InstantSerializer : KSerializer<Instant> {
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("Instant", PrimitiveKind.LONG)
+
+    override fun serialize(encoder: Encoder, value: Instant) {
+        encoder.encodeLong(value.toEpochMilli())
+    }
+
+    override fun deserialize(decoder: Decoder): Instant {
+        return Instant.ofEpochMilli(decoder.decodeLong())
+    }
+}
+
 data class ModelConfig(
-    val provider: ModelProvider = ModelProvider.LOCAL_QWEN,
-    val modelName: String = "qwen2-0.5b-instruct-q4_k_m",
+    val provider: ModelProvider = ModelProvider.CUSTOM_OLLAMA,
+    val modelName: String = "qwen2:0.5b",
     val customEndpoint: String = "",
     val apiKey: String = "",
     val temperature: Float = 0.7f,
@@ -144,7 +137,6 @@ data class ModelConfig(
     val timeoutSeconds: Int = 60
 ) {
     enum class ModelProvider(val value: String) {
-        LOCAL_QWEN("local_qwen"),
         CUSTOM_OPENAI("custom_openai"),
         CUSTOM_OLLAMA("custom_ollama"),
         CUSTOM_VLLM("custom_vllm"),
@@ -155,9 +147,9 @@ data class ModelConfig(
         fun default(): ModelConfig = ModelConfig()
     }
 
-    fun isLocal(): Boolean = provider == ModelProvider.LOCAL_QWEN
+    fun isLocal(): Boolean = false
 
-    fun isCustom(): Boolean = provider != ModelProvider.LOCAL_QWEN
+    fun isCustom(): Boolean = true
 
     fun effectiveEndpoint(): String {
         return when (provider) {
@@ -165,13 +157,12 @@ data class ModelConfig(
             ModelProvider.CUSTOM_OLLAMA -> if (customEndpoint.isNotBlank()) customEndpoint else "http://localhost:11434/v1"
             ModelProvider.CUSTOM_VLLM -> if (customEndpoint.isNotBlank()) customEndpoint else "http://localhost:8000/v1"
             ModelProvider.CUSTOM_OTHER -> customEndpoint
-            else -> ""
         }
     }
 }
 
 @Entity(tableName = "api_providers")
-@Serializable
+@TypeConverters(Converters::class)
 data class ApiProvider(
     @PrimaryKey
     val id: String = java.util.UUID.randomUUID().toString(),
@@ -182,18 +173,15 @@ data class ApiProvider(
     val models: List<String> = emptyList(),
     val headers: Map<String, String> = emptyMap(),
     val isEnabled: Boolean = true,
-    @Serializable(with = InstantSerializer::class)
     val createdAt: Instant = Instant.now()
 )
 
-@Serializable
 data class GenerationRequest(
     val messages: List<ChatMessage>,
     val config: ModelConfig,
     val systemPrompt: SystemPrompt? = null
 )
 
-@Serializable
 data class GenerationResponse(
     val id: String,
     val content: String,
@@ -203,14 +191,12 @@ data class GenerationResponse(
     val latencyMs: Long
 )
 
-@Serializable
 data class TokenUsage(
     val promptTokens: Int,
     val completionTokens: Int,
     val totalTokens: Int
 )
 
-@Serializable
 data class StreamChunk(
     val id: String,
     val delta: String,
@@ -219,7 +205,7 @@ data class StreamChunk(
 )
 
 @Entity(tableName = "model_configs")
-@Serializable
+@TypeConverters(Converters::class)
 data class ModelConfigWithConversation(
     @PrimaryKey
     val conversationId: String,

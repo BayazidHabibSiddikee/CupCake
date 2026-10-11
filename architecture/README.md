@@ -14,7 +14,7 @@ architecture/
 ├── component-design/
 │   ├── esp32-firmware.md        # ESP32 firmware design
 │   ├── android-app.md           # Android app architecture
-│   ├── qwen-inference.md        # Qwen on-device inference
+│   ├── ollama-inference.md      # Ollama HTTP API inference
 │   ├── api-gateway.md           # Custom API/Server integration
 │   └── system-prompt.md         # System prompt with image support
 ├── api/
@@ -22,7 +22,7 @@ architecture/
 │   ├── rest-api.md              # REST API for custom servers
 │   └── websocket-api.md         # WebSocket for streaming
 ├── models/
-│   ├── qwen-config.md           # Qwen model configuration
+│   ├── ollama-models.md         # Ollama model configuration
 │   ├── custom-model.md          # Custom model integration
 │   └── system-prompt.md         # System prompt schema
 └── security/
@@ -33,10 +33,10 @@ architecture/
 
 ## Key Architectural Decisions
 
-### 1. Hybrid Inference Model
-- **On-device**: Qwen-0.5B/1.5B quantized (INT4) via GGML
-- **Cloud fallback**: Custom API endpoints (OpenAI-compatible)
-- **Routing**: Automatic based on connectivity, latency, user preference
+### 1. Server-Based Inference Model
+- **Ollama server**: Local/remote HTTP API (smollm, qwen2:0.5b)
+- **Custom endpoints**: OpenAI-compatible APIs (vLLM, TGI, OpenAI, etc.)
+- **Routing**: ModelConfig selects provider type
 
 ### 2. System Prompt with Images
 - Users upload images (diagrams, docs, screenshots)
@@ -45,16 +45,16 @@ architecture/
 - Stored per-conversation, versioned
 
 ### 3. Multi-Server Support
-- Built-in: Local Qwen (offline-first)
+- Default: Ollama at http://localhost:11434/v1
 - Configurable: Custom OpenAI-compatible endpoints
-- Auth: API keys, OAuth, mTLS
-- Load balancing, failover, circuit breaker
+- Auth: API keys, Bearer tokens
+- Connection pooling, timeout, retry
 
 ### 4. Data Flow
 ```
-User Input → [System Prompt + Context] → Router → [Local Qwen | Custom API] → Stream Response
-                    ↑                         ↓
-              Image Upload              Config Store
+User Input → [System Prompt + Context] → ApiClient → [Ollama | OpenAI-compatible] → Stream Response
+                     ↑                         ↓
+               Image Upload              Config Store (Room)
 ```
 
 ## Technology Stack
@@ -62,7 +62,7 @@ User Input → [System Prompt + Context] → Router → [Local Qwen | Custom API
 | Layer | Technology |
 |-------|------------|
 | Mobile UI | Jetpack Compose, Material3 |
-| Local Inference | GGML, GGUF, tokenizers-cpp |
+| Inference | OllamaEngine (OkHttp + NDJSON/SSE) |
 | Networking | OkHttp, Retrofit, WebSocket |
 | Database | Room (SQLCipher), DataStore |
 | DI | Hilt |

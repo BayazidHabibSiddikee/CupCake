@@ -43,6 +43,13 @@ static uint32_t sensorSequence = 0;
 static uint32_t lastSensorRead = 0;
 static bool sensorStreaming = false;
 
+// Heartbeat state
+static uint32_t lastPingSent = 0;
+static uint32_t lastPongReceived = 0;
+static constexpr uint32_t PING_INTERVAL_MS = 10000;  // 10 seconds
+static constexpr uint32_t PONG_TIMEOUT_MS = 30000;   // 30 seconds
+static bool connectionHealthy = true;
+
 // =============================================================================
 // SENSOR TASK (Core 0)
 // =============================================================================
@@ -187,14 +194,44 @@ void handleCommand(const Command& cmd) {
 void onBLEConnect() {
     LOGI("BLE client connected");
     sensorStreaming = false; // Start paused
+    // Reset heartbeat state
+    lastPingSent = 0;
+    lastPongReceived = millis();
+    connectionHealthy = true;
 }
 
 void onBLEDisconnect() {
     LOGI("BLE client disconnected");
     sensorStreaming = false;
+    connectionHealthy = false;
 }
 
 void onBLEWrite(const uint8_t* data, size_t len) {
+    // Check for PONG response first
+    uint32_t pongTimestamp;
+    if (protocol.decodePong(data, len, pongTimestamp)) {
+        lastPongReceived = millis();
+        connectionHealthy = true;
+        ble.handlePong();
+        LOGD("Received pong, timestamp: %u", pongTimestamp);
+        return;
+    }
+    
+    // Check for PING request (from client)
+    if (len >= 5 && data[0] == ProtocolHandler::MSG_TYPE_PING) {
+        // Respond with PONG
+        uint32_t pingTimestamp;
+        memcpy(&pingTimestamp, data + 1, sizeof(pingTimestamp));
+        uint8_t buffer[5];
+        size_t pongLen = protocol.encodePong(pingTimestamp, buffer, sizeof(buffer));
+        if (pongLen > 0) {
+            ble.notify(buffer, pongLen);
+        }
+        LOGD("Received ping, sent pong");
+        return;
+    }
+
+    // Handle regular commands
     Command cmd;
     if (protocol.decodeCommand(data, len, cmd)) {
         handleCommand(cmd);

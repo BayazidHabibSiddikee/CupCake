@@ -1,18 +1,5 @@
 # ProGuard rules for CupCake
 
-# Keep native JNI interfaces
--keep class com.cupcake.jni.** { *; }
--keepclassmembers class com.cupcake.jni.** {
-    native <methods>;
-}
-
-# Keep llama.cpp JNI engine (loaded as libllama_jni, callbacks via reflection)
--keep class com.cupcake.ai.LlamaEngine { *; }
--keep class com.cupcake.ai.LlamaEngine$* { *; }
--keepclassmembers class com.cupcake.ai.LlamaEngine {
-    native <methods>;
-}
-
 # Keep Hilt generated classes
 -keep class dagger.hilt.** { *; }
 -keepclassmembers class dagger.hilt.** { *; }
@@ -58,7 +45,6 @@
 -mergeinterfacesaggressively
 
 # Don't warn about missing references
--dontwarn com.cupcake.jni.**
 -dontwarn kotlinx.coroutines.**
 -dontwarn kotlinx.serialization.**
 -dontwarn coil.**

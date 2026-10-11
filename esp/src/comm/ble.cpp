@@ -55,8 +55,16 @@ void BLEManager::setCallbacks(ConnectCallback onConnect,
     onWrite_ = std::move(onWrite);
 }
 
+void BLEManager::setMtuCallback(MtuCallback onMtuChange) {
+    onMtuChange_ = std::move(onMtuChange);
+}
+
 bool BLEManager::isConnected() const {
     return connected_;
+}
+
+uint16_t BLEManager::getMtu() const {
+    return currentMtu_;
 }
 
 void BLEManager::notify(const uint8_t* data, size_t len) {
@@ -91,6 +99,22 @@ void BLEManager::handle() {
     // NimBLE runs on its own host task; no polling required.
 }
 
+// Heartbeat
+void BLEManager::sendPing() {
+    // Ping message: [type:1][timestamp:4] = 5 bytes
+    uint8_t buffer[5];
+    buffer[0] = 0x04;  // MSG_TYPE_PING
+    uint32_t ts = millis();
+    memcpy(buffer + 1, &ts, sizeof(ts));
+    notify(buffer, sizeof(buffer));
+    LOGD("Sent ping");
+}
+
+void BLEManager::handlePong() {
+    LOGD("Received pong");
+    // Connection health updated in main.cpp
+}
+
 // --- Server callbacks -------------------------------------------------------
 
 void BLEManager::ServerCallbacks::onConnect(NimBLEServer* server,
@@ -101,7 +125,11 @@ void BLEManager::ServerCallbacks::onConnect(NimBLEServer* server,
         return;
     }
     parent->connected_ = true;
-    LOGI("BLE client connected");
+    parent->currentMtu_ = 23;  // Reset to default
+    
+    // Request MTU exchange (517 bytes)
+    connInfo.requestMtu(517);
+    LOGI("BLE client connected, requested MTU 517");
     if (parent->onConnect_) {
         parent->onConnect_();
     }
@@ -117,11 +145,27 @@ void BLEManager::ServerCallbacks::onDisconnect(NimBLEServer* server,
         return;
     }
     parent->connected_ = false;
+    parent->currentMtu_ = 23;
     LOGI("BLE client disconnected (reason %d)", reason);
     // Resume advertising so another client can connect.
     NimBLEDevice::startAdvertising();
     if (parent->onDisconnect_) {
         parent->onDisconnect_();
+    }
+}
+
+void BLEManager::ServerCallbacks::onMtuChange(NimBLEServer* server,
+                                              NimBLEConnInfo& connInfo,
+                                              uint16_t mtu) {
+    (void) server;
+    (void) connInfo;
+    if (parent == nullptr) {
+        return;
+    }
+    parent->currentMtu_ = mtu;
+    LOGI("BLE MTU changed to %d", mtu);
+    if (parent->onMtuChange_) {
+        parent->onMtuChange_(mtu);
     }
 }
 

@@ -81,6 +81,42 @@ static void copyParams(JsonObjectConst src, JsonDocument& dst) {
     }
 }
 
+// Encode PING message
+size_t ProtocolHandler::encodePing(uint32_t timestamp, uint8_t* buffer, size_t maxLen) {
+    // [type:1][timestamp:4] = 5 bytes
+    constexpr size_t kLen = 5;
+    if (buffer == nullptr || maxLen < kLen) {
+        return 0;
+    }
+    buffer[0] = MSG_TYPE_PING;
+    memcpy(buffer + 1, &timestamp, sizeof(timestamp));
+    return kLen;
+}
+
+// Encode PONG message
+size_t ProtocolHandler::encodePong(uint32_t timestamp, uint8_t* buffer, size_t maxLen) {
+    // [type:1][timestamp:4] = 5 bytes
+    constexpr size_t kLen = 5;
+    if (buffer == nullptr || maxLen < kLen) {
+        return 0;
+    }
+    buffer[0] = MSG_TYPE_PONG;
+    memcpy(buffer + 1, &timestamp, sizeof(timestamp));
+    return kLen;
+}
+
+// Decode PONG message (returns true if valid pong)
+bool ProtocolHandler::decodePong(const uint8_t* buffer, size_t len, uint32_t& timestamp) {
+    if (buffer == nullptr || len < 5) {
+        return false;
+    }
+    if (buffer[0] != MSG_TYPE_PONG) {
+        return false;
+    }
+    memcpy(&timestamp, buffer + 1, sizeof(timestamp));
+    return true;
+}
+
 bool ProtocolHandler::decodeCommand(const uint8_t* buffer, size_t len,
                                      Command& cmd) {
     if (buffer == nullptr || len == 0) {

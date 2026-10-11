@@ -12,6 +12,7 @@ import com.cupcake.domain.repository.ModelRepository
 import com.cupcake.domain.repository.SystemPromptRepository
 import com.cupcake.game.GameManager
 import com.cupcake.game.PointsManager
+import com.cupcake.ui.screen.points.PointsViewModel
 import com.cupcake.network.EspWebSocketServer
 import com.cupcake.tts.TtsManager
 import com.google.common.util.concurrent.ListeningExecutorService
@@ -88,6 +89,12 @@ object AppModule {
     @Singleton
     fun providePointsManager(): PointsManager {
         return PointsManager()
+    }
+
+    @Provides
+    @Singleton
+    fun providePointsViewModel(pointsManager: PointsManager): PointsViewModel {
+        return PointsViewModel(pointsManager)
     }
 
     @Provides

@@ -2,10 +2,8 @@ package com.cupcake.data.source.remote
 
 import com.cupcake.data.model.ApiProvider
 import com.cupcake.data.model.ChatMessage
-import com.cupcake.data.model.GenerationRequest
 import com.cupcake.data.model.ModelConfig
 import com.cupcake.data.model.StreamChunk
-import com.cupcake.jni.QwenNative
 import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.flow
@@ -23,40 +21,8 @@ import javax.inject.Singleton
 
 @Singleton
 class ApiClient @Inject constructor(
-    private val qwenNative: QwenNative,
     private val okHttpClient: OkHttpClient
 ) {
-
-    // Local generation via Qwen JNI
-    fun generateLocal(
-        messages: List<ChatMessage>,
-        config: ModelConfig
-    ) = channelFlow<StreamChunk> {
-        val prompt = buildPrompt(messages)
-
-        qwenNative.generateStream(
-            prompt = prompt,
-            config = QwenNative.GenerateConfig(
-                temperature = config.temperature,
-                topP = config.topP,
-                topK = config.topK,
-                maxTokens = config.maxTokens
-            )
-        ).consumeEach { chunk ->
-            trySend(StreamChunk(
-                id = java.util.UUID.randomUUID().toString(),
-                delta = chunk,
-                finishReason = null
-            ))
-        }
-
-        // Final chunk
-        trySend(StreamChunk(
-            id = java.util.UUID.randomUUID().toString(),
-            delta = "",
-            finishReason = "stop"
-        ))
-    }.flowOn(kotlinx.coroutines.Dispatchers.IO)
 
     // Remote generation via custom API
     fun generateRemote(

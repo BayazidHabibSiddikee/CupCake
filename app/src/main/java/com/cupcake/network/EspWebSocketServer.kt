@@ -15,7 +15,6 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.launch
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import org.json.JSONObject
@@ -43,7 +42,6 @@ object EspWebSocketServer {
         onMessageReceived = listener
     }
 
-    @Serializable
     data class IncomingMessage(
         val sessionId: String = "",
         val type: String = "",

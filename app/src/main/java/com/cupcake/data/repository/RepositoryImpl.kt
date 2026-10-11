@@ -70,13 +70,8 @@ class ChatRepositoryImpl @Inject constructor(
         // Build full message list
         val messages = buildMessageList(conversationId, message, systemPrompt)
 
-        return if (config.isLocal()) {
-            // Use local Qwen via JNI
-            apiClient.generateLocal(messages, config)
-        } else {
-            // Use custom API
-            apiClient.generateRemote(messages, config)
-        }
+        // Use custom API (Ollama or other providers)
+        return apiClient.generateRemote(messages, config)
     }
 
     override suspend fun saveAssistantMessage(

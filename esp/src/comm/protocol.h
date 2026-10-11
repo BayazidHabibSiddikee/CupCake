@@ -33,6 +33,15 @@ public:
     // Encode event (button, gesture, etc.)
     size_t encodeEvent(const char* event, const JsonDocument& data, uint8_t* buffer, size_t maxLen);
 
+    // Encode PING message
+    size_t encodePing(uint32_t timestamp, uint8_t* buffer, size_t maxLen);
+
+    // Encode PONG message
+    size_t encodePong(uint32_t timestamp, uint8_t* buffer, size_t maxLen);
+
+    // Decode PONG message
+    bool decodePong(const uint8_t* buffer, size_t len, uint32_t& timestamp);
+
     // Decode command from binary buffer
     bool decodeCommand(const uint8_t* buffer, size_t len, Command& cmd);
 
@@ -40,6 +49,8 @@ public:
     static constexpr uint8_t MSG_TYPE_SENSOR = 0x01;
     static constexpr uint8_t MSG_TYPE_BATTERY = 0x02;
     static constexpr uint8_t MSG_TYPE_EVENT = 0x03;
+    static constexpr uint8_t MSG_TYPE_PING = 0x04;
+    static constexpr uint8_t MSG_TYPE_PONG = 0x84;
     static constexpr uint8_t MSG_TYPE_RESPONSE = 0x80;
     static constexpr uint8_t MSG_TYPE_COMMAND = 0x81;
 

@@ -14,7 +14,7 @@ architecture/
 ├── component-design/
 │   ├── esp32-firmware.md               # ESP32 firmware design
 │   ├── android-app.md                  # Android app architecture
-│   ├── qwen-inference.md               # Qwen on-device inference
+│   ├── ollama-inference.md             # Ollama HTTP API inference
 │   ├── api-gateway.md                  # Custom API/Server integration
 │   └── system-prompt.md                # System prompt with image support
 ├── api/
@@ -22,7 +22,7 @@ architecture/
 │   ├── rest-api.md                     # REST API for custom servers
 │   └── websocket-api.md                # WebSocket for streaming
 ├── models/
-│   ├── qwen-config.md                  # Qwen model configuration
+│   ├── ollama-models.md                # Ollama model configuration
 │   ├── custom-model.md                 # Custom model integration
 │   └── system-prompt.md                # System prompt schema
 └── security/
@@ -128,52 +128,26 @@ app/
 │   │   │       │       └── ModelRepository.kt
 │   │   │       ├── di/
 │   │   │       │   └── AppModule.kt
-│   │   │       └── native/
-│   │   │           ├── QwenNative.kt           # JNI interface
-│   │   │           └── NativeLoader.kt         # System.loadLibrary
+│   │   │       ├── ai/
+│   │   │       │   ├── OllamaEngine.kt          # Ollama HTTP streaming client
+│   │   │       │   ├── CharacterManager.kt
+│   │   │       │   └── EnergyManager.kt
+│   │   │       └── game/
+│   │   │           └── GameManager.kt
 │   │   ├── cpp/
-│   │   │   ├── CMakeLists.txt
-│   │   │   ├── jni/
-│   │   │   │   ├── qwen_jni.cpp/h              # Qwen JNI bridge
-│   │   │   │   ├── jni_common.cpp/h            # Common JNI helpers
-│   │   │   │   └── ble_jni.cpp/h               # BLE JNI (optional)
-│   │   │   ├── qwen/
-│   │   │   │   ├── qwen_model.cpp/h            # Qwen model wrapper
-│   │   │   │   ├── tokenizer.cpp/h             # Tokenizer (BPE)
-│   │   │   │   ├── inference.cpp/h             # Inference engine
-│   │   │   │   ├── quantization.cpp/h          # INT4/INT8 quantization
-│   │   │   │   └── ggml_backend.cpp/h          # GGML backend wrapper
-│   │   │   ├── utils/
-│   │   │   │   ├── logger.cpp/h
-│   │   │   │   ├── memory.cpp/h                # Memory pool allocator
-│   │   │   │   └── threading.cpp/h             # Thread pool
-│   │   │   ├── third_party/
-│   │   │   │   ├── ggml/                       # GGML submodule
-│   │   │   │   └── tokenizers-cpp/             # Tokenizers submodule
-│   │   │   └── test/
-│   │   │       ├── test_tokenizer.cpp
-│   │   │       └── test_inference.cpp
-│   │   ├── jniLibs/
-│   │   │   ├── arm64-v8a/
-│   │   │   │   ├── libqwen.so
-│   │   │   │   └── libggml.so
-│   │   │   └── armeabi-v7a/
-│   │   │       ├── libqwen.so
-│   │   │       └── libggml.so
+│   │   │   ├── CMakeLists.txt          # Minimal - no native inference
+│   │   │   ├── test/
+│   │   │   └── utils/
 │   │   └── assets/
-│   │       ├── models/
-│   │       │   └── qwen-0.5b-q4_k_m.gguf       # Quantized model
-│   │       └── tokenizer/
-│   │           └── tokenizer.json              # BPE tokenizer
+│   │       └── images/                  # App icons, placeholders
 │   ├── test/
 │   │   └── java/com/cupcake/
 │   │       ├── repository/
 │   │       ├── usecase/
-│   │       └── native/
+│   │       └── data/
 │   └── androidTest/
 │       └── java/com/cupcake/
-│           ├── MainActivityTest.kt
-│           └── NativeIntegrationTest.kt
+│           └── MainActivityTest.kt
 ├── gradle/
 │   └── libs.versions.toml               # Version catalog
 ├── gradle.properties
@@ -205,18 +179,14 @@ build/
 │   ├── partitions.bin
 │   └── bootloader.bin
 └── app/
-    ├── outputs/
-    │   ├── apk/debug/app-debug.apk
-    │   └── bundle/release/app-release.aab
-    └── intermediates/
-        └── cxx/Debug/obj/arm64-v8a/libqwen.so
+    └── outputs/
+        ├── apk/debug/app-debug.apk
+        └── bundle/release/app-release.aab
 ```
 
 ## External Dependencies (Git Submodules)
 ```
 third_party/
-├── ggml/                                # GGML inference backend
-├── tokenizers-cpp/                      # Fast BPE tokenizer
 ├── nimble-arduino/                      # BLE stack for ESP32
 └── protobuf-c/                          # Protocol buffers (if needed)
 ```
@@ -226,11 +196,8 @@ third_party/
 | File | Purpose |
 |------|---------|
 | `esp/platformio.ini` | ESP32 build config, dependencies, upload settings |
-| `app/build.gradle.kts` | Android module config, NDK, CMake, dependencies |
-| `app/src/main/cpp/CMakeLists.txt` | Native build, link GGML, Qwen sources |
-| `app/src/main/cpp/jni/qwen_jni.cpp` | JNI bridge: Kotlin ↔ C++ Qwen |
-| `app/src/main/cpp/qwen/inference.cpp` | Core inference loop |
-| `app/src/main/java/com/cupcake/native/QwenNative.kt` | Kotlin JNI declarations |
+| `app/build.gradle.kts` | Android module config, dependencies (no NDK/CMake) |
+| `app/src/main/java/com/cupcake/ai/OllamaEngine.kt` | Ollama HTTP streaming client |
 | `app/src/main/java/com/cupcake/data/model/ChatMessage.kt` | Chat, system prompt, model config models |
 | `app/src/main/java/com/cupcake/ui/screen/chat/ChatScreen.kt` | Chat UI with streaming |
 | `app/src/main/java/com/cupcake/ui/screen/systemprompt/SystemPromptScreen.kt` | System prompt editor with images |

@@ -28,6 +28,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.VideogameAsset
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.EmojiEvents
 
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
@@ -40,7 +41,8 @@ fun HomeScreen(
     onNavigateToDevice: (String) -> Unit,
     onNavigateToSettings: () -> Unit,
     onNavigateToCharacters: () -> Unit,
-    onNavigateToGames: () -> Unit
+    onNavigateToGames: () -> Unit,
+    onNavigateToPoints: () -> Unit
 ) {
     val characters by viewModel.characters.collectAsStateWithLifecycle()
 
@@ -50,6 +52,12 @@ fun HomeScreen(
                 TopAppBar(
                     title = { Text("CupCake") },
                     actions = {
+                        androidx.compose.material3.IconButton(onClick = onNavigateToPoints) {
+                            Icon(
+                                imageVector = Icons.Filled.EmojiEvents,
+                                contentDescription = "Rewards"
+                            )
+                        }
                         androidx.compose.material3.IconButton(onClick = onNavigateToGames) {
                             Icon(
                                 imageVector = Icons.Filled.VideogameAsset,

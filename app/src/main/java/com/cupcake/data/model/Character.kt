@@ -1,8 +1,5 @@
 package com.cupcake.data.model
 
-import kotlinx.serialization.Serializable
-
-@Serializable
 data class Character(
     val id: String,
     val name: String,

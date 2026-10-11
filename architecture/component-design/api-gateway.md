@@ -2,15 +2,14 @@
 
 ## Overview
 
-CupCake supports connecting to custom LLM inference servers beyond the built-in local Qwen model. This enables users to leverage cloud models (OpenAI, Anthropic), self-hosted models (Ollama, vLLM, TGI), or any OpenAI-compatible API endpoint.
+CupCake connects to Ollama server for local LLM inference (smollm, qwen2:0.5b) and supports custom LLM inference servers beyond Ollama. This enables users to leverage cloud models (OpenAI, Anthropic), self-hosted models (vLLM, TGI), or any OpenAI-compatible API endpoint.
 
 ## Supported Provider Types
 
 | Provider Type | Protocol | Default Endpoint | Auth |
 |---------------|----------|------------------|------|
-| Local Qwen | GGML/JNI | N/A (on-device) | None |
+| Ollama | REST + NDJSON | `http://localhost:11434/v1` | Optional |
 | OpenAI Compatible | REST + SSE | `https://api.openai.com/v1` | Bearer token |
-| Ollama | REST + SSE | `http://localhost:11434/v1` | Optional |
 | vLLM | REST + SSE | `http://localhost:8000/v1` | Optional |
 | Custom | REST + SSE | User-defined | Configurable |
 
@@ -33,19 +32,18 @@ CupCake supports connecting to custom LLM inference servers beyond the built-in 
 │  │  - Parameters (temp, top_p, etc.)       │                   │
 │  └────────────────┬────────────────────────┘                   │
 │                   │                                             │
-│         ┌─────────┴─────────┐                                   │
-│         ▼                   ▼                                   │
-│  ┌─────────────┐     ┌─────────────┐                           │
-│  │  LOCAL      │     │  REMOTE     │                           │
-│  │  QWEN JNI   │     │  API CLIENT │                           │
-│  └─────────────┘     └──────┬──────┘                           │
-│                             │                                   │
-│                    ┌────────┴────────┐                          │
-│                    ▼                 ▼                          │
-│             ┌───────────┐     ┌───────────┐                    │
-│             │ OpenAI    │     │ Ollama    │                    │
-│             │ Compatible│     │ Native    │                    │
-│             └───────────┘     └───────────┘                    │
+│                   ▼                                             │
+│          ┌─────────────┐                                        │
+│          │  REMOTE     │                                        │
+│          │  API CLIENT │                                        │
+│          └──────┬──────┘                                        │
+│                 │                                               │
+│        ┌────────┴────────┐                                      │
+│        ▼                 ▼                                      │
+│  ┌───────────┐     ┌───────────┐                                │
+│  │ OpenAI    │     │ Ollama    │                                │
+│  │ Compatible│     │ Native    │                                │
+│  └───────────┘     └───────────┘                                │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -55,8 +53,8 @@ CupCake supports connecting to custom LLM inference servers beyond the built-in 
 ### ModelConfig
 ```kotlin
 data class ModelConfig(
-    val provider: ModelProvider = ModelProvider.LOCAL_QWEN,
-    val modelName: String = "qwen2-0.5b-instruct-q4_k_m",
+    val provider: ModelProvider = ModelProvider.CUSTOM_OLLAMA,
+    val modelName: String = "qwen2:0.5b",
     val customEndpoint: String = "",
     val apiKey: String = "",
     val temperature: Float = 0.7f,
@@ -68,12 +66,10 @@ data class ModelConfig(
     val timeoutSeconds: Int = 60
 ) {
     enum class ModelProvider(val value: String) {
-        LOCAL_QWEN("local_qwen"),
         CUSTOM_OPENAI("custom_openai"),
         CUSTOM_OLLAMA("custom_ollama"),
         CUSTOM_VLLM("custom_vllm"),
         CUSTOM_OTHER("custom_other")
-    }
 
     fun effectiveEndpoint(): String {
         return when (provider) {
