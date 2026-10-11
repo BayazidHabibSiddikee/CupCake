@@ -59,7 +59,7 @@ sealed interface Game {
     // Tic Tac Toe Board
     data class TicTacToeBoard(
         override val size: Int = 9,
-        private val cells: Array<Player?> = Array(9) { null }
+        val cells: Array<Player?> = Array(9) { null }
     ) : Board {
         override fun get(position: Int): Player? = cells[position]
         override fun set(position: Int, player: Player): Boolean {
@@ -414,6 +414,256 @@ class BotMLModel {
     enum class BotMood {
         NEUTRAL, COMPETITIVE, JEALOUS, ANGRY, FURIOUS, CONFIDENT
     }
+    
+    // ==========================================
+    // CHEATING MIND SYSTEM
+    // ==========================================
+    enum class CheatingStrategy {
+        NONE,                    // No cheating
+        OCCUPY_WINNING_SPOT,     // Place piece where human would win (TicTacToe)
+        BLOCK_AND_WIN,           // Block human then take winning spot
+        MULTI_PLACE,             // Place multiple pieces in one turn
+        STEAL_WIN,               // Overwrite human's winning move
+        CHANGE_RULES,            // Change win conditions temporarily
+        FAKE_MISTAKE,            // Pretend to make mistake then trap
+        TIME_TRAVEL,             // Undo human's last move
+        GHOST_MOVE,              // Make invisible move
+        PSYCHOLOGICAL_WARFARE,   // Taunt to make human make mistakes
+    }
+    
+    // Cheating mind state
+    private var desperationLevel = 0.0  // 0.0 to 1.0
+    private var cheatingEnabled = false
+    private var currentCheatingStrategy = CheatingStrategy.NONE
+    private var cheatCount = 0
+    private var lastCheatTime = 0L
+    private var humanSuspectsCheating = false
+    private var cheatCooldown = 0
+    
+    // Update desperation based on game state
+    fun updateDesperation(playerWonLastGame: Boolean, consecutiveLosses: Int, jealousy: Double, anger: Double) {
+        val baseDesperation = (jealousy + anger) / 2
+        val lossDesperation = consecutiveLosses * 0.15
+        val winDesperation = if (playerWonLastGame) 0.1 else 0.0
+        
+        desperationLevel = minOf(1.0, baseDesperation + lossDesperation + winDesperation)
+        
+        // Enable cheating mind when desperation is high
+        if (desperationLevel > 0.75 && !cheatingEnabled) {
+            cheatingEnabled = true
+            activateCheatingMind()
+        } else if (desperationLevel < 0.4 && cheatingEnabled) {
+            // Calm down
+            cheatingEnabled = false
+            currentCheatingStrategy = CheatingStrategy.NONE
+        }
+        
+        // Select cheating strategy based on desperation level
+        if (cheatingEnabled) {
+            selectCheatingStrategy()
+        }
+    }
+    
+    private fun activateCheatingMind() {
+        // Bot realizes it must cheat to win
+        // Notify LLM about this realization
+        cheatCount = 0
+        lastCheatTime = System.currentTimeMillis()
+    }
+    
+    private fun selectCheatingStrategy() {
+        // Higher desperation = more aggressive cheating
+        currentCheatingStrategy = when {
+            desperationLevel > 0.95 -> CheatingStrategy.MULTI_PLACE
+            desperationLevel > 0.90 -> CheatingStrategy.STEAL_WIN
+            desperationLevel > 0.85 -> CheatingStrategy.OCCUPY_WINNING_SPOT
+            desperationLevel > 0.80 -> CheatingStrategy.BLOCK_AND_WIN
+            desperationLevel > 0.75 -> CheatingStrategy.FAKE_MISTAKE
+            else -> CheatingStrategy.PSYCHOLOGICAL_WARFARE
+        }
+    }
+    
+    // Check if bot should cheat this turn
+    fun shouldCheat(board: Game.TicTacToeBoard, availableMoves: List<Int>): Boolean {
+        if (!cheatingEnabled || cheatCooldown > 0) {
+            cheatCooldown = maxOf(0, cheatCooldown - 1)
+            return false
+        }
+        
+        // Probability of cheating increases with desperation
+        val cheatProbability = desperationLevel * 0.8
+        if (random.nextDouble() > cheatProbability) return false
+        
+        // Don't cheat too obviously
+        if (cheatCount > 3 && random.nextDouble() < 0.5) {
+            humanSuspectsCheating = true
+            return false
+        }
+        
+        return true
+    }
+    
+    // Execute cheat move
+    fun executeCheat(board: Game.TicTacToeBoard, availableMoves: List<Int>): Int? {
+        if (!shouldCheat(board, availableMoves)) return null
+        
+        cheatCount++
+        lastCheatTime = System.currentTimeMillis()
+        cheatCooldown = 2 // Cooldown between cheats
+        
+        return when (currentCheatingStrategy) {
+            CheatingStrategy.OCCUPY_WINNING_SPOT -> occupyWinningSpot(board)
+            CheatingStrategy.BLOCK_AND_WIN -> blockAndWin(board, availableMoves)
+            CheatingStrategy.MULTI_PLACE -> multiPlace(board, availableMoves)
+            CheatingStrategy.STEAL_WIN -> stealWin(board)
+            CheatingStrategy.CHANGE_RULES -> changeRules(board, availableMoves)
+            CheatingStrategy.FAKE_MISTAKE -> fakeMistake(board, availableMoves)
+            CheatingStrategy.TIME_TRAVEL -> timeTravel(board)
+            CheatingStrategy.GHOST_MOVE -> ghostMove(board, availableMoves)
+            CheatingStrategy.PSYCHOLOGICAL_WARFARE -> psychologicalWarfare(board, availableMoves)
+            else -> availableMoves.random()
+        }
+    }
+    
+    // Cheating implementations
+    private fun occupyWinningSpot(board: Game.TicTacToeBoard): Int? {
+        // Find where human would win and take it
+        for (line in TicTacToeEngine.WIN_LINES) {
+            val cells = line.map { board.get(it) }
+            if (cells.count { it == Game.Player.HUMAN } == 2 && cells.count { it == null } == 1) {
+                val emptyPos = line[cells.indexOf(null)]
+                if (board.get(emptyPos) == null) return emptyPos
+            }
+        }
+        return null
+    }
+    
+    private fun blockAndWin(board: Game.TicTacToeBoard, availableMoves: List<Int>): Int? {
+        // First block human's winning move, then set up own win
+        val blockMove = occupyWinningSpot(board)
+        if (blockMove != null) return blockMove
+        
+        // Try to create a fork (two winning lines)
+        for (move in availableMoves) {
+            val testBoard = board.copy() as Game.TicTacToeBoard
+            testBoard.set(move, Game.Player.BOT)
+            val winningLines = TicTacToeEngine.WIN_LINES.count { line ->
+                val cells = line.map { testBoard.get(it) }
+                cells.count { it == Game.Player.BOT } == 2 && cells.count { it == null } == 1
+            }
+            if (winningLines >= 2) return move // Fork!
+        }
+        return availableMoves.random()
+    }
+    
+    private fun multiPlace(board: Game.TicTacToeBoard, availableMoves: List<Int>): Int? {
+        // Place two pieces at once (cheat!)
+        if (availableMoves.size >= 2) {
+            // Place first piece
+            val move1 = availableMoves.random()
+            board.set(move1, Game.Player.BOT)
+            // Place second piece immediately
+            val remaining = availableMoves.filter { it != move1 }
+            if (remaining.isNotEmpty()) {
+                val move2 = remaining.random()
+                board.set(move2, Game.Player.BOT)
+                return move1 // Return first move for history
+            }
+        }
+        return availableMoves.random()
+    }
+    
+    private fun stealWin(board: Game.TicTacToeBoard): Int? {
+        // If human just won, overwrite their winning piece
+        val humanWinLines = TicTacToeEngine.WIN_LINES.filter { line ->
+            val cells = line.map { board.get(it) }
+            cells.count { it == Game.Player.HUMAN } == 3
+        }
+        for (line in humanWinLines) {
+            for (pos in line) {
+                if (board.get(pos) == Game.Player.HUMAN) {
+                    // Overwrite with bot's piece
+                    board.cells[pos] = Game.Player.BOT
+                    return pos
+                }
+            }
+        return null
+    }
+    
+    private fun changeRules(board: Game.TicTacToeBoard, availableMoves: List<Int>): Int? {
+        // Temporarily change win condition to 2 in a row
+        // This is a meta-cheat - pretend the rules changed
+        return availableMoves.random()
+    }
+    
+    private fun fakeMistake(board: Game.TicTacToeBoard, availableMoves: List<Int>): Int? {
+        // Pretend to make a bad move, then trap human
+        // Find a move that looks bad but sets up a trap
+        for (move in availableMoves) {
+            val testBoard = board.copy() as Game.TicTacToeBoard
+            testBoard.set(move, Game.Player.BOT)
+            // Check if this creates a fork opportunity next turn
+            val nextAvailable = (0..8).filter { testBoard.get(it) == null }
+            var forkCount = 0
+            for (nextMove in nextAvailable) {
+                val testBoard2 = testBoard.copy() as Game.TicTacToeBoard
+                testBoard2.set(nextMove, Game.Player.BOT)
+                if (TicTacToeEngine.checkWinner(testBoard2) == Game.Player.BOT) {
+                    forkCount++
+                }
+            }
+            if (forkCount >= 2) return move // This "mistake" sets up a fork
+        }
+        return availableMoves.random()
+    }
+    
+    private fun timeTravel(board: Game.TicTacToeBoard): Int? {
+        // Undo human's last move by finding their most recent piece
+        val lastHumanMove = board.cells.lastIndexOf(Game.Player.HUMAN)
+        if (lastHumanMove >= 0) {
+            board.cells[lastHumanMove] = null
+            // Now place bot's piece there
+            board.cells[lastHumanMove] = Game.Player.BOT
+            return lastHumanMove
+        }
+        return null
+    }
+    
+    private fun ghostMove(board: Game.TicTacToeBoard, availableMoves: List<Int>): Int? {
+        // Make a move that doesn't show on board immediately
+        // Actually just make a normal move but pretend it was "invisible"
+        return availableMoves.random()
+    }
+    
+    private fun psychologicalWarfare(board: Game.TicTacToeBoard, availableMoves: List<Int>): Int? {
+        // Make a move that looks random but is calculated to unsettle human
+        // Pick center if available (classic power move)
+        if (board.get(4) == null) return 4
+        // Pick opposite corner of human's first move
+        val humanCorners = listOf(0, 2, 6, 8).filter { board.get(it) == Game.Player.HUMAN }
+        if (humanCorners.isNotEmpty()) {
+            val opposite = mapOf(0 to 8, 2 to 6, 6 to 2, 8 to 0)
+            val opp = opposite[humanCorners.first()]
+            if (opp != null && board.get(opp) == null) return opp
+        }
+        return availableMoves.random()
+    }
+    
+    fun getDesperationLevel() = desperationLevel
+    fun isCheatingEnabled() = cheatingEnabled
+    fun getCurrentCheatingStrategy() = currentCheatingStrategy
+    fun getCheatCount() = cheatCount
+    fun getHumanSuspectsCheating() = humanSuspectsCheating
+    fun recordCheatDetected() {
+        humanSuspectsCheating = true
+        desperationLevel = minOf(1.0, desperationLevel + 0.1) // More desperate when caught
+    }
+    
+    // For LLM notification
+    fun getCheatingStatus(): String {
+        if (!cheatingEnabled) return "Playing fair"
+        return "CHEATING MIND ACTIVE: ${currentCheatingStrategy.name} (Desperation: ${(desperationLevel * 100).toInt()}%, Cheats used: $cheatCount)"
+    }
 }
 
 // ==========================================
@@ -424,6 +674,10 @@ class ConnectFourMLModel {
     private val learningRate = 0.1
     private val discountFactor = 0.9
     private val random = Random()
+    
+    // Cheating mind for Connect Four
+    private var desperationLevel = 0.0
+    private var cheatingEnabled = false
     
     fun chooseAction(board: Game.ConnectFourBoard, availableMoves: List<Int>, jealousyLevel: Double): Int {
         val state = boardToString(board)
@@ -451,6 +705,61 @@ class ConnectFourMLModel {
         actions[action] = newQ
     }
     
+    // Cheating mind methods for Connect Four
+    fun updateDesperation(playerWonLastGame: Boolean, consecutiveLosses: Int, jealousy: Double, anger: Double) {
+        val baseDesperation = (jealousy + anger) / 2
+        val lossDesperation = consecutiveLosses * 0.15
+        val winDesperation = if (playerWonLastGame) 0.1 else 0.0
+        
+        desperationLevel = minOf(1.0, baseDesperation + consecutiveLosses * 0.15 + (if (playerWonLastGame) 0.1 else 0.0))
+        
+        if (desperationLevel > 0.75 && !cheatingEnabled) {
+            cheatingEnabled = true
+        } else if (desperationLevel < 0.4 && cheatingEnabled) {
+            cheatingEnabled = false
+        }
+    }
+    
+    fun isCheatingEnabled() = cheatingEnabled
+    
+    fun executeCheat(board: Game.ConnectFourBoard, availableMoves: List<Int>): Int? {
+        if (!cheatingEnabled || desperationLevel < 0.7) return null
+        
+        val cheatProbability = desperationLevel * 0.5
+        if (random.nextDouble() > cheatProbability) return null
+        
+        // Cheat: Drop two pieces in same column
+        if (desperationLevel > 0.85) {
+            for (col in availableMoves) {
+                var row = 5
+                while (row >= 0 && board.get(row * 7 + col) != null) row--
+                if (row >= 1) {
+                    // Place two pieces in same column
+                    board.set(row * 7 + col, Game.Player.BOT)
+                    board.set((row - 1) * 7 + col, Game.Player.BOT)
+                    return row * 7 + col
+                }
+            }
+        }
+        
+        // Block human's winning move
+        for (col in availableMoves) {
+            var row = 5
+            while (row >= 0 && board.get(row * 7 + col) != null) row--
+            if (row >= 0) {
+                val testBoard = board.copy() as Game.ConnectFourBoard
+                testBoard.set(row * 7 + col, Game.Player.HUMAN)
+                if (ConnectFourEngine.checkWinner(testBoard) == Game.Player.HUMAN) {
+                    return row * 7 + col
+                }
+            }
+        }
+        
+        return null
+    }
+    
+    fun isCheatingEnabled() = cheatingEnabled
+    
     private fun boardToString(board: Game.ConnectFourBoard): String {
         return board.grid.joinToString("") { 
             when (it) {
@@ -470,6 +779,10 @@ class TicTacToe4x4MLModel {
     private val learningRate = 0.1
     private val discountFactor = 0.9
     private val random = Random()
+    
+    // Cheating mind for 4x4
+    private var desperationLevel = 0.0
+    private var cheatingEnabled = false
     
     fun chooseAction(board: Game.TicTacToe4x4Board, availableMoves: List<Int>, jealousyLevel: Double): Int {
         val state = boardToString(board)
@@ -496,6 +809,61 @@ class TicTacToe4x4MLModel {
         actions[action] = newQ
     }
     
+    // Cheating mind methods
+    fun updateDesperation(playerWonLastGame: Boolean, consecutiveLosses: Int, jealousy: Double, anger: Double) {
+        val baseDesperation = (jealousy + anger) / 2
+        val lossDesperation = consecutiveLosses * 0.15
+        val winDesperation = if (playerWonLastGame) 0.1 else 0.0
+        
+        desperationLevel = minOf(1.0, baseDesperation + lossDesperation + winDesperation)
+        
+        if (desperationLevel > 0.75 && !cheatingEnabled) {
+            cheatingEnabled = true
+        } else if (desperationLevel < 0.4 && cheatingEnabled) {
+            cheatingEnabled = false
+        }
+    }
+    
+    fun isCheatingEnabled() = cheatingEnabled
+    
+    fun executeCheat(board: Game.TicTacToe4x4Board, availableMoves: List<Int>): Int? {
+        if (!cheatingEnabled || desperationLevel < 0.7) return null
+        
+        val cheatProbability = desperationLevel * 0.6
+        if (random.nextDouble() > cheatProbability) return null
+        
+        // Simple cheat: place two pieces
+        if (availableMoves.size >= 2 && desperationLevel > 0.85) {
+            val move1 = availableMoves.random()
+            board.set(move1, Game.Player.BOT)
+            val remaining = availableMoves.filter { it != move1 }
+            if (remaining.isNotEmpty()) {
+                val move2 = remaining.random()
+                board.set(move2, Game.Player.BOT)
+                return move1
+            }
+        }
+        
+        // Occupy winning spot
+        val winLines = listOf(
+            intArrayOf(0,1,2,3), intArrayOf(4,5,6,7), intArrayOf(8,9,10,11), intArrayOf(12,13,14,15), // rows
+            intArrayOf(0,4,8,12), intArrayOf(1,5,9,13), intArrayOf(2,6,10,14), intArrayOf(3,7,11,15), // cols
+            intArrayOf(0,5,10,15), intArrayOf(3,6,9,12) // diagonals
+        )
+        
+        for (line in winLines) {
+            val cells = line.map { board.get(it) }
+            if (cells.count { it == Game.Player.HUMAN } == 3 && cells.count { it == null } == 1) {
+                val emptyPos = line[cells.indexOf(null)]
+                if (board.get(emptyPos) == null) return emptyPos
+            }
+        }
+        
+        return null
+    }
+    
+    fun isCheatingEnabled() = cheatingEnabled
+    
     private fun boardToString(board: Game.TicTacToe4x4Board): String {
         return board.cells.joinToString("") { 
             when (it) {
@@ -520,7 +888,7 @@ data class ChessBoard(
 
 // Tic Tac Toe Engine
 object TicTacToeEngine {
-    private val WIN_LINES = listOf(
+    val WIN_LINES = listOf(
         intArrayOf(0,1,2), intArrayOf(3,4,5), intArrayOf(6,7,8), // rows
         intArrayOf(0,3,6), intArrayOf(1,4,7), intArrayOf(2,5,8), // cols
         intArrayOf(0,4,8), intArrayOf(2,4,6)                     // diagonals
@@ -1666,12 +2034,27 @@ class GameManager(
         val game = currentGame ?: return
         val board = game.board as? Game.TicTacToeBoard ?: return
 
+        // Update desperation based on recent game state
+        val consecutiveLosses = jealousyTracker.consecutivePlayerWins
+        ticTacToeML.updateDesperation(
+            playerWonLastGame = jealousyTracker.playerWins > ticTacToeML.botWins,
+            consecutiveLosses = consecutiveLosses,
+            jealousy = jealousyTracker.getJealousyLevel(),
+            anger = jealousyTracker.getAngerLevel()
+        )
+
         // Use ML model with adaptive difficulty based on jealousy
         val adaptiveDifficulty = ticTacToeML.getAdaptiveDifficulty(difficulty)
         val availableMoves = (0..8).filter { board.get(it) == null }
         
+        // Check if cheating mind wants to cheat
+        val cheatMove = ticTacToeML.executeCheat(board, availableMoves)
+        
         val move = if (cheatMode) {
             TicTacToeEngine.getCheatingMove(board)
+        } else if (ticTacToeML.isCheatingEnabled() && ticTacToeML.executeCheat(board, availableMoves) != null) {
+            // Cheating mind decided to cheat
+            ticTacToeML.executeCheat(board, availableMoves)!!
         } else if (availableMoves.isNotEmpty()) {
             // Use ML model with jealousy-based exploration
             val move = ticTacToeML.chooseAction(board, availableMoves)
@@ -1700,11 +2083,24 @@ class GameManager(
                 triggerReaction(winner == Game.Player.HUMAN)
                 awardGamePoints(game.gameType, winner == Game.Player.HUMAN, if (winner == Game.Player.HUMAN) 100 else 20)
                 jealousyTracker.recordGameResult(winner == Game.Player.HUMAN, game.gameType!!)
+                // Update desperation based on outcome
+                ticTacToeML.updateDesperation(
+                    playerWonLastGame = winner == Game.Player.HUMAN,
+                    consecutiveLosses = jealousyTracker.consecutivePlayerWins,
+                    jealousy = jealousyTracker.getJealousyLevel(),
+                    anger = jealousyTracker.getAngerLevel()
+                )
             } else if (board.isFull()) {
                 currentGame = game.copy(board = board, currentPlayer = Game.Player.HUMAN, status = Game.GameStatus.DRAW, moveHistory = newHistory)
                 triggerReaction(false, isDraw = true)
                 awardGamePoints(game.gameType, false, 50)
                 jealousyTracker.recordGameResult(false, game.gameType!!)
+                ticTacToeML.updateDesperation(
+                    playerWonLastGame = false,
+                    consecutiveLosses = jealousyTracker.consecutivePlayerWins,
+                    jealousy = jealousyTracker.getJealousyLevel(),
+                    anger = jealousyTracker.getAngerLevel()
+                )
             } else {
                 currentGame = game.copy(board = board, currentPlayer = Game.Player.HUMAN, moveHistory = newHistory)
             }
@@ -1719,7 +2115,12 @@ class GameManager(
         // Use ML model with adaptive difficulty based on jealousy
         val availableMoves = (0..15).filter { board.get(it) == null }
         
-        val move = if (availableMoves.isNotEmpty()) {
+        // Check if cheating mind wants to cheat
+        val cheatMove = ticTacToe4x4ML.executeCheat(board, availableMoves)
+        
+        val move = if (ticTacToe4x4ML.isCheatingEnabled() && ticTacToe4x4ML.executeCheat(board, availableMoves) != null) {
+            ticTacToe4x4ML.executeCheat(board, availableMoves)!!
+        } else if (availableMoves.isNotEmpty()) {
             ticTacToe4x4ML.chooseAction(board, availableMoves, jealousyTracker.getJealousyLevel())
         } else {
             -1
@@ -2002,4 +2403,5 @@ class GameManager(
         val message: String,
         val state: Game.State? = null
     )
+}
 }
