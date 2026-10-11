@@ -2,7 +2,7 @@
 
 ## Overview
 
-CupCake is a hybrid edge-AI system combining an ESP32-S3 microcontroller for sensor acquisition and an Android application for on-device LLM inference using a quantized Qwen model.
+CupCake is a hybrid edge-AI system combining an ESP32-S3 microcontroller for sensor acquisition and an Android application that connects to an Ollama server for LLM inference (smollm, qwen2:0.5b models).
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -16,10 +16,10 @@ CupCake is a hybrid edge-AI system combining an ESP32-S3 microcontroller for sen
 │       │                                            │            │
 │       ▼                                            ▼            │
 │  ┌──────────────┐                         ┌──────────────┐     │
-│  │  Sensors     │                         │  Qwen Model  │     │
-│  │  - IMU       │                         │  (INT4 GGUF) │     │
-│  │  - Temp      │                         │  - Tokenizer │     │
-│  │  - Battery   │                         │  - Inference │     │
+│  │  Sensors     │                         │  Ollama      │     │
+│  │  - IMU       │                         │  (HTTP API)  │     │
+│  │  - Temp      │                         │  - smollm    │     │
+│  │  - Battery   │                         │  - qwen2:0.5b│     │
 │  └──────────────┘                         └──────────────┘     │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
@@ -67,12 +67,12 @@ CupCake is a hybrid edge-AI system combining an ESP32-S3 microcontroller for sen
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│                     ANDROID APP (Clean Architecture)           │
+│                    ANDROID APPLICATION                         │
 ├────────────────────────────────────────────────────────────────┤
 │                                                                │
 │  ┌──────────────────────────────────────────────────────────┐  │
 │  │                      UI LAYER                            │  │
-│  │  Compose Screens ──► ViewModels ──► State (Flow/LiveData)│  │
+│  │  Compose Screens ◄── ViewModels ◄── StateFlow/LiveData   │  │
 │  └──────────────────────────────────────────────────────────┘  │
 │                              │                                 │
 │  ┌──────────────────────────────────────────────────────────┐  │
@@ -83,14 +83,8 @@ CupCake is a hybrid edge-AI system combining an ESP32-S3 microcontroller for sen
 │                              │                                 │
 │  ┌──────────────────────────────────────────────────────────┐  │
 │  │                      DATA LAYER                          │  │
-│  │  RepositoryImpl ◄── Local (Room) + Remote (BLE)          │  │
+│  │  RepositoryImpl ◄── Local (Room) + Remote (BLE, Ollama)  │  │
 │  │  DataSources: BleDataSource, Database, Preferences       │  │
-│  └──────────────────────────────────────────────────────────┘  │
-│                              │                                 │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │                    NATIVE LAYER (JNI)                    │  │
-│  │  QwenNative.kt ◄── qwen_jni.cpp ◄── Qwen C++ Engine      │  │
-│  │  BleNative.kt  ◄── ble_jni.cpp  ◄── (optional)           │  │
 │  └──────────────────────────────────────────────────────────┘  │
 │                                                                │
 └────────────────────────────────────────────────────────────────┘
@@ -101,50 +95,60 @@ CupCake is a hybrid edge-AI system combining an ESP32-S3 microcontroller for sen
 app
 ├── ui (compose, viewmodel, navigation)
 ├── domain (usecase, model, repository interfaces)
-├── data (repository impl, Room, BLE, DataStore)
-├── native (JNI interfaces, NativeLoader)
+├── data (repository impl, Room, BLE, DataStore, OllamaEngine)
+├── ai (OllamaEngine for HTTP inference)
 └── core (di, util, constants) → all modules depend on this
 ```
 
-### Qwen Inference Engine (C++)
+### Ollama Inference Engine (HTTP API)
 
-```
-┌────────────────────────────────────────────────────────────────┐
-│                      QWEN INFERENCE ENGINE                     │
-├────────────────────────────────────────────────────────────────┤
-│                                                                │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐     │
-│  │  Tokenizer   │    │   Model      │    │  Sampler     │     │
-│  │  (BPE)       │───►│  (GGML)      │───►│  (top-k,     │     │
-│  │  tokenizers- │    │  INT4 GGUF   │    │  top-p, temp)│     │
-│  │  cpp         │    │              │    │              │     │
-│  └──────────────┘    └──────────────┘    └──────────────┘     │
-│         │                   │                   │              │
-│         ▼                   ▼                   ▼              │
-│  ┌────────────────────────────────────────────────────────┐   │
-│  │                  Memory Pool Allocator                  │   │
-│  │  - Pre-allocated tensor buffers (no malloc in hot path) │   │
-│  │  - Arena allocator for GGML context                     │   │
-│  └────────────────────────────────────────────────────────┘   │
-│                                                                │
-│  Thread Model:                                                 │
-│  - Main thread: JNI calls, tokenizer                           │
-│  - Worker pool: GGML inference (1-4 threads)                   │
-│  - Callback thread: Kotlin Flow emission                       │
-│                                                                │
-└────────────────────────────────────────────────────────────────┘
-```
+The Android app connects to a local or remote Ollama server via HTTP API for LLM inference. No native/JNI code is required.
 
 **Model Specifications:**
 | Parameter | Value |
 |-----------|-------|
-| Base Model | Qwen2-0.5B-Instruct |
-| Quantization | Q4_K_M (GGUF) |
-| Model Size | ~400 MB |
-| Context Window | 4096 tokens |
-| Vocabulary | 151,936 (BPE) |
-| Target Latency | <100ms/token (Snapdragon 8 Gen 2) |
-| Peak RAM | ~600 MB (model + KV cache + workspace) |
+| Models | smollm, qwen2:0.5b |
+| Protocol | HTTP/1.1 + NDJSON streaming |
+| Endpoint | http://localhost:11434/v1 (configurable) |
+| Context Window | Up to model limit (e.g., 4096 tokens for qwen2:0.5b) |
+| Target Latency | Network-dependent (~50-500ms first token) |
+| Peak RAM | Minimal (streaming only) |
+
+### Game Engine & AI System
+
+The CupCake app includes a comprehensive game engine with 14 game types and an advanced AI system with ML-powered bots.
+
+**Game Types (14):**
+- **Classic**: TicTacToe (3x3), TicTacToe 4x4, Connect Four, Chess
+- **Quick**: Rock Paper Scissors, Guess Number
+- **Brain**: Math Quiz, Memory Match, Number Base Conversion
+- **Word**: Hangman, Word Scramble
+- **Logic**: Mastermind
+- **Reflex**: Reaction Time
+- **Idle**: Clicker
+
+**AI/ML Bot System:**
+- **Q-Learning Models**: Separate models for TicTacToe, Connect Four, TicTacToe 4x4
+- **Adaptive Difficulty**: EASY/NORMAL/HARD/CHEATING based on bot's emotional state
+- **Jealousy/Anger Tracking**: 0.0-1.0 scale tracking player vs bot win ratios
+- **Bot Mood System**: NEUTRAL, COMPETITIVE, JEALOUS, ANGRY, FURIOUS, CONFIDENT
+
+**Cheating Mind System:**
+- **Desperation-Based Activation**: Triggers when desperation > 0.75 (high jealousy/anger + consecutive losses)
+- **9 Cheating Strategies**: OCCUPY_WINNING_SPOT, BLOCK_AND_WIN, MULTI_PLACE, STEAL_WIN, CHANGE_RULES, FAKE_MISTAKE, TIME_TRAVEL, GHOST_MOVE, PSYCHOLOGICAL_WARFARE
+- **Probability Scaling**: Cheating probability scales with desperation level (up to 80%)
+- **Cooldown & Detection**: Cooldown between cheats, human suspicion tracking
+
+**LLM Integration for Games:**
+- **notifyLLMMove()**: Sends move info to Ollama after EVERY move with jealousy/anger/mood context
+- **triggerReaction()**: Includes jealousy%, anger%, mood in LLM prompts for emotional reactions
+- **Bot Personality**: Adapts dynamically to mood (furious, jealous, competitive, etc.)
+
+**Points/XP System:**
+- **PointsManager**: Tracks XP, levels (exponential curve), achievements
+- **Game-Specific Rewards**: Difficulty multipliers (Chess 2x, Connect Four 1.5x, etc.)
+- **Achievements**: Streak, milestones, perfect games, polymath (try all games)
+- **PointsScreen UI**: Profile tab, Achievements tab, Stats tab with per-game stats
 
 ## Data Flow
 
@@ -302,19 +306,19 @@ Service: 6E400001-B5A3-F393-E0A9-E50E24DCCA9E (Nordic UART compatible)
 
 | Asset | Threat | Mitigation |
 |-------|--------|------------|
-| Model weights | Extraction | Obfuscation, Play Asset Delivery encryption |
 | Sensor data | Eavesdropping | BLE encryption (LE Secure Connections) |
 | Commands | Injection | Message authentication (HMAC) |
 | OTA firmware | Tampering | Signed images, secure boot |
 | User chats | Local access | Android Keystore, encrypted Room |
+| API keys | Exposure | Encrypted storage, never logged |
 
 ### Implementation
 
 - **BLE**: LE Secure Connections (FIPS), bonding required
 - **OTA**: RSA-2048 signed firmware, verified before flash
-- **Model**: Encrypted in assets, decrypted at runtime via Keystore
 - **Database**: SQLCipher (Room encryption)
-- **Network**: None (offline-first), future: TLS 1.3
+- **Network**: TLS 1.3 for remote endpoints
+- **API Keys**: Encrypted in Android Keystore
 
 ## Performance Targets
 
@@ -322,11 +326,11 @@ Service: 6E400001-B5A3-F393-E0A9-E50E24DCCA9E (Nordic UART compatible)
 |--------|--------|-------------|
 | BLE connection time | <2s | Android scan + connect |
 | Sensor latency (ESP32→UI) | <50ms | Timestamp delta |
-| First token latency | <500ms | JNI call → first callback |
-| Token generation rate | >10 tok/s | Sustained throughput |
-| Peak memory (Android) | <800 MB | profilers |
+| First token latency | <500ms | HTTP request → first chunk |
+| Token generation rate | >10 tok/s | Sustained throughput (Ollama) |
+| Peak memory (Android) | <100 MB | profilers (streaming only) |
 | Battery impact (ESP32) | <5%/day | 24h test |
-| APK size | <150 MB | Bundle analyzer |
+| APK size | <50 MB | Bundle analyzer |
 | Firmware size | <1 MB | .bin size |
 
 ## Deployment
@@ -344,7 +348,6 @@ PlatformIO → pio run -e esp32s3
 ./gradlew assembleRelease
   ├─ AAB: app/build/outputs/bundle/release/app-release.aab
   ├─ APK: app/build/outputs/apk/release/app-release.apk
-  ├─ Native libs: stripped, aligned
   └─ ProGuard: minifyEnabled true
 ```
 
@@ -363,7 +366,6 @@ jobs:
     - Unit tests (JUnit + MockK)
     - Instrumented tests (emulator)
     - Build APK + AAB
-    - Native tests (CMake + CTest)
   
   integration:
     - Hardware-in-loop (if runners available)
@@ -376,9 +378,8 @@ jobs:
 
 ## Future Extensibility
 
-1. **Multi-model support**: Switch between Qwen, Phi, Gemma via model registry
-2. **WiFi Direct / Thread**: Higher bandwidth for model updates
-3. **Federated learning**: On-device fine-tuning with privacy
-4. **Voice I/O**: Whisper.cpp + Piper TTS integration
-5. **Mesh networking**: ESP32-ESP32 sensor relay
-6. **Wear OS companion**: Glanceable sensor data on watch
+1. **Multi-model support**: Switch between smollm, qwen2:0.5b, and other Ollama models
+2. **WiFi Direct / Thread**: Higher bandwidth for sensor data
+3. **Voice I/O**: Whisper.cpp + Piper TTS integration
+4. **Mesh networking**: ESP32-ESP32 sensor relay
+5. **Wear OS companion**: Glanceable sensor data on watch
