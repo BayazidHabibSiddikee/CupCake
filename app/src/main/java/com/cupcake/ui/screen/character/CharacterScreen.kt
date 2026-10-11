@@ -43,6 +43,11 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Save
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material.icons.filled.Image
+import com.cupcake.ui.component.CharacterAvatar
+
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun CharacterScreen(
@@ -52,8 +57,16 @@ fun CharacterScreen(
     val characters by viewModel.characters.collectAsStateWithLifecycle()
     val showCreateDialog by viewModel.showCreateDialog.collectAsStateWithLifecycle()
     val newCharName by viewModel.newCharName.collectAsStateWithLifecycle()
+    val newCharDescription by viewModel.newCharDescription.collectAsStateWithLifecycle()
     val newCharPrompt by viewModel.newCharPrompt.collectAsStateWithLifecycle()
     val newCharPersonality by viewModel.newCharPersonality.collectAsStateWithLifecycle()
+    val newCharAvatar by viewModel.newCharAvatar.collectAsStateWithLifecycle()
+
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let { viewModel.newCharAvatar.value = it.toString() }
+    }
 
     CupCakeTheme {
         Column(
@@ -117,29 +130,74 @@ fun CharacterScreen(
             },
             title = { Text(viewModel.editingCharacterId.value?.let { "Edit Character" } ?: "Create Character") },
             text = {
-                Column(Modifier.padding(16.dp).fillMaxWidth()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Avatar Picker Row
+                    androidx.compose.foundation.layout.Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CharacterAvatar(
+                            avatar = newCharAvatar,
+                            modifier = Modifier.size(56.dp),
+                            emojiSize = 30.sp
+                        )
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            androidx.compose.material3.FilledTonalButton(
+                                onClick = { photoPickerLauncher.launch("image/*") },
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(imageVector = Icons.Default.Image, contentDescription = null, modifier = Modifier.size(16.dp))
+                                androidx.compose.foundation.layout.Spacer(Modifier.size(6.dp))
+                                Text("Choose Image / Art", fontSize = 12.sp)
+                            }
+                            TextField(
+                                value = newCharAvatar,
+                                onValueChange = { viewModel.newCharAvatar.value = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                placeholder = { Text("Emoji or image path") },
+                                singleLine = true,
+                                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 11.sp)
+                            )
+                        }
+                    }
+
                     TextField(
                         value = newCharName,
                         onValueChange = { viewModel.newCharName.value = it },
                         modifier = Modifier.fillMaxWidth(),
                         label = { Text("Name") },
-                        placeholder = { Text("e.g., My Custom Bot") },
+                        placeholder = { Text("e.g., Cyber Sam, Alice") },
                         singleLine = true
                     )
 
-                    androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(top = 16.dp))
+                    TextField(
+                        value = newCharDescription,
+                        onValueChange = { viewModel.newCharDescription.value = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Short Description") },
+                        placeholder = { Text("e.g., Sassy companion who roasts code") },
+                        singleLine = true
+                    )
 
                     TextField(
                         value = newCharPrompt,
                         onValueChange = { viewModel.newCharPrompt.value = it },
                         modifier = Modifier.fillMaxWidth(),
-                        label = { Text("System Prompt") },
-                        placeholder = { Text("Enter character instructions...") },
-                        minLines = 6,
-                        maxLines = 10
+                        label = { Text("System Prompt (Persona)") },
+                        placeholder = { Text("Define character identity and background...") },
+                        minLines = 4,
+                        maxLines = 8
                     )
-
-                    androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(top = 16.dp))
 
                     TextField(
                         value = newCharPersonality,
@@ -186,16 +244,12 @@ fun CharacterCard(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Avatar
-                    Box(
+                    // Avatar with custom image support
+                    CharacterAvatar(
+                        avatar = character.avatar,
                         modifier = Modifier.size(48.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = character.avatar,
-                            fontSize = 28.sp
-                        )
-                    }
+                        emojiSize = 26.sp
+                    )
 
                     androidx.compose.foundation.layout.Column {
                         androidx.compose.foundation.layout.Row(

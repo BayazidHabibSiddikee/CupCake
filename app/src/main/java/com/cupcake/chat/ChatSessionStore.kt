@@ -1,26 +1,34 @@
 package com.cupcake.chat
 
 import com.cupcake.data.model.ChatMessage
+import com.cupcake.data.source.local.AppDatabase
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Single in-memory session per character.
+ * Persistent chat session per character backed by Room database.
  *
- * There is exactly one message list per character id, shared across
- * navigation so leaving and reopening a character's chat resumes the
- * same session. Nothing is duplicated: no "New Chat" copies.
+ * Each character owns exactly one persistent conversation history ("chat_$characterId").
+ * Messages are loaded from SQLite on startup and immediately saved to Room on every addMessage.
  */
 @Singleton
-class ChatSessionStore @Inject constructor() {
+class ChatSessionStore @Inject constructor(
+    private val database: AppDatabase?
+) {
+    // Secondary constructor for unit tests
+    constructor() : this(null)
 
     private val sessions = ConcurrentHashMap<String, MutableStateFlow<List<ChatMessage>>>()
-
     private val idCounter = java.util.concurrent.atomic.AtomicLong(1L)
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     fun conversationIdFor(characterId: String): String = "chat_$characterId"
 
@@ -32,18 +40,68 @@ class ChatSessionStore @Inject constructor() {
         val uniqueId = if (message.id > 0) message.id else idCounter.getAndIncrement()
         val stamped = message.copy(id = uniqueId, conversationId = conversationIdFor(characterId))
         flow.value = flow.value + stamped
+
+        database?.let { db ->
+            scope.launch {
+                try {
+                    db.chatMessageDao().insert(stamped)
+                } catch (e: Exception) {
+                    android.util.Log.e("ChatSessionStore", "Failed to persist message", e)
+                }
+            }
+        }
     }
 
     fun clear(characterId: String) {
         session(characterId).value = emptyList()
+        database?.let { db ->
+            scope.launch {
+                try {
+                    db.chatMessageDao().deleteByConversation(conversationIdFor(characterId))
+                } catch (e: Exception) {
+                    android.util.Log.e("ChatSessionStore", "Failed to delete messages", e)
+                }
+            }
+        }
     }
 
     fun clearAll() {
         sessions.values.forEach { it.value = emptyList() }
+        database?.let { db ->
+            scope.launch {
+                try {
+                    sessions.keys.forEach { charId ->
+                        db.chatMessageDao().deleteByConversation(conversationIdFor(charId))
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("ChatSessionStore", "Failed to clear all messages", e)
+                }
+            }
+        }
     }
 
     fun sessionCount(): Int = sessions.size
 
     private fun session(characterId: String): MutableStateFlow<List<ChatMessage>> =
-        sessions.getOrPut(characterId) { MutableStateFlow(emptyList()) }
+        sessions.getOrPut(characterId) {
+            val flow = MutableStateFlow<List<ChatMessage>>(emptyList())
+            database?.let { db ->
+                scope.launch {
+                    try {
+                        val convId = conversationIdFor(characterId)
+                        val stored = db.chatMessageDao().getMessagesPaged(convId, 300, 0)
+                        if (stored.isNotEmpty()) {
+                            flow.value = stored
+                            val maxId = stored.maxOfOrNull { it.id } ?: 0L
+                            if (maxId >= idCounter.get()) {
+                                idCounter.set(maxId + 1)
+                            }
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.e("ChatSessionStore", "Failed to load chat history for $characterId", e)
+                    }
+                }
+            }
+            flow
+        }
 }

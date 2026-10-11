@@ -21,8 +21,10 @@ class CharacterViewModel @Inject constructor(
     val showCreateDialog = MutableStateFlow(false)
     val editingCharacterId = MutableStateFlow<String?>(null)
     val newCharName = MutableStateFlow("")
+    val newCharDescription = MutableStateFlow("")
     val newCharPrompt = MutableStateFlow("")
     val newCharPersonality = MutableStateFlow("friendly")
+    val newCharAvatar = MutableStateFlow("🎭")
 
     private fun refresh() {
         _characters.value = characterManager.getAllCharacters()
@@ -36,8 +38,10 @@ class CharacterViewModel @Inject constructor(
     fun editCharacter(character: Character) {
         editingCharacterId.value = character.id
         newCharName.value = character.name
+        newCharDescription.value = character.description
         newCharPrompt.value = character.systemPrompt
         newCharPersonality.value = character.personality
+        newCharAvatar.value = character.avatar
         showCreateDialog.value = true
     }
 
@@ -50,15 +54,17 @@ class CharacterViewModel @Inject constructor(
         val name = newCharName.value.trim()
         val prompt = newCharPrompt.value.trim()
         val personality = newCharPersonality.value.trim()
+        val description = newCharDescription.value.trim()
+        val avatar = newCharAvatar.value.trim().ifEmpty { "🎭" }
         
         if (name.isBlank() || prompt.isBlank()) return
 
         val character = Character(
             id = editingCharacterId.value ?: "custom_${System.currentTimeMillis()}",
             name = name,
-            description = "Custom character",
+            description = description.ifEmpty { "Custom companion" },
             systemPrompt = prompt,
-            avatar = "🎭",
+            avatar = avatar,
             personality = personality.ifEmpty { "friendly" },
             languages = listOf("en", "bn"),
             isBuiltIn = false,
@@ -73,7 +79,9 @@ class CharacterViewModel @Inject constructor(
     fun clearForm() {
         editingCharacterId.value = null
         newCharName.value = ""
+        newCharDescription.value = ""
         newCharPrompt.value = ""
         newCharPersonality.value = "friendly"
+        newCharAvatar.value = "🎭"
     }
 }

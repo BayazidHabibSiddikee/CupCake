@@ -26,8 +26,9 @@ import com.cupcake.data.model.ChatMessage
 import com.cupcake.ui.component.ChatMessageItem
 import com.cupcake.ui.component.MessageInput
 import com.cupcake.ui.theme.CupCakeTheme
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.PeopleAlt
 import androidx.compose.material.icons.filled.Delete
 
@@ -196,15 +197,20 @@ fun CharacterHeader(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 androidx.compose.material3.IconButton(onClick = onBackClick) {
                     androidx.compose.material3.Icon(
-                        imageVector = androidx.compose.material.icons.Icons.Filled.ArrowBack,
+                        imageVector = androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Back"
                     )
                 }
+                com.cupcake.ui.component.CharacterAvatar(
+                    avatar = characterAvatar,
+                    modifier = Modifier.size(32.dp),
+                    emojiSize = 18.sp
+                )
+                androidx.compose.foundation.layout.Spacer(Modifier.size(8.dp))
                 Text(
-                    text = "$characterAvatar $characterName",
+                    text = characterName,
                     fontSize = 18.sp,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(start = 4.dp)
+                    fontWeight = FontWeight.Medium
                 )
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -251,16 +257,27 @@ fun CharacterPickerDialog(
                         ),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Text(
-                                text = "${character.avatar} ${character.name}",
-                                fontWeight = FontWeight.Medium
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            com.cupcake.ui.component.CharacterAvatar(
+                                avatar = character.avatar,
+                                modifier = Modifier.size(36.dp),
+                                emojiSize = 20.sp
                             )
-                            Text(
-                                text = character.description,
-                                fontSize = 12.sp,
-                                color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            Column {
+                                Text(
+                                    text = character.name,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    text = character.description,
+                                    fontSize = 12.sp,
+                                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
                 }

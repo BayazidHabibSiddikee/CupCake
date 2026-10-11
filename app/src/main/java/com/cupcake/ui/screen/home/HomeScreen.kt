@@ -142,11 +142,12 @@ fun CharacterCard(
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = character.avatar,
-                fontSize = 32.sp,
-                modifier = Modifier.padding(end = 16.dp)
+            com.cupcake.ui.component.CharacterAvatar(
+                avatar = character.avatar,
+                modifier = Modifier.size(52.dp),
+                emojiSize = 28.sp
             )
+            androidx.compose.foundation.layout.Spacer(Modifier.size(14.dp))
             Column {
                 Text(
                     character.name,
