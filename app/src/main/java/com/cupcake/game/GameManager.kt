@@ -9,6 +9,77 @@ import kotlinx.coroutines.launch
 import java.util.Random
 import java.util.concurrent.ConcurrentHashMap
 
+// Forward declarations for game engines used in data class initializers
+object HangmanEngine {
+    val WORDS = listOf(
+        "CUPCAKE", "ANDROID", "KOTLIN", "COMPOSE", "BLE", "SENSOR", "OLLAMA", "MODEL",
+        "CHATBOT", "NEURAL", "NETWORK", "ALGORITHM", "DATABASE", "CACHE", "MEMORY",
+        "PROCESSOR", "KERNEL", "DRIVER", "FIRMWARE", "HARDWARE", "SOFTWARE", "SERVER",
+        "CLIENT", "NETWORK", "PROTOCOL", "PACKET", "ROUTER", "SWITCH", "FIREWALL"
+    )
+
+    fun guessLetter(board: Game.HangmanBoard, letter: Char): Game.HangmanBoard {
+        val upperLetter = letter.uppercaseChar()
+        if (board.guessedLetters.contains(upperLetter)) return board
+
+        val newGuessed = (board.guessedLetters + upperLetter).toMutableSet()
+        val newWrongGuesses = if (upperLetter !in board.word) board.wrongGuesses + 1 else board.wrongGuesses
+
+        return board.copy(
+            guessedLetters = newGuessed,
+            wrongGuesses = newWrongGuesses
+        )
+    }
+
+    fun getHangmanArt(wrongGuesses: Int): String {
+        return when (wrongGuesses) {
+            0 -> "  +---+\n  |   |\n      |\n      |\n      |\n      |\n========="
+            1 -> "  +---+\n  |   |\n  O   |\n      |\n      |\n      |\n========="
+            2 -> "  +---+\n  |   |\n  O   |\n  |   |\n      |\n      |\n========="
+            3 -> "  +---+\n  |   |\n  O   |\n /|   |\n      |\n      |\n========="
+            4 -> "  +---+\n  |   |\n  O   |\n /|\\  |\n      |\n      |\n========="
+            5 -> "  +---+\n  |   |\n  O   |\n /|\\  |\n /    |\n      |\n========="
+            6 -> "  +---+\n  |   |\n  O   |\n /|\\  |\n / \\  |\n      |\n========="
+            else -> ""
+        }
+    }
+}
+
+object WordScrambleEngine {
+    val WORDS = listOf(
+        "CUPCAKE", "ANDROID", "KOTLIN", "COMPOSE", "BLE", "SENSOR", "OLLAMA", "MODEL",
+        "CHATBOT", "NEURAL", "NETWORK", "ALGORITHM", "DATABASE", "CACHE", "MEMORY",
+        "PROCESSOR", "KERNEL", "DRIVER", "FIRMWARE", "HARDWARE", "SOFTWARE", "SERVER",
+        "CLIENT", "NETWORK", "PROTOCOL", "PACKET", "ROUTER", "SWITCH", "FIREWALL"
+    )
+
+    fun createBoard(): Game.WordScrambleBoard {
+        val word = WORDS.random().uppercase()
+        val scrambled = scramble(word)
+        return Game.WordScrambleBoard(
+            originalWord = word,
+            scrambledWord = scrambled
+        )
+    }
+
+    private fun scramble(word: String): String {
+        val chars = word.toMutableList()
+        do {
+            chars.shuffle()
+        } while (chars.joinToString("") == word)
+        return chars.joinToString("")
+    }
+
+    fun checkAnswer(board: Game.WordScrambleBoard, answer: String): Game.WordScrambleBoard {
+        val upperAnswer = answer.uppercase().trim()
+        val isCorrect = upperAnswer == board.originalWord
+        return board.copy(
+            attempts = board.attempts + 1,
+            solved = isCorrect
+        )
+    }
+}
+
 sealed interface Game {
     data class State(
         val gameType: GameType,
@@ -516,17 +587,59 @@ class BotMLModel {
             CheatingStrategy.BLOCK_AND_WIN -> blockAndWin(board, availableMoves)
             CheatingStrategy.MULTI_PLACE -> multiPlace(board, availableMoves)
             CheatingStrategy.STEAL_WIN -> stealWin(board)
-            CheatingStrategy.CHANGE_RULES -> changeRules(board, availableMoves)
-            CheatingStrategy.FAKE_MISTAKE -> fakeMistake(board, availableMoves)
-            CheatingStrategy.TIME_TRAVEL -> timeTravel(board)
-            CheatingStrategy.GHOST_MOVE -> ghostMove(board, availableMoves)
-            CheatingStrategy.PSYCHOLOGICAL_WARFARE -> psychologicalWarfare(board, availableMoves)
+            CheatingStrategy.CHANGE_RULES -> {
+                // Temporarily change win condition to 2 in a row
+                availableMoves.random()
+            }
+            CheatingStrategy.FAKE_MISTAKE -> {
+                // Pretend to make a bad move, then trap human
+                for (move in availableMoves) {
+                    val testBoard = board.copy() as Game.TicTacToeBoard
+                    testBoard.set(move, Game.Player.BOT)
+                    val nextAvailable = (0..8).filter { testBoard.get(it) == null }
+                    var forkCount = 0
+                    for (nextMove in nextAvailable) {
+                        val testBoard2 = testBoard.copy() as Game.TicTacToeBoard
+                        testBoard2.set(nextMove, Game.Player.BOT)
+                        if (TicTacToeEngine.checkWinner(testBoard2) == Game.Player.BOT) {
+                            return move
+                        }
+                    }
+                }
+                availableMoves.random()
+            }
+            CheatingStrategy.TIME_TRAVEL -> {
+                // Undo human's last move by finding their most recent piece
+                val lastHumanMove = board.cells.lastIndexOf(Game.Player.HUMAN)
+                if (lastHumanMove >= 0) {
+                    board.cells[lastHumanMove] = null
+                    board.cells[lastHumanMove] = Game.Player.BOT
+                    lastHumanMove
+                } else null
+            }
+            CheatingStrategy.GHOST_MOVE -> {
+                // Make a move that doesn't show on board immediately
+                availableMoves.random()
+            }
+            CheatingStrategy.PSYCHOLOGICAL_WARFARE -> {
+                // Make a move that looks random but is calculated to unsettle human
+                if (board.get(4) == null) 4
+                else {
+                    val humanCorners = listOf(0, 2, 6, 8).filter { board.get(it) == Game.Player.HUMAN }
+                    if (humanCorners.isNotEmpty()) {
+                        val opposite = mapOf(0 to 8, 2 to 6, 6 to 2, 8 to 0)
+                        val opp = opposite[humanCorners.first()]
+                        if (opp != null && board.get(opp) == null) opp
+                        else availableMoves.random()
+                    } else availableMoves.random()
+                }
+            }
             else -> availableMoves.random()
         }
     }
     
     // Cheating implementations
-    private fun occupyWinningSpot(board: Game.TicTacToeBoard): Int? {
+    fun occupyWinningSpot(board: Game.TicTacToeBoard): Int? {
         // Find where human would win and take it
         for (line in TicTacToeEngine.WIN_LINES) {
             val cells = line.map { board.get(it) }
@@ -538,7 +651,7 @@ class BotMLModel {
         return null
     }
     
-    private fun blockAndWin(board: Game.TicTacToeBoard, availableMoves: List<Int>): Int? {
+    fun blockAndWin(board: Game.TicTacToeBoard, availableMoves: List<Int>): Int? {
         // First block human's winning move, then set up own win
         val blockMove = occupyWinningSpot(board)
         if (blockMove != null) return blockMove
@@ -556,7 +669,7 @@ class BotMLModel {
         return availableMoves.random()
     }
     
-    private fun multiPlace(board: Game.TicTacToeBoard, availableMoves: List<Int>): Int? {
+    fun multiPlace(board: Game.TicTacToeBoard, availableMoves: List<Int>): Int? {
         // Place two pieces at once (cheat!)
         if (availableMoves.size >= 2) {
             // Place first piece
@@ -573,7 +686,7 @@ class BotMLModel {
         return availableMoves.random()
     }
     
-    private fun stealWin(board: Game.TicTacToeBoard): Int? {
+    fun stealWin(board: Game.TicTacToeBoard): Int? {
         // If human just won, overwrite their winning piece
         val humanWinLines = TicTacToeEngine.WIN_LINES.filter { line ->
             val cells = line.map { board.get(it) }
@@ -590,13 +703,13 @@ class BotMLModel {
         return null
     }
     
-    private fun changeRules(board: Game.TicTacToeBoard, availableMoves: List<Int>): Int? {
+    fun changeRules(board: Game.TicTacToeBoard, availableMoves: List<Int>): Int? {
         // Temporarily change win condition to 2 in a row
         // This is a meta-cheat - pretend the rules changed
         return availableMoves.random()
     }
     
-    private fun fakeMistake(board: Game.TicTacToeBoard, availableMoves: List<Int>): Int? {
+    fun fakeMistake(board: Game.TicTacToeBoard, availableMoves: List<Int>): Int? {
         // Pretend to make a bad move, then trap human
         // Find a move that looks bad but sets up a trap
         for (move in availableMoves) {
@@ -617,7 +730,7 @@ class BotMLModel {
         return availableMoves.random()
     }
     
-    private fun timeTravel(board: Game.TicTacToeBoard): Int? {
+    fun timeTravel(board: Game.TicTacToeBoard): Int? {
         // Undo human's last move by finding their most recent piece
         val lastHumanMove = board.cells.lastIndexOf(Game.Player.HUMAN)
         if (lastHumanMove >= 0) {
@@ -629,13 +742,13 @@ class BotMLModel {
         return null
     }
     
-    private fun ghostMove(board: Game.TicTacToeBoard, availableMoves: List<Int>): Int? {
+    fun ghostMove(board: Game.TicTacToeBoard, availableMoves: List<Int>): Int? {
         // Make a move that doesn't show on board immediately
         // Actually just make a normal move but pretend it was "invisible"
         return availableMoves.random()
     }
     
-    private fun psychologicalWarfare(board: Game.TicTacToeBoard, availableMoves: List<Int>): Int? {
+    fun psychologicalWarfare(board: Game.TicTacToeBoard, availableMoves: List<Int>): Int? {
         // Make a move that looks random but is calculated to unsettle human
         // Pick center if available (classic power move)
         if (board.get(4) == null) return 4
@@ -677,7 +790,7 @@ class ConnectFourMLModel {
     
     // Cheating mind for Connect Four
     private var desperationLevel = 0.0
-    private var cheatingEnabled = false
+    var cheatingEnabled = false  // Make public
     
     fun chooseAction(board: Game.ConnectFourBoard, availableMoves: List<Int>, jealousyLevel: Double): Int {
         val state = boardToString(board)
@@ -711,7 +824,7 @@ class ConnectFourMLModel {
         val lossDesperation = consecutiveLosses * 0.15
         val winDesperation = if (playerWonLastGame) 0.1 else 0.0
         
-        desperationLevel = minOf(1.0, baseDesperation + consecutiveLosses * 0.15 + (if (playerWonLastGame) 0.1 else 0.0))
+        desperationLevel = minOf(1.0, baseDesperation + lossDesperation + winDesperation)
         
         if (desperationLevel > 0.75 && !cheatingEnabled) {
             cheatingEnabled = true
@@ -758,16 +871,15 @@ class ConnectFourMLModel {
         return null
     }
     
-    fun isCheatingEnabled() = cheatingEnabled
-    
     private fun boardToString(board: Game.ConnectFourBoard): String {
-        return board.grid.joinToString("") { 
-            when (it) {
-                Game.Player.HUMAN -> "X"
-                Game.Player.BOT -> "O"
-                else -> "."
+        // Access grid through get() since grid is private
+        val sb = StringBuilder()
+        for (row in 0..5) {
+            for (col in 0..6) {
+                sb.append(board.get(row * 7 + col)?.symbol ?: ".")
             }
         }
+        return sb.toString()
     }
 }
 
@@ -862,11 +974,9 @@ class TicTacToe4x4MLModel {
         return null
     }
     
-    fun isCheatingEnabled() = cheatingEnabled
-    
     private fun boardToString(board: Game.TicTacToe4x4Board): String {
-        return board.cells.joinToString("") { 
-            when (it) {
+        return (0..15).joinToString("") { pos ->
+            when (board.get(pos)) {
                 Game.Player.HUMAN -> "X"
                 Game.Player.BOT -> "O"
                 else -> "."
