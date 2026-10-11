@@ -2,9 +2,6 @@ package com.cupcake.ai
 
 import android.content.Context
 import android.util.Log
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.LifecycleOwner
 import com.cupcake.data.model.ModelConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -12,20 +9,26 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import kotlin.Result
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import okhttp3.Call
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import okhttp3.Response
-import okhttp3.sse.EventSource
-import okhttp3.sse.EventSourceListener
-import okhttp3.sse.EventSources
+import java.io.BufferedReader
 import java.io.IOException
+import java.io.InputStreamReader
+import java.util.Collections
 import java.util.concurrent.TimeUnit
+import kotlin.Result
 
 class OllamaEngine private constructor(
     private val okHttpClient: OkHttpClient,
@@ -64,6 +67,7 @@ class OllamaEngine private constructor(
 
     fun isReady(): Boolean = true
 
+    @Serializable
     data class OllamaChatRequest(
         val model: String,
         val messages: List<OllamaMessage>,
@@ -71,11 +75,13 @@ class OllamaEngine private constructor(
         val options: OllamaOptions? = null
     )
 
+    @Serializable
     data class OllamaMessage(
         val role: String,
         val content: String
     )
 
+    @Serializable
     data class OllamaOptions(
         val temperature: Float = 0.7f,
         val top_p: Float = 0.9f,
@@ -87,39 +93,37 @@ class OllamaEngine private constructor(
         val seed: Int = -1
     )
 
+    @Serializable
     data class OllamaChatResponse(
-        val model: String,
-        val created_at: String,
-        val message: OllamaMessage,
-        val done: Boolean,
-        val total_duration: Long? = null,
-        val load_duration: Long? = null,
-        val prompt_eval_count: Int? = null,
-        val prompt_eval_duration: Long? = null,
-        val eval_count: Int? = null,
-        val eval_duration: Long? = null
+        val model: String? = null,
+        val created_at: String? = null,
+        val message: OllamaMessage? = null,
+        val done: Boolean = false
     )
 
+    @Serializable
     data class OllamaModelsResponse(
-        val models: List<OllamaModelInfo>
+        val models: List<OllamaModelInfo> = emptyList()
     )
 
+    @Serializable
     data class OllamaModelInfo(
         val name: String,
-        val model: String,
-        val modified_at: String,
-        val size: Long,
-        val digest: String,
+        val model: String? = null,
+        val modified_at: String? = null,
+        val size: Long = 0L,
+        val digest: String? = null,
         val details: OllamaModelDetails? = null
     )
 
+    @Serializable
     data class OllamaModelDetails(
-        val parent_model: String,
-        val format: String,
-        val family: String,
-        val families: List<String>,
-        val parameter_size: String,
-        val quantization_level: String
+        val parent_model: String? = null,
+        val format: String? = null,
+        val family: String? = null,
+        val families: List<String>? = null,
+        val parameter_size: String? = null,
+        val quantization_level: String? = null
     )
 
     interface GenerateCallback {
@@ -128,115 +132,98 @@ class OllamaEngine private constructor(
         fun onError(error: String)
     }
 
-    private val generateMutex = kotlinx.coroutines.sync.Mutex()
+    private val generateMutex = Mutex()
+    private val activeCalls = Collections.synchronizedSet(HashSet<Call>())
 
     fun checkConnection(baseUrl: String): ReceiveChannel<Result<Boolean>> = Channel<Result<Boolean>>(1).apply {
         CoroutineScope(Dispatchers.IO).launch {
-            val channel = this@apply
             try {
-                val url = "$baseUrl/api/tags"
+                val cleanBase = baseUrl.removeSuffix("/v1").removeSuffix("/")
+                val url = "$cleanBase/api/tags"
                 val request = Request.Builder().url(url).get().build()
                 okHttpClient.newCall(request).execute().use { response ->
-                    if (response.isSuccessful) {
-                        channel.send(Result.success(true))
-                    } else {
-                        channel.send(Result.success(false))
-                    }
-                    channel.close()
+                    send(Result.success(response.isSuccessful))
                 }
             } catch (e: Exception) {
-                channel.send(Result.success(false))
-                channel.close()
+                send(Result.success(false))
+            } finally {
+                close()
             }
         }
     }
 
     fun listModels(baseUrl: String): ReceiveChannel<Result<List<OllamaModelInfo>>> = Channel<Result<List<OllamaModelInfo>>>(1).apply {
         CoroutineScope(Dispatchers.IO).launch {
-            val channel = this@apply
             try {
-                val url = "$baseUrl/api/tags"
+                val cleanBase = baseUrl.removeSuffix("/v1").removeSuffix("/")
+                val url = "$cleanBase/api/tags"
                 val request = Request.Builder().url(url).get().build()
                 okHttpClient.newCall(request).execute().use { response ->
                     if (response.isSuccessful) {
                         val body = response.body?.string() ?: "{}"
                         val result = json.decodeFromString<OllamaModelsResponse>(body)
-                        channel.send(Result.success(result.models))
+                        send(Result.success(result.models))
                     } else {
-                        channel.send(Result.failure(IOException("HTTP ${response.code}")))
+                        send(Result.failure(IOException("HTTP ${response.code}")))
                     }
-                    channel.close()
                 }
             } catch (e: Exception) {
-                channel.send(Result.failure(e))
-                channel.close()
+                send(Result.failure(e))
+            } finally {
+                close()
             }
         }
     }
 
     fun pullModel(baseUrl: String, modelName: String, onProgress: (String) -> Unit): ReceiveChannel<Result<Unit>> = Channel<Result<Unit>>(1).apply {
         CoroutineScope(Dispatchers.IO).launch {
-            val channel = this@apply
             try {
-                val url = "$baseUrl/api/pull"
-                val jsonBody = json.encodeToString(
-                    mapOf("name" to modelName, "stream" to true as Any)
-                )
+                val cleanBase = baseUrl.removeSuffix("/v1").removeSuffix("/")
+                val url = "$cleanBase/api/pull"
+                val jsonBody = json.encodeToString(mapOf("name" to modelName, "stream" to "true"))
                 val request = Request.Builder()
                     .url(url)
                     .post(jsonBody.toRequestBody("application/json".toMediaType()))
                     .build()
 
-                val eventSource = EventSources.createFactory(okHttpClient).newEventSource(request, object : EventSourceListener {
-                    override fun onOpen(eventSource: EventSource, response: Response) {
-                        Log.d(TAG, "Pull started for $modelName")
+                val call = okHttpClient.newCall(request)
+                activeCalls.add(call)
+                call.execute().use { response ->
+                    if (!response.isSuccessful) {
+                        send(Result.failure(IOException("HTTP ${response.code}: ${response.message}")))
+                        return@use
                     }
-
-                    override fun onEvent(eventSource: EventSource, id: String?, type: String?, data: String?) {
-                        data?.let {
-                            try {
-                                val progress = json.decodeFromString<Map<String, Any>>(it)
-                                val status = progress["status"] as? String ?: ""
-                                val completed = progress["completed"] as? Long ?: 0L
-                                val total = progress["total"] as? Long ?: 0L
-                                if (total > 0) {
-                                    onProgress("$status: ${(completed * 100 / total)}%")
-                                } else {
-                                    onProgress(status)
+                    val body = response.body ?: throw IOException("Empty response body")
+                    val reader = BufferedReader(InputStreamReader(body.byteStream()))
+                    var line: String?
+                    while (reader.readLine().also { line = it } != null) {
+                        line?.let { raw ->
+                            if (raw.isNotBlank()) {
+                                try {
+                                    val obj = json.decodeFromString<JsonObject>(raw)
+                                    val status = obj["status"]?.jsonPrimitive?.content ?: ""
+                                    val completed = obj["completed"]?.jsonPrimitive?.content?.toLongOrNull() ?: 0L
+                                    val total = obj["total"]?.jsonPrimitive?.content?.toLongOrNull() ?: 0L
+                                    if (total > 0) {
+                                        onProgress("$status: ${(completed * 100 / total)}%")
+                                    } else {
+                                        onProgress(status)
+                                    }
+                                } catch (e: Exception) {
+                                    onProgress(raw)
                                 }
-                            } catch (e: Exception) {
-                                onProgress(it)
                             }
                         }
                     }
-
-                    override fun onClosed(eventSource: EventSource) {
-                        Log.d(TAG, "Pull completed for $modelName")
-                        channel.send(Result.success(Unit))
-                        channel.close()
-                    }
-
-                    override fun onFailure(eventSource: EventSource?, t: Throwable, response: Response?) {
-                        Log.e(TAG, "Pull failed for $modelName", t)
-                        channel.send(Result.failure(t ?: IOException("Pull failed")))
-                        channel.close()
-                    }
-                })
-
-                // Keep reference to prevent GC
-                getOrCreateEventSourceRegistry().add(eventSource)
+                    send(Result.success(Unit))
+                }
             } catch (e: Exception) {
-                channel.send(Result.failure(e))
-                channel.close()
+                send(Result.failure(e))
+            } finally {
+                close()
             }
         }
     }
-
-    private val eventSourceRegistry = java.util.Collections.synchronizedSet(
-        java.util.HashSet<EventSource>()
-    )
-
-    private fun getOrCreateEventSourceRegistry(): java.util.Set<EventSource> = eventSourceRegistry
 
     fun generateStream(
         baseUrl: String,
@@ -251,8 +238,14 @@ class OllamaEngine private constructor(
                 return@launch
             }
             try {
-                val endpoint = config.effectiveEndpoint()
-                val url = "$endpoint/chat/completions"
+                val effectiveUrl = if (baseUrl.endsWith("/v1")) {
+                    baseUrl.removeSuffix("/v1").removeSuffix("/")
+                } else if (baseUrl.endsWith("/v1/")) {
+                    baseUrl.removeSuffix("/v1/").removeSuffix("/")
+                } else {
+                    baseUrl.removeSuffix("/")
+                }
+                val url = "$effectiveUrl/api/chat"
 
                 val requestBody = OllamaChatRequest(
                     model = config.modelName,
@@ -264,7 +257,7 @@ class OllamaEngine private constructor(
                         top_k = config.topK,
                         num_predict = config.maxTokens,
                         num_ctx = 4096,
-                        repeat_penalty = config.repeatPenalty,
+                        repeat_penalty = 1.1f,
                         repeat_last_n = 64,
                         seed = -1
                     )
@@ -276,59 +269,71 @@ class OllamaEngine private constructor(
                     .post(jsonBody.toRequestBody("application/json".toMediaType()))
                     .build()
 
-                if (config.useStreaming) {
-                    val eventSource = EventSources.createFactory(okHttpClient).newEventSource(request, object : EventSourceListener {
-                        override fun onOpen(eventSource: EventSource, response: Response) {
-                            Log.d(TAG, "Stream opened")
-                        }
+                val call = okHttpClient.newCall(request)
+                activeCalls.add(call)
 
-                        override fun onEvent(eventSource: EventSource, id: String?, type: String?, data: String?) {
-                            data?.let {
-                                if (it == "[DONE]") {
-                                    callback.onComplete()
-                                    return
-                                }
-                                try {
-                                    val chunk = json.decodeFromString<OllamaChatResponse>(it)
-                                    val content = chunk.message.content
-                                    if (content.isNotBlank()) {
-                                        callback.onToken(content)
-                                    }
-                                    if (chunk.done) {
-                                        callback.onComplete()
-                                    }
-                                } catch (e: Exception) {
-                                    Log.w(TAG, "Failed to parse stream chunk: $it", e)
-                                }
+                call.execute().use { response ->
+                    activeCalls.remove(call)
+                    if (!response.isSuccessful) {
+                        val errorBody = response.body?.string() ?: "HTTP ${response.code}"
+                        callback.onError("HTTP ${response.code}: $errorBody")
+                        return@use
+                    }
+
+                    val body = response.body
+                    if (body == null) {
+                        callback.onError("Response body was null")
+                        return@use
+                    }
+
+                    val reader = BufferedReader(InputStreamReader(body.byteStream()))
+                    var line: String?
+                    while (reader.readLine().also { line = it } != null) {
+                        val trimmed = line?.trim() ?: continue
+                        if (trimmed.isEmpty()) continue
+
+                        // Check for OpenAI format (SSE "data: ...") or raw Ollama NDJSON
+                        val jsonString = if (trimmed.startsWith("data:")) {
+                            val dataPayload = trimmed.removePrefix("data:").trim()
+                            if (dataPayload == "[DONE]") {
+                                callback.onComplete()
+                                break
                             }
+                            dataPayload
+                        } else {
+                            trimmed
                         }
 
-                        override fun onClosed(eventSource: EventSource) {
-                            Log.d(TAG, "Stream closed")
-                        }
+                        try {
+                            val jsonObj = json.decodeFromString<JsonObject>(jsonString)
 
-                        override fun onFailure(eventSource: EventSource?, t: Throwable, response: Response?) {
-                            Log.e(TAG, "Stream failed", t)
-                            callback.onError(t?.message ?: "Stream failed")
-                        }
-                    })
-
-                    eventSourceRegistry.add(eventSource)
-                } else {
-                    okHttpClient.newCall(request).execute().use { response ->
-                        if (response.isSuccessful) {
-                            val body = response.body?.string() ?: ""
-                            val result = json.decodeFromString<OllamaChatResponse>(body)
-                            val content = result.message.content
-                            if (content.isNotBlank()) {
+                            // Try Ollama native format: {"message": {"content": "..."}, "done": boolean}
+                            val messageObj = jsonObj["message"]?.jsonObject
+                            val content = messageObj?.get("content")?.jsonPrimitive?.content
+                            if (!content.isNullOrEmpty()) {
                                 callback.onToken(content)
                             }
-                            callback.onComplete()
-                        } else {
-                            val errorBody = response.body?.string() ?: "HTTP ${response.code}"
-                            callback.onError("HTTP ${response.code}: $errorBody")
+
+                            // Try OpenAI format: {"choices": [{"delta": {"content": "..."}}]}
+                            val choices = jsonObj["choices"]?.jsonArray
+                            if (choices != null && choices.isNotEmpty()) {
+                                val delta = choices[0].jsonObject["delta"]?.jsonObject
+                                val openAiContent = delta?.get("content")?.jsonPrimitive?.content
+                                if (!openAiContent.isNullOrEmpty()) {
+                                    callback.onToken(openAiContent)
+                                }
+                            }
+
+                            val isDone = jsonObj["done"]?.jsonPrimitive?.booleanOrNull == true
+                            if (isDone) {
+                                callback.onComplete()
+                                break
+                            }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Failed parsing chunk: $jsonString", e)
                         }
                     }
+                    callback.onComplete()
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Generation error", e)
@@ -340,7 +345,9 @@ class OllamaEngine private constructor(
     }
 
     fun cancel() {
-        eventSourceRegistry.forEach { it.cancel() }
-        eventSourceRegistry.clear()
+        synchronized(activeCalls) {
+            activeCalls.forEach { it.cancel() }
+            activeCalls.clear()
+        }
     }
 }

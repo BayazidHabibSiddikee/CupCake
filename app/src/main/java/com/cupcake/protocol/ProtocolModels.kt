@@ -1,18 +1,19 @@
 package com.cupcake.protocol
 
 import java.time.Instant
+import kotlinx.serialization.Serializable
 
 /**
  * Protocol data models for ESP32 communication.
- * These are kept in a separate file to avoid kapt duplicate class issues.
- * Made internal to prevent duplicate class generation by kapt.
  */
 
-internal sealed interface DecodedMessage
+@Serializable
+sealed interface DecodedMessage
 
-internal data class SensorData(
+@Serializable
+data class SensorData(
     val sequence: Long,
-    val timestamp: Instant,
+    val timestamp: Long,
     val accelX: Float,
     val accelY: Float,
     val accelZ: Float,
@@ -28,26 +29,31 @@ internal data class SensorData(
         get() = Math.sqrt((gyroX * gyroX + gyroY * gyroY + gyroZ * gyroZ).toDouble()).toFloat()
 }
 
-internal data class BatteryData(
+@Serializable
+data class BatteryData(
     val voltage: Float,
     val percentage: Float
 ) : DecodedMessage
 
-internal data class EventData(
+@Serializable
+data class EventData(
     val eventName: String,
-    val data: Map<String, Any>?
+    val data: Map<String, String>? = null
 ) : DecodedMessage
 
-internal data class CommandResponse(
+@Serializable
+data class CommandResponse(
     val id: String,
     val status: String,
-    val data: Map<String, Any>? = null,
+    val data: Map<String, String>? = null,
     val error: String? = null
 ) : DecodedMessage
 
-internal data class Command(
+@Serializable
+data class Command(
     val type: String = "control",
     val id: String = java.util.UUID.randomUUID().toString(),
     val action: String,
-    val params: Map<String, Any> = emptyMap()
-)
+    val params: Map<String, String> = emptyMap()
+) : DecodedMessage
+

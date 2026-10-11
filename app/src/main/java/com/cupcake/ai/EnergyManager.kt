@@ -8,6 +8,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.decodeFromString
 import java.io.File
 
 class EnergyManager(private val context: Context) {
@@ -59,7 +61,7 @@ class EnergyManager(private val context: Context) {
         try {
             val state = EnergyState(_energy.value, _isPro.value)
             energyFile.writeText(
-                kotlinx.serialization.json.Json.encodeToString(energyStateSerializer, state)
+                kotlinx.serialization.json.Json.encodeToString(state)
             )
         } catch (e: Exception) {
             Log.e(TAG, "Failed to save energy state", e)
@@ -122,33 +124,11 @@ class EnergyManager(private val context: Context) {
         return if (_isPro.value) 1f else (_energy.value.toFloat() / MAX_ENERGY).coerceIn(0f, 1f)
     }
 
+    @Serializable
     data class EnergyState(
         val energyRemaining: Long,
         val isPro: Boolean
     )
-
-    private val energyStateSerializer = object : kotlinx.serialization.KSerializer<EnergyState> {
-        override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
-            kotlinx.serialization.descriptors.buildClassSerialDescriptor("EnergyState") {
-                element<Long>("energyRemaining")
-                element<Boolean>("isPro")
-            }
-
-        override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: EnergyState) {
-            val output = encoder.encodeStructure(descriptor)
-            output.encodeLongElement(descriptor, 0, value.energyRemaining)
-            output.encodeBooleanElement(descriptor, 1, value.isPro)
-            output.finishStructure(descriptor)
-        }
-
-        override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): EnergyState {
-            val input = decoder.decodeStructure(descriptor)
-            val energyRemaining = input.decodeLongElement(descriptor, 0)
-            val isPro = input.decodeBooleanElement(descriptor, 1)
-            input.finishStructure(descriptor)
-            return EnergyState(energyRemaining, isPro)
-        }
-    }
 }
 
 // Ad Manager (placeholder for Google AdMob integration)

@@ -10,8 +10,8 @@ class BotMLModel {
     private val explorationRate = 0.1
     private val random = Random()
 
-    var jealousyLevel = 0.0
-    var angerLevel = 0.0
+    private var jealousyLevel = 0.0
+    private var angerLevel = 0.0
     internal var playerWins = 0
     internal var botWins = 0
     internal var totalGames = 0
@@ -96,8 +96,8 @@ class BotMLModel {
         updateQValue(state, action, reward, nextState)
     }
 
-    fun getJealousyLevel() = jealousyLevel
-    fun getAngerLevel() = angerLevel
+    fun getJealousyLevel(): Double = jealousyLevel
+    fun getAngerLevel(): Double = angerLevel
     fun getPlayerWins() = playerWins
     fun getBotWins() = botWins
     fun getTotalGames() = totalGames
@@ -110,7 +110,7 @@ class BotMLModel {
 
     private var desperationLevel = 0.0
     var cheatingEnabled = false
-    var currentCheatingStrategy = CheatingStrategy.NONE
+    private var currentCheatingStrategy = CheatingStrategy.NONE
     private var cheatCount = 0
     private var lastCheatTime = 0L
     private var humanSuspectsCheating = false
@@ -238,7 +238,7 @@ class BotMLModel {
 
     fun getDesperationLevel() = desperationLevel
     fun isCheatingEnabled() = cheatingEnabled
-    fun getCurrentCheatingStrategy() = currentCheatingStrategy
+    fun getCurrentCheatingStrategy(): CheatingStrategy = currentCheatingStrategy
     fun getCheatCount() = cheatCount
     fun getHumanSuspectsCheating() = humanSuspectsCheating
     fun recordCheatDetected() { humanSuspectsCheating = true; desperationLevel = minOf(1.0, desperationLevel + 0.1) }

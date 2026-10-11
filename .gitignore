@@ -6,6 +6,7 @@ out/
 *.bin
 *.elf
 *.map
+app/src/main/assets/ollama/
 
 # Gradle
 .gradle/

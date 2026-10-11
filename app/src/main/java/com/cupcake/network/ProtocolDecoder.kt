@@ -8,35 +8,14 @@ import com.cupcake.protocol.EventData
 import com.cupcake.protocol.BatteryData
 import com.cupcake.protocol.SensorData
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.decodeFromString
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.time.Instant
 
 /**
  * Kotlin port of ESP32 ProtocolHandler for decoding binary BLE notifications.
- * Binary format (little-endian):
- *
- * Sensor Data (0x01) - 37 bytes:
- *   [type:1][sequence:4][timestamp:4][accelX:4][accelY:4][accelZ:4][gyroX:4][gyroY:4][gyroZ:4][temp:4]
- *
- * Battery (0x02) - 9 bytes:
- *   [type:1][voltage:4][percentage:4]
- *
- * Event (0x03) - variable:
- *   [type:1][event_len:1][event_string][json payload]
- *
- * Ping (0x04) - 5 bytes:
- *   [type:1][timestamp:4]
- *
- * Pong (0x84) - 5 bytes:
- *   [type:1][timestamp:4]
- *
- * Response (0x80) - JSON:
- *   id / status / data / error
- *
- * Command (0x81) - JSON or binary
  */
-
 object ProtocolDecoder {
 
     private const val TAG = "ProtocolDecoder"
@@ -51,7 +30,6 @@ object ProtocolDecoder {
     const val MSG_TYPE_RESPONSE = 0x80
     const val MSG_TYPE_COMMAND = 0x81
 
-    // Expected payload sizes
     const val SENSOR_PAYLOAD_SIZE = 37 // 1 + 4 + 4 + 7*4
     const val BATTERY_PAYLOAD_SIZE = 9  // 1 + 2*4
     const val PING_PONG_PAYLOAD_SIZE = 5 // 1 + 4
@@ -96,7 +74,7 @@ object ProtocolDecoder {
         val temperature = buffer.getFloat()
         return SensorData(
             sequence = sequence,
-            timestamp = Instant.ofEpochMilli(timestamp),
+            timestamp = timestamp,
             accelX = accelX,
             accelY = accelY,
             accelZ = accelZ,
@@ -122,7 +100,7 @@ object ProtocolDecoder {
         val timestamp = buffer.getInt().toLong().and(0xFFFFFFFFL)
         return EventData(
             eventName = "ping",
-            data = mapOf("timestamp" to timestamp)
+            data = mapOf("timestamp" to timestamp.toString())
         )
     }
 
@@ -133,7 +111,7 @@ object ProtocolDecoder {
         val timestamp = buffer.getInt().toLong().and(0xFFFFFFFFL)
         return EventData(
             eventName = "pong",
-            data = mapOf("timestamp" to timestamp)
+            data = mapOf("timestamp" to timestamp.toString())
         )
     }
 
@@ -142,12 +120,12 @@ object ProtocolDecoder {
         val eventLen = (data[1].toInt() and 0xFF)
         if (data.size < 2 + eventLen) return null
         val eventName = String(data.copyOfRange(2, 2 + eventLen))
-        var jsonData: Map<String, Any>? = null
+        var jsonData: Map<String, String>? = null
         if (data.size > 2 + eventLen) {
             val jsonBytes = data.copyOfRange(2 + eventLen, data.size)
             val jsonStr = String(jsonBytes)
             try {
-                jsonData = json.decodeFromString<Map<String, Any>>(jsonStr)
+                jsonData = json.decodeFromString<Map<String, String>>(jsonStr)
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to parse event JSON: $jsonStr", e)
             }
@@ -203,7 +181,7 @@ object ProtocolDecoder {
         fun startStreaming(deviceId: String, intervalMs: Int = 100): Command {
             return Command(
                 action = "start_streaming",
-                params = mapOf("deviceId" to deviceId, "intervalMs" to intervalMs)
+                params = mapOf("deviceId" to deviceId, "intervalMs" to intervalMs.toString())
             )
         }
 
@@ -217,7 +195,7 @@ object ProtocolDecoder {
         fun setSensorInterval(deviceId: String, intervalMs: Int): Command {
             return Command(
                 action = "set_interval",
-                params = mapOf("deviceId" to deviceId, "intervalMs" to intervalMs)
+                params = mapOf("deviceId" to deviceId, "intervalMs" to intervalMs.toString())
             )
         }
 

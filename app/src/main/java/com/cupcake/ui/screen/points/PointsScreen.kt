@@ -1,61 +1,64 @@
 package com.cupcake.ui.screen.points
 
-import androidx.compose.foundation.border
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.autoMirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.graphics.BorderStroke
-import androidx.compose.ui.graphics.Color
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.cupcake.game.PointsManager
 import com.cupcake.ui.theme.CupCakeTheme
 import com.cupcake.ui.theme.CuteCard
 import com.cupcake.ui.theme.GoldAccent
-import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.cupcake.game.PointsManager
-import com.cupcake.game.PointsManager.Companion.GameStats
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+data class AchievementData(
+    val id: String,
+    val title: String,
+    val description: String,
+    val icon: ImageVector,
+    val rarity: String
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PointsScreen(
     onClose: () -> Unit,
@@ -69,57 +72,31 @@ fun PointsScreen(
     val gameStats by viewModel.gameStats.collectAsStateWithLifecycle()
     val achievements by viewModel.achievements.collectAsStateWithLifecycle()
     val (currentXp, nextXp) = viewModel.getLevelProgress()
-    
-    var showConfetti by remember { mutableStateOf(false) }
-    var selectedTab by remember { mutableStateOf(0) }
-    
+
+    var selectedTab by remember { mutableIntStateOf(0) }
     val tabs = listOf("Profile", "Achievements", "Stats")
 
     CupCakeTheme {
         Column(Modifier.fillMaxSize()) {
             TopAppBar(
                 title = { Text("Rewards") },
-                navigationIcon = { 
-                    IconButton(onClick = onClose) { 
-                        Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") 
-                    } 
+                navigationIcon = {
+                    IconButton(onClick = onClose) {
+                        Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                 )
             )
 
-            Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                // Profile Tab
-                if (selectedTab == 0) {
-                    ProfileTab(
-                        points = points,
-                        level = level,
-                        xpProgress = xpProgress,
-                        currentXp = currentXp,
-                        nextXp = nextXp,
-                        totalGamesPlayed = totalGamesPlayed,
-                        totalWins = totalWins,
-                        showConfetti = { /* confetti disabled for now */ }
-                    )
-                }
-                
-                // Achievements Tab
-                else if (selectedTab == 1) {
-                    AchievementsTab(achievements = achievements)
-                }
-                
-                // Stats Tab
-                else {
-                    StatsTab(
-                        gameStats = gameStats,
-                        totalGamesPlayed = totalGamesPlayed,
-                        totalWins = totalWins
-                    )
-                }
-                
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
                 // Tab Bar
-                androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(top = 16.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly
@@ -133,9 +110,9 @@ fun PointsScreen(
                                 .height(56.dp),
                             onClick = { selectedTab = index },
                             colors = CardDefaults.cardColors(
-                                containerColor = if (isSelected) 
+                                containerColor = if (isSelected)
                                     MaterialTheme.colorScheme.primaryContainer
-                                    else MaterialTheme.colorScheme.surfaceContainerLow
+                                else MaterialTheme.colorScheme.surfaceContainerLow
                             ),
                             shape = RoundedCornerShape(16.dp),
                             elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 4.dp else 2.dp)
@@ -147,13 +124,31 @@ fun PointsScreen(
                                 Text(
                                     text = tab,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (isSelected) 
+                                    color = if (isSelected)
                                         MaterialTheme.colorScheme.onPrimaryContainer
-                                        else MaterialTheme.colorScheme.onSurfaceVariant
+                                    else MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
                     }
+                }
+
+                when (selectedTab) {
+                    0 -> ProfileTab(
+                        points = points,
+                        level = level,
+                        xpProgress = xpProgress,
+                        currentXp = currentXp,
+                        nextXp = nextXp,
+                        totalGamesPlayed = totalGamesPlayed,
+                        totalWins = totalWins
+                    )
+                    1 -> AchievementsTab(achievements = achievements)
+                    else -> StatsTab(
+                        gameStats = gameStats,
+                        totalGamesPlayed = totalGamesPlayed,
+                        totalWins = totalWins
+                    )
                 }
             }
         }
@@ -168,38 +163,33 @@ fun ProfileTab(
     currentXp: Long,
     nextXp: Long,
     totalGamesPlayed: Int,
-    totalWins: Int,
-    showConfetti: () -> Unit
+    totalWins: Int
 ) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        // Level Card
         CuteCard {
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(
-                    text = "🏆",
-                    fontSize = 64.sp
-                )
-                
+                Text(text = "🏆", fontSize = 64.sp)
                 Text(
                     text = "Level $level",
                     fontSize = 36.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
                 )
-                
                 Text(
                     text = "💖 $points total points",
                     fontSize = 18.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                
+
                 // XP Progress Bar
                 Column(
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Row(
@@ -209,7 +199,7 @@ fun ProfileTab(
                         Text("XP to next level", fontSize = 14.sp, fontWeight = FontWeight.Medium)
                         Text("$currentXp / $nextXp XP", fontSize = 14.sp, fontWeight = FontWeight.Medium)
                     }
-                    
+
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -219,7 +209,7 @@ fun ProfileTab(
                     ) {
                         Box(
                             modifier = Modifier
-                                .width((xpProgress * 100).toInt())
+                                .fillMaxWidth(fraction = xpProgress.coerceIn(0f, 1f))
                                 .fillMaxHeight()
                                 .background(
                                     color = MaterialTheme.colorScheme.primary,
@@ -227,17 +217,21 @@ fun ProfileTab(
                                 )
                         )
                     }
-                    
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Level ${level + 1} needs ${nextXp - currentXp} more XP", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            "Level ${level + 1} needs ${nextXp - currentXp} more XP",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
         }
-        
+
         // Quick Stats
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -262,7 +256,7 @@ fun ProfileTab(
                 color = MaterialTheme.colorScheme.tertiary
             )
         }
-        
+
         // Level Rewards Preview
         CuteCard {
             Column(
@@ -270,8 +264,12 @@ fun ProfileTab(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text("✨ Level Rewards", fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                Text("Unlock cute rewards as you level up!", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                
+                Text(
+                    "Unlock cute rewards as you level up!",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -287,15 +285,14 @@ fun ProfileTab(
 }
 
 @Composable
-fun StatCard(
-    modifier: Modifier = Modifier,
+fun RowScope.StatCard(
     emoji: String,
     label: String,
     value: String,
     color: Color
 ) {
     Card(
-        modifier = modifier
+        modifier = Modifier
             .weight(1f)
             .height(100.dp),
         colors = CardDefaults.cardColors(
@@ -304,7 +301,9 @@ fun StatCard(
         shape = RoundedCornerShape(20.dp)
     ) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(16.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
@@ -316,26 +315,27 @@ fun StatCard(
 }
 
 @Composable
-fun LevelRewardIcon(
-    modifier: Modifier = Modifier,
+fun RowScope.LevelRewardIcon(
     level: Int,
     title: String,
     emoji: String,
     unlocked: Boolean
 ) {
     Card(
-        modifier = modifier
+        modifier = Modifier
             .weight(1f)
             .height(100.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (unlocked) 
+            containerColor = if (unlocked)
                 MaterialTheme.colorScheme.primaryContainer
-                else MaterialTheme.colorScheme.surfaceContainerHighest
+            else MaterialTheme.colorScheme.surfaceContainerHighest
         ),
         shape = RoundedCornerShape(16.dp)
     ) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(12.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
@@ -344,16 +344,16 @@ fun LevelRewardIcon(
                 text = if (unlocked) "✨ $title" else "🔒 $title",
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
-                color = if (unlocked) 
+                color = if (unlocked)
                     MaterialTheme.colorScheme.onPrimaryContainer
-                    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
             )
             Text(
                 text = "Level $level",
                 fontSize = 11.sp,
-                color = if (unlocked) 
+                color = if (unlocked)
                     MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
             )
         }
     }
@@ -361,21 +361,21 @@ fun LevelRewardIcon(
 
 @Composable
 fun AchievementsTab(achievements: Set<String>) {
-    val achievementData = remember { 
+    val achievementData = remember {
         listOf(
             AchievementData("first_win", "First Victory", "Win your first game", Icons.Filled.EmojiEvents, "common"),
-            AchievementData("casual_player", "Casual Player", "Play 10 games", Icons.Filled.SportsEsports, "common"),
+            AchievementData("casual_player", "Casual Player", "Play 10 games", Icons.Filled.Star, "common"),
             AchievementData("regular_player", "Regular Player", "Play 50 games", Icons.Filled.Star, "rare"),
-            AchievementData("dedicated_player", "Dedicated Player", "Play 100 games", Icons.Filled.Diamond, "rare"),
-            AchievementData("hardcore_player", "Hardcore Player", "Play 500 games", Icons.Filled.MilitaryTech, "epic"),
-            AchievementData("legendary_player", "Legendary", "Play 1000 games", Icons.Filled.WorkspacePremium, "legendary"),
-            AchievementData("point_collector", "Point Collector", "Earn 1,000 points", Icons.Filled.AutoAwesome, "common"),
-            AchievementData("point_hoarder", "Point Hoarder", "Earn 10,000 points", Icons.Filled.LocalFireDepartment, "rare"),
-            AchievementData("point_millionaire", "Point Millionaire", "Earn 100,000 points", Icons.Filled.WorkspacePremium, "legendary"),
-            AchievementData("polymath", "Polymath", "Try all 10 games", Icons.Filled.Palette, "epic"),
+            AchievementData("dedicated_player", "Dedicated Player", "Play 100 games", Icons.Filled.EmojiEvents, "rare"),
+            AchievementData("hardcore_player", "Hardcore Player", "Play 500 games", Icons.Filled.EmojiEvents, "epic"),
+            AchievementData("legendary_player", "Legendary", "Play 1000 games", Icons.Filled.EmojiEvents, "legendary"),
+            AchievementData("point_collector", "Point Collector", "Earn 1,000 points", Icons.Filled.Star, "common"),
+            AchievementData("point_hoarder", "Point Hoarder", "Earn 10,000 points", Icons.Filled.Star, "rare"),
+            AchievementData("point_millionaire", "Point Millionaire", "Earn 100,000 points", Icons.Filled.EmojiEvents, "legendary"),
+            AchievementData("polymath", "Polymath", "Try all 10 games", Icons.Filled.EmojiEvents, "epic")
         )
     }
-    
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -390,28 +390,28 @@ fun AchievementsTab(achievements: Set<String>) {
     }
 }
 
-
-
 @Composable
 fun AchievementCard(data: AchievementData, unlocked: Boolean) {
     val (bgColor, borderColor, iconColor) = when (data.rarity) {
-        "common" -> MaterialTheme.colorScheme.surfaceContainerLow to MaterialTheme.colorScheme.outlineVariant to MaterialTheme.colorScheme.primary
-        "rare" -> MaterialTheme.colorScheme.secondaryContainer to MaterialTheme.colorScheme.secondary to MaterialTheme.colorScheme.secondary
-        "epic" -> MaterialTheme.colorScheme.tertiaryContainer to MaterialTheme.colorScheme.tertiary to MaterialTheme.colorScheme.tertiary
-        "legendary" -> GoldAccent.copy(alpha = 0.2f) to GoldAccent to GoldAccent
-        else -> MaterialTheme.colorScheme.surfaceContainerLow to MaterialTheme.colorScheme.outlineVariant to MaterialTheme.colorScheme.primary
+        "common" -> Triple(MaterialTheme.colorScheme.surfaceContainerLow, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.colorScheme.primary)
+        "rare" -> Triple(MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.secondary, MaterialTheme.colorScheme.secondary)
+        "epic" -> Triple(MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.tertiary, MaterialTheme.colorScheme.tertiary)
+        "legendary" -> Triple(GoldAccent.copy(alpha = 0.2f), GoldAccent, GoldAccent)
+        else -> Triple(MaterialTheme.colorScheme.surfaceContainerLow, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.colorScheme.primary)
     }
-    
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = if (unlocked) bgColor else MaterialTheme.colorScheme.surfaceContainerHighest
         ),
         shape = RoundedCornerShape(20.dp),
-        border = if (unlocked) androidx.compose.foundation.border(2.dp, borderColor, RoundedCornerShape(20.dp)) else null
+        border = if (unlocked) BorderStroke(2.dp, borderColor) else null
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -425,11 +425,8 @@ fun AchievementCard(data: AchievementData, unlocked: Boolean) {
                     tint = if (unlocked) iconColor else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
                     modifier = Modifier.size(28.dp)
                 )
-                if (unlocked) {
-                    androidx.compose.foundation.border.BorderStroke(2.dp, GoldAccent)
-                }
             }
-            
+
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(2.dp)
@@ -446,16 +443,16 @@ fun AchievementCard(data: AchievementData, unlocked: Boolean) {
                     color = if (unlocked) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
                 )
             }
-            
+
             if (unlocked) {
-                androidx.compose.material3.Icon(
-                    imageVector = Icons.Filled.CheckCircle,
+                Icon(
+                    imageVector = Icons.Filled.EmojiEvents,
                     contentDescription = "Unlocked",
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(24.dp)
                 )
             } else {
-                androidx.compose.material3.Icon(
+                Icon(
                     imageVector = Icons.Filled.Lock,
                     contentDescription = "Locked",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
@@ -512,7 +509,7 @@ fun GameStatCard(
         com.cupcake.game.Game.GameType.REACTION_TIME -> "⚡" to MaterialTheme.colorScheme.error
         com.cupcake.game.Game.GameType.CLICKER -> "🧁" to MaterialTheme.colorScheme.primary
     }
-    
+
     CuteCard {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -525,15 +522,19 @@ fun GameStatCard(
             ) {
                 Text(text = emoji, fontSize = 28.sp)
             }
-            
+
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(text = gameType.name.replace("_", " "), fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                Text(text = "${stats.wins}/${stats.gamesPlayed} wins • $winRate% win rate", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    text = "${stats.wins}/${stats.gamesPlayed} wins • $winRate% win rate",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
-            
+
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(2.dp)
@@ -544,5 +545,3 @@ fun GameStatCard(
         }
     }
 }
-
-

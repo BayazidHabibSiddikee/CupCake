@@ -29,12 +29,15 @@ import com.cupcake.protocol.EventData
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.asFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
-import suspendCoroutine
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
+import kotlin.coroutines.Continuation
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
@@ -70,6 +73,38 @@ class BleGattClient(private val context: Context) {
         private const val NUS_TX_UUID_STR = "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"
         private const val NUS_RX_UUID_STR = "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"
         private const val CCCD_UUID_STR = "00002902-0000-1000-8000-00805F9B34FB"
+
+        /**
+         * Check if BLE is supported and enabled.
+         */
+        fun isBleSupported(context: Context): Boolean {
+            val manager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
+            val adapter = manager?.adapter
+            return adapter != null && adapter.isEnabled
+        }
+
+        /**
+         * Request BLE permissions (Android 12+).
+         */
+        fun requestPermissions(activity: android.app.Activity, requestCode: Int) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                activity.requestPermissions(
+                    arrayOf(
+                        android.Manifest.permission.BLUETOOTH_SCAN,
+                        android.Manifest.permission.BLUETOOTH_CONNECT,
+                        android.Manifest.permission.BLUETOOTH_ADVERTISE
+                    ),
+                    requestCode
+                )
+            } else {
+                activity.requestPermissions(
+                    arrayOf(
+                        android.Manifest.permission.ACCESS_FINE_LOCATION
+                    ),
+                    requestCode
+                )
+            }
+        }
     }
 
     // Nordic UART Service UUIDs
@@ -79,9 +114,9 @@ class BleGattClient(private val context: Context) {
     private val CCCD_UUID = UUID.fromString(CCCD_UUID_STR)
 
     // State
-    private val bluetoothManager: BluetoothManager = context.getSystemService(Context.BLUETOOTH_MANAGER)!!
-    private val bluetoothAdapter: BluetoothAdapter = bluetoothManager.adapter!!
-    private val scanner: BluetoothLeScanner = bluetoothAdapter.bluetoothLeScanner!!
+    private val bluetoothManager: BluetoothManager? = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
+    private val bluetoothAdapter: BluetoothAdapter? = bluetoothManager?.adapter
+    private val scanner: BluetoothLeScanner? = bluetoothAdapter?.bluetoothLeScanner
 
     private val gattRef = AtomicReference<BluetoothGatt?>(null)
     private val txCharacteristicRef = AtomicReference<BluetoothGattCharacteristic?>(null)
@@ -91,6 +126,7 @@ class BleGattClient(private val context: Context) {
     private val isConnecting = AtomicBoolean(false)
     private val isConnected = AtomicBoolean(false)
     private val reconnectAttempts = AtomicInteger(0)
+    private val currentMtu = AtomicInteger(23)
     private val targetDeviceRef = AtomicReference<BluetoothDevice?>(null)
     private val pendingScanCallback = AtomicReference<ScanCallback?>(null)
     private val pendingGattCallback = AtomicReference<BluetoothGattCallback?>(null)
@@ -108,10 +144,10 @@ class BleGattClient(private val context: Context) {
     
     // Connection state flow
     private val connectionStateFlow = MutableSharedFlow<ConnectionState>(replay = 1)
-    val connectionState = connectionStateFlow.asFlow()
+    val connectionState = connectionStateFlow.asSharedFlow()
 
     private val scanResults = MutableSharedFlow<ScanResult>(extraBufferCapacity = 20)
-    val scanResultsFlow = scanResults.asFlow()
+    val scanResultsFlow = scanResults.asSharedFlow()
 
     // Pending command responses
     private val pendingCommands = ConcurrentHashMap<String, CommandCompleter>()
@@ -127,7 +163,7 @@ class BleGattClient(private val context: Context) {
 
     private class CommandCompleter(
         val commandId: String,
-        val continuation: kotlinx.coroutines.continuation.Continuation<CommandResponse>
+        val continuation: Continuation<CommandResponse>
     )
 
     /**
@@ -173,7 +209,13 @@ class BleGattClient(private val context: Context) {
 
         pendingScanCallback.set(callback)
 
-        scanner.startScan(filters, settings, callback)
+        val s = scanner
+        if (s == null) {
+            Log.e(TAG, "BluetoothLeScanner not available")
+            isScanning.set(false)
+            return false
+        }
+        s.startScan(filters, settings, callback)
 
         // Auto-stop scan after timeout
         handler.postDelayed({
@@ -193,7 +235,7 @@ class BleGattClient(private val context: Context) {
     fun stopScan() {
         if (isScanning.getAndSet(false)) {
             val callback = pendingScanCallback.getAndSet(null)
-            callback?.let { scanner.stopScan(it) }
+            callback?.let { scanner?.stopScan(it) }
         }
     }
 
@@ -264,6 +306,7 @@ class BleGattClient(private val context: Context) {
                 scope.launch {
                     if (status == BluetoothGatt.GATT_SUCCESS) {
                         Log.i(TAG, "MTU negotiated: $mtu")
+                        currentMtu.set(mtu)
                         discoverServices(gatt)
                     } else {
                         Log.w(TAG, "MTU negotiation failed: $status, proceeding with default")
@@ -378,11 +421,7 @@ class BleGattClient(private val context: Context) {
         isConnected.set(true)
         reconnectAttempts.set(0)
 
-        val mtu = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            gatt.mtu
-        } else {
-            20
-        }
+        val mtu = currentMtu.get()
 
         Log.i(TAG, "Nordic UART setup complete, MTU=$mtu")
         connectionStateFlow.tryEmit(ConnectionState.Connected(deviceName, mtu))
@@ -454,8 +493,11 @@ class BleGattClient(private val context: Context) {
         }
 
         return kotlinx.coroutines.withTimeoutOrNull(5000) {
-            suspendCoroutine { cont -
+            suspendCancellableCoroutine { cont ->
                 pendingCommands[command.id] = CommandCompleter(command.id, cont)
+                cont.invokeOnCancellation {
+                    pendingCommands.remove(command.id)
+                }
             }
         }
     }
@@ -513,38 +555,5 @@ class BleGattClient(private val context: Context) {
         scope.cancel()
         handler.removeCallbacksAndMessages(null)
     }
-
-    companion object {
-        /**
-         * Check if BLE is supported and enabled.
-         */
-        fun isBleSupported(context: Context): Boolean {
-            val manager = context.getSystemService(Context.BLUETOOTH_MANAGER) as BluetoothManager
-            val adapter = manager.adapter
-            return adapter != null && adapter.isEnabled
-        }
-
-        /**
-         * Request BLE permissions (Android 12+).
-         */
-        fun requestPermissions(activity: android.app.Activity, requestCode: Int) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                activity.requestPermissions(
-                    arrayOf(
-                        android.Manifest.permission.BLUETOOTH_SCAN,
-                        android.Manifest.permission.BLUETOOTH_CONNECT,
-                        android.Manifest.permission.BLUETOOTH_ADVERTISE
-                    ),
-                    requestCode
-                )
-            } else {
-                activity.requestPermissions(
-                    arrayOf(
-                        android.Manifest.permission.ACCESS_FINE_LOCATION
-                    ),
-                    requestCode
-                )
-            }
-        }
-    }
 }
+
