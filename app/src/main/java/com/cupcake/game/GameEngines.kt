@@ -122,7 +122,7 @@ object GuessNumberEngine {
     }
 
     fun getHint(board: Game.GuessNumberBoard): String {
-        val remaining = 100 - board.guesses.size
+        val remaining = 10 - board.guesses.size
         return when {
             board.guesses.isEmpty() -> "I'm thinking of a number between 1 and 100. You have $remaining guesses!"
             board.lastResult == Game.GuessNumberBoard.GuessResult.TOO_HIGH -> "Too high! 📉 $remaining guesses left. Range: 1-${board.lastGuess!! - 1}"

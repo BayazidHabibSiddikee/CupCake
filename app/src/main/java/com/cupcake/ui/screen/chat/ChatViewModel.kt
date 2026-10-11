@@ -42,7 +42,8 @@ class ChatViewModel @Inject constructor(
     private val espServer: EspWebSocketServer,
     private val ttsManager: TtsManager,
     private val energyManager: EnergyManager,
-    private val getApiProvidersUseCase: GetApiProvidersUseCase
+    private val getApiProvidersUseCase: GetApiProvidersUseCase,
+    private val modelDownloadManager: com.cupcake.ai.ModelDownloadManager
 ) : ViewModel() {
 
     val characterId: String =
@@ -108,18 +109,20 @@ class ChatViewModel @Inject constructor(
     fun ensureModelLoaded() {
         val config = _modelConfig.value
         if (config.isLocal()) {
-            if (LlamaEngine.getInstance().isReady()) {
+            val targetModel = config.modelName
+            if (LlamaEngine.getInstance().isReady() && LlamaEngine.getInstance().getLoadedModelName() == targetModel) {
                 _modelLoadState.value = ModelLoadState.Ready
                 return
             }
-            _modelLoadState.value = ModelLoadState.Loading("Loading local Qwen model...")
+            _modelLoadState.value = ModelLoadState.Loading("Loading $targetModel...")
             viewModelScope.launch(Dispatchers.IO) {
                 try {
                     LlamaEngine.initialize(appContext)
                     val result = LlamaEngine.getInstance().loadModel(
                         context = appContext,
                         config = LlamaEngine.Config(
-                            modelFileName = "models/${config.modelName}",
+                            modelFileName = "models/$targetModel",
+                            nCtx = 1024,
                             maxTokens = config.maxTokens,
                             temperature = config.temperature,
                             topP = config.topP,
@@ -128,7 +131,7 @@ class ChatViewModel @Inject constructor(
                     ) { copiedBytes, totalBytes ->
                         if (totalBytes > 0) {
                             val pct = (copiedBytes * 100 / totalBytes).toInt()
-                            _modelLoadState.value = ModelLoadState.Loading("Extracting model: $pct%")
+                            _modelLoadState.value = ModelLoadState.Loading("Loading model: $pct%")
                         }
                     }
                     _modelLoadState.value = if (result.isSuccess) {
@@ -170,6 +173,16 @@ class ChatViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
+            modelDownloadManager.activeModel.collect { activeLocalModel ->
+                if (_modelConfig.value.isLocal()) {
+                    if (_modelConfig.value.modelName != activeLocalModel) {
+                        _modelConfig.value = _modelConfig.value.copy(modelName = activeLocalModel)
+                        ensureModelLoaded()
+                    }
+                }
+            }
+        }
+        viewModelScope.launch {
             getApiProvidersUseCase().collect { providerList ->
                 val active = providerList.firstOrNull { it.isEnabled }
                 if (active != null) {
@@ -183,7 +196,11 @@ class ChatViewModel @Inject constructor(
                     )
                     _modelConfig.value = newConfig
                 } else {
-                    _modelConfig.value = ModelConfig.default()
+                    val localModel = modelDownloadManager.activeModel.value
+                    _modelConfig.value = ModelConfig(
+                        provider = ModelConfig.ModelProvider.LOCAL_LLAMA,
+                        modelName = localModel
+                    )
                 }
                 ensureModelLoaded()
             }
@@ -353,17 +370,23 @@ class ChatViewModel @Inject constructor(
     }
 
     private fun buildPrompt(): String {
-        // Each session is locked to one character, so use this session's
-        // character - not the global "current" selection.
-        val systemPrompt = characterManager.getSystemPromptForCharacter(
-            _currentCharacter.value?.id ?: characterId
-        )
+        val customSys = _systemPrompt.value?.fullPrompt()
+        val systemPrompt = if (!customSys.isNullOrBlank()) {
+            customSys
+        } else {
+            characterManager.getSystemPromptForCharacter(
+                _currentCharacter.value?.id ?: characterId
+            )
+        }
         
         val builder = StringBuilder()
         builder.append("<|im_start|>system\n").append(systemPrompt).append("<|im_end|>\n")
         
-        // Get recent messages for context
-        val recentMessages = messages.value.takeLast(6)
+        // Take up to 14 dialogue messages, excluding system toasts/errors to maintain valid ChatML
+        val recentMessages = messages.value.filter {
+            it.role == ChatMessage.MessageRole.USER || it.role == ChatMessage.MessageRole.ASSISTANT
+        }.takeLast(14)
+
         for (msg in recentMessages) {
             builder.append("<|im_start|>").append(msg.role.value).append("\n")
                 .append(msg.content).append("<|im_end|>\n")

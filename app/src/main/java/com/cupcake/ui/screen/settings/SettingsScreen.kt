@@ -52,6 +52,9 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Wifi
 
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.foundation.BorderStroke
+
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
@@ -67,14 +70,17 @@ fun SettingsScreen(
     val newProviderModel by viewModel.newProviderModel.collectAsStateWithLifecycle()
     val statusMessage by viewModel.statusMessage.collectAsStateWithLifecycle()
 
+    val activeLocalModel by viewModel.modelDownloadManager.activeModel.collectAsStateWithLifecycle()
+    val downloadProgressMap by viewModel.modelDownloadManager.downloadProgress.collectAsStateWithLifecycle()
+    val isLocalActive = providers.none { it.isEnabled }
+
     CupCakeTheme {
         Column(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            modifier = Modifier.fillMaxSize()
         ) {
             // Header
             androidx.compose.material3.TopAppBar(
-                title = { Text("Settings") },
+                title = { Text("Settings & Models") },
                 navigationIcon = { IconButton(onClick = onClose) { Icon(imageVector = androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } },
                 colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
                     containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerLow
@@ -88,7 +94,7 @@ fun SettingsScreen(
                     shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
                 ) {
                     Row(
                         modifier = Modifier.padding(12.dp),
@@ -115,61 +121,107 @@ fun SettingsScreen(
                 }
             }
 
-            // Providers list
-            Column(
+            // Scrollable Content
+            LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 12.dp)
             ) {
-                // Default Ollama model section
-                ProviderSection(
-                    title = "Ollama (Local Server)",
-                    subtitle = "smollm / qwen2:0.5b via Ollama (http://localhost:11434)",
-                    isEnabled = providers.none { it.isEnabled },
-                    onClick = { viewModel.selectLocalModel() }
-                )
-
-                // Custom providers
-                Text("Custom API Providers", fontWeight = FontWeight.Medium, fontSize = 18.sp)
-
-                if (providers.isEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 32.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(imageVector = androidx.compose.material.icons.Icons.Filled.CloudOff, contentDescription = null, modifier = Modifier.size(48.dp))
-                            Text("No custom providers configured", fontSize = 16.sp, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text("Add a custom API endpoint to use cloud models", fontSize = 14.sp, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                }
-
-                LazyColumn(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(providers) { provider ->
-                        ProviderCard(
-                            provider = provider,
-                            onTest = { viewModel.testConnection(provider) },
-                            onEdit = { viewModel.editProvider(provider) },
-                            onDelete = { viewModel.deleteProvider(provider.id) },
-                            onSelect = { viewModel.selectProvider(provider) }
+                // Section: On-Device Models
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("On-Device GGUF Models", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                        Text(
+                            "Offline AI running directly on your phone CPU. Switch models anytime without losing chat history.",
+                            fontSize = 12.sp,
+                            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
 
+                items(com.cupcake.ai.ModelDownloadManager.CATALOG) { model ->
+                    val isInstalled = viewModel.modelDownloadManager.isModelInstalled(model.fileName)
+                    val isCurrentActive = isLocalActive && activeLocalModel == model.fileName
+                    val progress = downloadProgressMap[model.fileName]
+
+                    OnDeviceModelCard(
+                        model = model,
+                        isInstalled = isInstalled,
+                        isActive = isCurrentActive,
+                        downloadProgress = progress,
+                        onSelect = { viewModel.selectOnDeviceModel(model.fileName) },
+                        onDownload = { viewModel.downloadModel(model) },
+                        onCancelDownload = { viewModel.cancelModelDownload(model.fileName) },
+                        onDelete = { viewModel.deleteDownloadedModel(model.fileName) }
+                    )
+                }
+
+                // Section: External / Custom API Providers
+                item {
+                    androidx.compose.foundation.layout.Spacer(Modifier.size(8.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("External API Providers", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                        Text(
+                            "Connect to local Ollama on Termux/PC or OpenAI-compatible servers.",
+                            fontSize = 12.sp,
+                            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                if (providers.isEmpty()) {
+                    item {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = androidx.compose.material3.CardDefaults.cardColors(
+                                containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerLow
+                            )
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(20.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = androidx.compose.material.icons.Icons.Filled.CloudOff,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(36.dp),
+                                    tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    "No custom providers added",
+                                    fontSize = 14.sp,
+                                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+
+                items(providers) { provider ->
+                    ProviderCard(
+                        provider = provider,
+                        onTest = { viewModel.testConnection(provider) },
+                        onEdit = { viewModel.editProvider(provider) },
+                        onDelete = { viewModel.deleteProvider(provider.id) },
+                        onSelect = { viewModel.selectProvider(provider) }
+                    )
+                }
+
                 // Add provider button
-                androidx.compose.material3.OutlinedButton(
-                    onClick = { viewModel.showAddProviderDialog.value = true },
-                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp)
-                ) {
-                    Icon(imageVector = androidx.compose.material.icons.Icons.Filled.Add, contentDescription = null)
-                    Text("Add Custom Provider")
+                item {
+                    androidx.compose.material3.OutlinedButton(
+                        onClick = { viewModel.showAddProviderDialog.value = true },
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 16.dp)
+                    ) {
+                        Icon(imageVector = androidx.compose.material.icons.Icons.Filled.Add, contentDescription = null)
+                        androidx.compose.foundation.layout.Spacer(Modifier.size(8.dp))
+                        Text("Add Custom Provider")
+                    }
                 }
             }
         }
@@ -205,6 +257,180 @@ fun SettingsScreen(
 }
 
 @Composable
+fun OnDeviceModelCard(
+    model: com.cupcake.ai.ModelDownloadManager.GgufModelInfo,
+    isInstalled: Boolean,
+    isActive: Boolean,
+    downloadProgress: com.cupcake.ai.ModelDownloadManager.DownloadProgress?,
+    onSelect: () -> Unit,
+    onDownload: () -> Unit,
+    onCancelDownload: () -> Unit,
+    onDelete: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = androidx.compose.material3.CardDefaults.cardColors(
+            containerColor = if (isActive)
+                androidx.compose.material3.MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+            else
+                androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerHigh
+        ),
+        border = if (isActive)
+            androidx.compose.foundation.BorderStroke(1.5.dp, androidx.compose.material3.MaterialTheme.colorScheme.primary)
+        else null
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = model.displayName,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 15.sp
+                        )
+                        androidx.compose.material3.Surface(
+                            color = if (model.isBundled) Color(0xFF2E7D32) else Color(0xFF1565C0),
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp)
+                        ) {
+                            Text(
+                                text = model.tag,
+                                fontSize = 10.sp,
+                                color = Color.White,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                    Text(
+                        text = model.description,
+                        fontSize = 12.sp,
+                        color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                if (!model.isBundled && isInstalled && !isActive) {
+                    IconButton(onClick = onDelete, modifier = Modifier.size(28.dp)) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Delete model",
+                            tint = androidx.compose.material3.MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            }
+
+            // Download progress if active
+            if (downloadProgress?.isDownloading == true) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "Downloading... ${downloadProgress.progressPct}%",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = androidx.compose.material3.MaterialTheme.colorScheme.primary
+                        )
+                        val mbDownloaded = downloadProgress.downloadedBytes / (1024 * 1024)
+                        val mbTotal = downloadProgress.totalBytes / (1024 * 1024)
+                        Text(
+                            text = "$mbDownloaded MB / $mbTotal MB",
+                            fontSize = 12.sp,
+                            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    androidx.compose.material3.LinearProgressIndicator(
+                        progress = { downloadProgress.progressPct / 100f },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        androidx.compose.material3.TextButton(
+                            onClick = onCancelDownload,
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                        ) {
+                            Text("Cancel", fontSize = 12.sp, color = androidx.compose.material3.MaterialTheme.colorScheme.error)
+                        }
+                    }
+                }
+            } else if (downloadProgress?.error != null) {
+                Text(
+                    text = "Error: ${downloadProgress.error}",
+                    fontSize = 12.sp,
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.error
+                )
+            }
+
+            // Actions row
+            if (downloadProgress?.isDownloading != true) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val sizeMb = model.sizeBytes / (1024 * 1024)
+                    Text(
+                        text = if (model.isBundled) "Bundled (~$sizeMb MB)" else "Size: ~$sizeMb MB",
+                        fontSize = 12.sp,
+                        color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    if (isActive) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                tint = Color(0xFF2E7D32),
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                text = "Active",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF2E7D32)
+                            )
+                        }
+                    } else if (isInstalled) {
+                        Button(
+                            onClick = onSelect,
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 4.dp)
+                        ) {
+                            Text("Use Model", fontSize = 12.sp)
+                        }
+                    } else {
+                        androidx.compose.material3.FilledTonalButton(
+                            onClick = onDownload,
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Download,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            androidx.compose.foundation.layout.Spacer(Modifier.size(4.dp))
+                            Text("Download", fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun ProviderSection(
     title: String,
     subtitle: String,
@@ -213,7 +439,6 @@ fun ProviderSection(
 ) {
     Card(
         modifier = Modifier
-            .fillMaxWidth()
             .fillMaxWidth()
             .padding(vertical = 8.dp),
         onClick = onClick

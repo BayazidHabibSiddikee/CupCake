@@ -107,12 +107,12 @@ class LlamaEngine private constructor() {
     }
 
     data class Config(
-        val modelFileName: String = "models/smollm-135m-instruct-q4_k_m.gguf",
-        // Ultra-fast 512 context for snappy, dumb-but-fast chat on phones.
-        val nCtx: Int = 512,
+        val modelFileName: String = "models/qwen2.5-0.5b-instruct-q2_k.gguf",
+        // 1024 context for full multi-turn conversation memory on phones.
+        val nCtx: Int = 1024,
         val nThreads: Int = 4, // 4 threads: optimal for mobile 2 big + 2 little cores
         val nBatch: Int = 512,
-        val maxTokens: Int = 128,
+        val maxTokens: Int = 256,
         val temperature: Float = 0.7f,
         val topP: Float = 0.9f,
         val topK: Int = 40,
@@ -122,16 +122,30 @@ class LlamaEngine private constructor() {
     )
 
     private var _isModelLoaded = false
+    @Volatile
+    private var _loadedModelName: String? = null
+
+    fun getLoadedModelName(): String? = _loadedModelName
 
     fun loadModel(
         context: Context,
         config: Config = Config(),
         onProgressBytes: ((copiedBytes: Long, totalBytes: Long) -> Unit)? = null
     ): Result<Unit> {
-        // Already loaded (e.g. warmed at app start) - don't pay init cost again.
-        if (isReady()) return Result.success(Unit)
+        val modelFile = copyModelFromAssets(context, config.modelFileName, onProgressBytes)
+        val targetName = modelFile.name
+
+        // Already loaded this model - don't pay init cost again.
+        if (isReady() && _loadedModelName == targetName) {
+            return Result.success(Unit)
+        }
+
+        // Switching models: unload previous model from memory
+        if (isReady()) {
+            unload()
+        }
+
         return try {
-            val modelFile = copyModelFromAssets(context, config.modelFileName, onProgressBytes)
             val result = initModel(
                 modelFile.absolutePath,
                 config.nCtx,
@@ -140,6 +154,7 @@ class LlamaEngine private constructor() {
             )
             if (result == 0) {
                 _isModelLoaded = true
+                _loadedModelName = targetName
                 setSamplingParams(
                     config.temperature,
                     config.topP,
@@ -151,9 +166,11 @@ class LlamaEngine private constructor() {
                 )
                 Result.success(Unit)
             } else {
+                _loadedModelName = null
                 Result.failure(Exception("Init failed: $result"))
             }
         } catch (e: Exception) {
+            _loadedModelName = null
             Result.failure(e)
         }
     }
@@ -205,6 +222,7 @@ class LlamaEngine private constructor() {
         if (_isModelLoaded) {
             release()
             _isModelLoaded = false
+            _loadedModelName = null
         }
     }
 

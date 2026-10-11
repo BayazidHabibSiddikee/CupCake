@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import com.cupcake.ai.ModelDownloadManager
 import javax.inject.Inject
 import dagger.hilt.android.lifecycle.HiltViewModel
 
@@ -25,7 +26,8 @@ class SettingsViewModel @Inject constructor(
     private val updateProviderUseCase: UpdateApiProviderUseCase,
     private val deleteProviderUseCase: DeleteApiProviderUseCase,
     private val testConnectionUseCase: TestProviderConnectionUseCase,
-    private val getProviderModelsUseCase: GetProviderModelsUseCase
+    private val getProviderModelsUseCase: GetProviderModelsUseCase,
+    val modelDownloadManager: ModelDownloadManager
 ) : ViewModel() {
 
     val providers: StateFlow<List<ApiProvider>> = getProvidersUseCase()
@@ -62,12 +64,42 @@ class SettingsViewModel @Inject constructor(
 
     fun selectLocalModel() {
         viewModelScope.launch {
-            // Disable custom providers so local Ollama default is active
+            // Disable custom providers so on-device model is active
             providers.value.filter { it.isEnabled }.forEach { p ->
                 updateProviderUseCase(p.copy(isEnabled = false))
             }
-            statusMessage.value = "Selected default local Ollama (localhost:11434)"
+            val active = modelDownloadManager.activeModel.value
+            statusMessage.value = "Selected on-device model: $active"
             onLocalModelSelected?.invoke()
+        }
+    }
+
+    fun selectOnDeviceModel(fileName: String) {
+        viewModelScope.launch {
+            providers.value.filter { it.isEnabled }.forEach { p ->
+                updateProviderUseCase(p.copy(isEnabled = false))
+            }
+            modelDownloadManager.setActiveModel(fileName)
+            statusMessage.value = "Active on-device model: $fileName"
+            onLocalModelSelected?.invoke()
+        }
+    }
+
+    fun downloadModel(model: ModelDownloadManager.GgufModelInfo) {
+        statusMessage.value = "Starting download for ${model.displayName}..."
+        modelDownloadManager.startDownload(model)
+    }
+
+    fun cancelModelDownload(fileName: String) {
+        modelDownloadManager.cancelDownload(fileName)
+        statusMessage.value = "Cancelled download for $fileName"
+    }
+
+    fun deleteDownloadedModel(fileName: String) {
+        if (modelDownloadManager.deleteModel(fileName)) {
+            statusMessage.value = "Deleted model $fileName"
+        } else {
+            statusMessage.value = "Cannot delete $fileName"
         }
     }
 

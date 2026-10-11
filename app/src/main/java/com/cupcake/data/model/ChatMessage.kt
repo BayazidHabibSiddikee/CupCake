@@ -125,7 +125,7 @@ object InstantSerializer : KSerializer<Instant> {
 
 data class ModelConfig(
     val provider: ModelProvider = ModelProvider.LOCAL_LLAMA,
-    val modelName: String = "smollm-135m-instruct-q4_k_m.gguf",
+    val modelName: String = "qwen2.5-0.5b-instruct-q2_k.gguf",
     val customEndpoint: String = "",
     val apiKey: String = "",
     val temperature: Float = 0.7f,

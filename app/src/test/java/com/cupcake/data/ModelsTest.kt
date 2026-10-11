@@ -22,13 +22,12 @@ class ModelsTest {
     }
 
     @Test
-    fun `default model config is ollama qwen`() {
+    fun `default model config is local qwen`() {
         val config = ModelConfig.default()
-        assertThat(config.provider).isEqualTo(ModelConfig.ModelProvider.CUSTOM_OLLAMA)
-        assertThat(config.modelName).isEqualTo("qwen2:0.5b")
-        assertThat(config.isLocal()).isFalse()
-        assertThat(config.isCustom()).isTrue()
-        assertThat(config.effectiveEndpoint()).isEqualTo("http://localhost:11434/v1")
+        assertThat(config.provider).isEqualTo(ModelConfig.ModelProvider.LOCAL_LLAMA)
+        assertThat(config.modelName).isEqualTo("qwen2.5-0.5b-instruct-q2_k.gguf")
+        assertThat(config.isLocal()).isTrue()
+        assertThat(config.isCustom()).isFalse()
     }
 
     @Test

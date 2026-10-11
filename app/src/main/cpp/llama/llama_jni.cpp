@@ -150,11 +150,19 @@ Java_com_cupcake_ai_LlamaEngine_generate(
 
     const char* prompt_str = env->GetStringUTFChars(prompt, nullptr);
     
-    // Tokenize prompt
-    std::vector<llama_token> tokens(llama_n_ctx(g_ctx));
-    int n_tokens = llama_tokenize(g_model, prompt_str, strlen(prompt_str), tokens.data(), tokens.size(), true, false);
+    // Tokenize prompt with parse_special = true so <|im_start|>, <|im_end|>, etc. are parsed as control tokens
+    const int32_t n_ctx = llama_n_ctx(g_ctx);
+    std::vector<llama_token> tokens(n_ctx);
+    int n_tokens = llama_tokenize(g_model, prompt_str, strlen(prompt_str), tokens.data(), tokens.size(), true, true);
     if (n_tokens < 0) {
-        LOGE("Tokenization failed");
+        int needed = -n_tokens;
+        if (needed <= n_ctx) {
+            tokens.resize(needed);
+            n_tokens = llama_tokenize(g_model, prompt_str, strlen(prompt_str), tokens.data(), tokens.size(), true, true);
+        }
+    }
+    if (n_tokens < 0) {
+        LOGE("Tokenization failed, prompt exceeds context limit or error");
         env->ReleaseStringUTFChars(prompt, prompt_str);
         g_is_generating = false;
         return -3;

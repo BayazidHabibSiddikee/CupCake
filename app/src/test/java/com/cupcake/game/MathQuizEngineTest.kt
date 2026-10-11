@@ -26,7 +26,7 @@ class MathQuizEngineTest {
 
     @Test
     fun `checks correct answer`() {
-        val question = MathQuizEngine.MathQuestion("5+3", 8, 10)
+        val question = Game.MathQuizBoard.MathQuestion("5+3", 8, 10)
         val board = Game.MathQuizBoard(currentQuestion = question)
         
         assertThat(MathQuizEngine.checkAnswer(board, 8)).isTrue()
@@ -36,7 +36,7 @@ class MathQuizEngineTest {
 
     @Test
     fun `checks correct answer for subtraction`() {
-        val question = MathQuizEngine.MathQuestion("10-3", 7, 5)
+        val question = Game.MathQuizBoard.MathQuestion("10-3", 7, 5)
         val board = Game.MathQuizBoard(currentQuestion = question)
         
         assertThat(MathQuizEngine.checkAnswer(board, 7)).isTrue()
@@ -45,7 +45,7 @@ class MathQuizEngineTest {
 
     @Test
     fun `checks correct answer for multiplication`() {
-        val question = MathQuizEngine.MathQuestion("6×7", 42, 35)
+        val question = Game.MathQuizBoard.MathQuestion("6×7", 42, 35)
         val board = Game.MathQuizBoard(currentQuestion = question)
         
         assertThat(MathQuizEngine.checkAnswer(board, 42)).isTrue()
@@ -54,7 +54,7 @@ class MathQuizEngineTest {
 
     @Test
     fun `checks correct answer for division`() {
-        val question = MathQuizEngine.MathQuestion("56÷8", 7, 6)
+        val question = Game.MathQuizBoard.MathQuestion("56÷8", 7, 6)
         val board = Game.MathQuizBoard(currentQuestion = question)
         
         assertThat(MathQuizEngine.checkAnswer(board, 7)).isTrue()
