@@ -1,179 +1,253 @@
 package com.cupcake.ui.component
 
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cupcake.data.model.ChatMessage
-import com.cupcake.ui.theme.CupCakeTheme
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.SmartToy
+
+// Signature Messenger Blue
+val MessengerBlue = Color(0xFF0084FF)
+val MessengerBlueDark = Color(0xFF0072E5)
 
 @Composable
 fun ChatMessageItem(
     message: ChatMessage,
+    characterAvatar: String? = null,
     isStreaming: Boolean = false
 ) {
     val isUser = message.role == ChatMessage.MessageRole.USER
     val isSystem = message.role == ChatMessage.MessageRole.SYSTEM
 
-    Box(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-        contentAlignment = if (isUser) Alignment.CenterEnd else Alignment.CenterStart
-    ) {
-        Card(
-            modifier = Modifier.fillMaxWidth(0.85f),
-            colors = androidx.compose.material3.CardDefaults.cardColors(
-                containerColor = when {
-                    isUser -> androidx.compose.material3.MaterialTheme.colorScheme.primaryContainer
-                    isSystem -> androidx.compose.material3.MaterialTheme.colorScheme.secondaryContainer
-                    else -> androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerHigh
-                }
-            ),
-            shape = RoundedCornerShape(
-                topStart = 16.dp,
-                topEnd = 16.dp,
-                bottomStart = if (isUser) 16.dp else 4.dp,
-                bottomEnd = if (isUser) 4.dp else 16.dp
-            )
-        ) {
-            Column(
-            modifier = Modifier.padding(16.dp),
-            horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
-        ) {
-            // Role indicator
-            if (!isUser) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Start
+    when {
+        isSystem -> {
+            // Messenger centered system notice pill
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 6.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
-                    Icon(
-                        imageVector = when {
-                            isSystem -> Icons.Filled.Description
-                            else -> Icons.Filled.SmartToy
-                        },
-                        contentDescription = null,
-                        tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp)
-                    )
                     Text(
-                        text = when {
-                            isSystem -> "System Prompt"
-                            else -> "Assistant"
-                        },
+                        text = message.content,
                         fontSize = 12.sp,
-                        color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontWeight = androidx.compose.ui.text.font.FontWeight.Medium
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                        textAlign = TextAlign.Center
                     )
                 }
             }
+        }
 
-            // Message content
-            Text(
-                text = message.content,
-                fontSize = 14.sp,
-                color = when {
-                    isUser -> androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer
-                    isSystem -> androidx.compose.material3.MaterialTheme.colorScheme.onSecondaryContainer
-                    else -> androidx.compose.material3.MaterialTheme.colorScheme.onSurface
-                },
-                textAlign = if (isUser) TextAlign.End else TextAlign.Start
-            )
-
-            // Metadata
-            if (message.tokenCount > 0 || message.latencyMs > 0) {
-                Text(
-                    text = "${message.tokenCount} tokens • ${message.latencyMs}ms • ${message.modelUsed}",
-                    fontSize = 10.sp,
-                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                    modifier = Modifier.padding(top = 8.dp)
-                )
-            }
-
-            // Streaming indicator
-            if (isStreaming) {
-                Row(
+        isUser -> {
+            // Messenger User message: Blue gradient bubble, right aligned, white text
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 56.dp, end = 12.dp, top = 2.dp, bottom = 2.dp),
+                horizontalArrangement = Arrangement.End
+            ) {
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.End
+                        .widthIn(max = 290.dp)
+                        .clip(
+                            RoundedCornerShape(
+                                topStart = 18.dp,
+                                topEnd = 18.dp,
+                                bottomStart = 18.dp,
+                                bottomEnd = 4.dp
+                            )
+                        )
+                        .background(
+                            brush = Brush.linearGradient(
+                                colors = listOf(MessengerBlue, MessengerBlueDark)
+                            )
+                        )
+                        .padding(horizontal = 14.dp, vertical = 10.dp)
                 ) {
-                    TypingIndicator()
+                    Text(
+                        text = message.content,
+                        fontSize = 15.sp,
+                        lineHeight = 20.sp,
+                        color = Color.White
+                    )
+                }
+            }
+        }
+
+        else -> {
+            // Messenger Bot message: Left aligned with character avatar, clean grey bubble
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 12.dp, end = 56.dp, top = 2.dp, bottom = 2.dp),
+                horizontalArrangement = Arrangement.Start,
+                verticalAlignment = Alignment.Bottom
+            ) {
+                if (characterAvatar != null) {
+                    CharacterAvatar(
+                        avatar = characterAvatar,
+                        modifier = Modifier.size(28.dp),
+                        emojiSize = 16.sp
+                    )
+                    Spacer(Modifier.size(8.dp))
+                } else {
+                    Spacer(Modifier.size(4.dp))
+                }
+
+                Column(modifier = Modifier.widthIn(max = 285.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .clip(
+                                RoundedCornerShape(
+                                    topStart = 18.dp,
+                                    topEnd = 18.dp,
+                                    bottomStart = 4.dp,
+                                    bottomEnd = 18.dp
+                                )
+                            )
+                            .background(
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f)
+                            )
+                            .padding(horizontal = 14.dp, vertical = 10.dp)
+                    ) {
+                        Text(
+                            text = message.content,
+                            fontSize = 15.sp,
+                            lineHeight = 20.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    if (isStreaming) {
+                        Box(modifier = Modifier.padding(top = 4.dp, start = 4.dp)) {
+                            TypingIndicator()
+                        }
+                    }
                 }
             }
         }
     }
 }
+
+@Composable
+fun MessengerTypingBubble(
+    characterAvatar: String? = null
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 12.dp, end = 60.dp, top = 4.dp, bottom = 4.dp),
+        horizontalArrangement = Arrangement.Start,
+        verticalAlignment = Alignment.Bottom
+    ) {
+        if (characterAvatar != null) {
+            CharacterAvatar(
+                avatar = characterAvatar,
+                modifier = Modifier.size(28.dp),
+                emojiSize = 16.sp
+            )
+            Spacer(Modifier.size(8.dp))
+        }
+
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(18.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f))
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+        ) {
+            TypingIndicator()
+        }
+    }
 }
 
 @Composable
 fun TypingIndicator() {
-    val infiniteTransition = rememberInfiniteTransition(label = "typing")
-    val alpha1 by infiniteTransition.animateFloat(
+    val transition = rememberInfiniteTransition(label = "messenger_typing")
+
+    val bounce1 by transition.animateFloat(
         initialValue = 0f,
-        targetValue = 1f,
+        targetValue = -5f,
         animationSpec = infiniteRepeatable(
-            animation = tween(600, delayMillis = 0),
+            animation = tween(400, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
-        label = "alpha1"
+        label = "bounce1"
     )
-    val alpha2 by infiniteTransition.animateFloat(
+    val bounce2 by transition.animateFloat(
         initialValue = 0f,
-        targetValue = 1f,
+        targetValue = -5f,
         animationSpec = infiniteRepeatable(
-            animation = tween(600, delayMillis = 200),
+            animation = tween(400, delayMillis = 150, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
-        label = "alpha2"
+        label = "bounce2"
     )
-    val alpha3 by infiniteTransition.animateFloat(
+    val bounce3 by transition.animateFloat(
         initialValue = 0f,
-        targetValue = 1f,
+        targetValue = -5f,
         animationSpec = infiniteRepeatable(
-            animation = tween(600, delayMillis = 400),
+            animation = tween(400, delayMillis = 300, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
-        label = "alpha3"
+        label = "bounce3"
     )
 
-    val dotColor = androidx.compose.material3.MaterialTheme.colorScheme.primary
-    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        Canvas(modifier = Modifier.size(8.dp)) {
-            drawCircle(color = dotColor.copy(alpha = alpha1), radius = 4f)
-        }
-        Canvas(modifier = Modifier.size(8.dp)) {
-            drawCircle(color = dotColor.copy(alpha = alpha2), radius = 4f)
-        }
-        Canvas(modifier = Modifier.size(8.dp)) {
-            drawCircle(color = dotColor.copy(alpha = alpha3), radius = 4f)
-        }
+    val dotColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
+
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .offset(y = bounce1.dp)
+                .size(7.dp)
+                .background(dotColor, CircleShape)
+        )
+        Box(
+            modifier = Modifier
+                .offset(y = bounce2.dp)
+                .size(7.dp)
+                .background(dotColor, CircleShape)
+        )
+        Box(
+            modifier = Modifier
+                .offset(y = bounce3.dp)
+                .size(7.dp)
+                .background(dotColor, CircleShape)
+        )
     }
 }
