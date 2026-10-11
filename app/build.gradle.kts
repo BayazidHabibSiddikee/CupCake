@@ -70,7 +70,9 @@ android {
             isDebuggable = true
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
-            matchingFallbacks += "release"
+            ndk {
+                abiFilters.add("arm64-v8a")
+            }
         }
     }
 
@@ -100,6 +102,19 @@ android {
 
     packagingOptions {
         resources.excludes.add("META-INF/*")
+        jniLibs.pickFirsts.add("libc++_shared.so")
+        jniLibs.pickFirsts.add("libllama_jni.so")
+    }
+
+    androidResources {
+        noCompress += "gguf"
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
     }
 }
 

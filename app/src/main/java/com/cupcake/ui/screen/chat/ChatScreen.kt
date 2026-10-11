@@ -143,7 +143,7 @@ fun ChatScreen(
             ) {
                 // Current streaming response at bottom
                 if (currentResponse.isNotEmpty()) {
-                    item {
+                    item(key = "streaming_response") {
                         ChatMessageItem(
                             message = ChatMessage.assistant(currentResponse, viewModel.conversationId),
                             isStreaming = true
@@ -153,7 +153,10 @@ fun ChatScreen(
 
                 items(
                     count = messages.size,
-                    key = { i -> messages[messages.lastIndex - i].id }
+                    key = { i ->
+                        val msg = messages[messages.lastIndex - i]
+                        if (msg.id > 0) msg.id else "${msg.timestamp}_${messages.lastIndex - i}"
+                    }
                 ) { i ->
                     val message = messages[messages.lastIndex - i]
                     ChatMessageItem(message = message)

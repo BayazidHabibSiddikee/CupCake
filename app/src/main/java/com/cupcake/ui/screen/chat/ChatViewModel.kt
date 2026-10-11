@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cupcake.ai.CharacterManager
 import com.cupcake.ai.EnergyManager
+import com.cupcake.ai.LlamaEngine
 import com.cupcake.ai.OllamaEngine
 import com.cupcake.data.model.Character
 import com.cupcake.data.model.ChatMessage
@@ -102,21 +103,56 @@ class ChatViewModel @Inject constructor(
     }
 
     /**
-     * Checks Ollama server connection. Safe to call repeatedly.
+     * Checks model availability and loads on-device model or verifies remote connection.
      */
     fun ensureModelLoaded() {
-        _modelLoadState.value = ModelLoadState.Loading("Connecting to Ollama...")
-        viewModelScope.launch(Dispatchers.IO) {
-            val baseUrl = _modelConfig.value.effectiveEndpoint()
-            val result = ollamaEngine.checkConnection(baseUrl)
-            result.consumeEach { connectionResult ->
-                _modelLoadState.value = connectionResult.fold(
-                    onSuccess = { connected ->
-                        if (connected) ModelLoadState.Ready
-                        else ModelLoadState.Error("Cannot connect to Ollama at $baseUrl")
-                    },
-                    onFailure = { ModelLoadState.Error(it.message ?: "Connection failed") }
-                )
+        val config = _modelConfig.value
+        if (config.isLocal()) {
+            if (LlamaEngine.getInstance().isReady()) {
+                _modelLoadState.value = ModelLoadState.Ready
+                return
+            }
+            _modelLoadState.value = ModelLoadState.Loading("Loading local Qwen model...")
+            viewModelScope.launch(Dispatchers.IO) {
+                try {
+                    LlamaEngine.initialize(appContext)
+                    val result = LlamaEngine.getInstance().loadModel(
+                        context = appContext,
+                        config = LlamaEngine.Config(
+                            modelFileName = "models/${config.modelName}",
+                            temperature = config.temperature,
+                            topP = config.topP,
+                            topK = config.topK
+                        )
+                    ) { copiedBytes, totalBytes ->
+                        if (totalBytes > 0) {
+                            val pct = (copiedBytes * 100 / totalBytes).toInt()
+                            _modelLoadState.value = ModelLoadState.Loading("Extracting model: $pct%")
+                        }
+                    }
+                    _modelLoadState.value = if (result.isSuccess) {
+                        ModelLoadState.Ready
+                    } else {
+                        ModelLoadState.Error(result.exceptionOrNull()?.message ?: "Failed to load model")
+                    }
+                } catch (e: Exception) {
+                    _modelLoadState.value = ModelLoadState.Error(e.message ?: "Failed to load model")
+                }
+            }
+        } else {
+            _modelLoadState.value = ModelLoadState.Loading("Connecting to Ollama...")
+            viewModelScope.launch(Dispatchers.IO) {
+                val baseUrl = config.effectiveEndpoint()
+                val result = ollamaEngine.checkConnection(baseUrl)
+                result.consumeEach { connectionResult ->
+                    _modelLoadState.value = connectionResult.fold(
+                        onSuccess = { connected ->
+                            if (connected) ModelLoadState.Ready
+                            else ModelLoadState.Error("Cannot connect to Ollama at $baseUrl")
+                        },
+                        onFailure = { ModelLoadState.Error(it.message ?: "Connection failed") }
+                    )
+                }
             }
         }
     }
@@ -217,11 +253,14 @@ class ChatViewModel @Inject constructor(
     fun sendMessage(text: String) {
         if (text.isBlank() || _isGenerating.value) return
 
-        if (!ollamaEngine.isReady()) {
+        val config = _modelConfig.value
+        val isReady = if (config.isLocal()) LlamaEngine.getInstance().isReady() else ollamaEngine.isReady()
+        if (!isReady) {
             ensureModelLoaded()
             addMessage(
                 ChatMessage.system(
-                    "⏳ Model is still loading, please wait a moment and try again.",
+                    if (config.isLocal()) "⏳ Local model is loading, please wait a moment..."
+                    else "⏳ Model is still loading, please wait a moment and try again.",
                     conversationId
                 )
             )
@@ -230,17 +269,6 @@ class ChatViewModel @Inject constructor(
 
         // Check energy
         energyManager.consumeEnergy() // Consume it but don't block if they don't have it (make it simple!)
-        /*
-        if (!energyManager.consumeEnergy()) {
-            addMessage(
-                ChatMessage.system(
-                    "⚡ Energy depleted! Watch an ad or upgrade to Pro to continue.",
-                    conversationId
-                )
-            )
-            return
-        }
-        */
 
         val userMessage = ChatMessage.user(text, conversationId)
         addMessage(userMessage)
@@ -248,42 +276,47 @@ class ChatViewModel @Inject constructor(
         _isGenerating.value = true
         _currentResponse.value = ""
 
-viewModelScope.launch {
+        viewModelScope.launch {
             var fullResponse = ""
-            val config = _modelConfig.value
-            val endpoint = config.effectiveEndpoint()
 
             try {
-                val personality = currentCharacter.value?.personality ?: ""
-                
-                // Build messages for Ollama format
-                val messages = buildOllamaMessages()
-                
-                ollamaEngine.generateStream(
-                    baseUrl = endpoint,
-                    config = config,
-                    messages = messages,
-                    callback = object : OllamaEngine.GenerateCallback {
-                        override fun onToken(token: String) {
-                            fullResponse += token
-                            _currentResponse.value = fullResponse
-                        }
-
-                        override fun onComplete() {
-                            _currentResponse.value = com.cupcake.ai.BanglishTranslator.translate(fullResponse, personality)
-                        }
-
-                        override fun onError(error: String) {
-                            Log.e("ChatViewModel", "Generation failed: $error")
-                            addMessage(
-                                ChatMessage.system(
-                                    "❌ Ollama request failed: $error",
-                                    conversationId
-                                )
-                            )
-                        }
+                if (config.isLocal()) {
+                    val prompt = buildPrompt()
+                    val tokenChannel = LlamaEngine.getInstance().generateStream(prompt)
+                    for (token in tokenChannel) {
+                        fullResponse += token
+                        _currentResponse.value = fullResponse
                     }
-                )
+                } else {
+                    val personality = currentCharacter.value?.personality ?: ""
+                    val messages = buildOllamaMessages()
+                    val endpoint = config.effectiveEndpoint()
+                    ollamaEngine.generateStream(
+                        baseUrl = endpoint,
+                        config = config,
+                        messages = messages,
+                        callback = object : OllamaEngine.GenerateCallback {
+                            override fun onToken(token: String) {
+                                fullResponse += token
+                                _currentResponse.value = fullResponse
+                            }
+
+                            override fun onComplete() {
+                                _currentResponse.value = com.cupcake.ai.BanglishTranslator.translate(fullResponse, personality)
+                            }
+
+                            override fun onError(error: String) {
+                                Log.e("ChatViewModel", "Generation failed: $error")
+                                addMessage(
+                                    ChatMessage.system(
+                                        "❌ Ollama request failed: $error",
+                                        conversationId
+                                    )
+                                )
+                            }
+                        }
+                    )
+                }
             } catch (e: Exception) {
                 Log.e("ChatViewModel", "Generation failed", e)
                 addMessage(

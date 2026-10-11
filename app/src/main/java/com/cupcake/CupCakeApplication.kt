@@ -19,6 +19,9 @@ class CupCakeApplication : Application() {
         // Initialize Energy Manager (loads saved state)
         EnergyManager(this)
 
+        // Initialize Native Llama Engine
+        com.cupcake.ai.LlamaEngine.initialize(this)
+
         // Pre-create database
         Room.databaseBuilder(
             this,

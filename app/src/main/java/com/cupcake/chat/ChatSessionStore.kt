@@ -20,6 +20,8 @@ class ChatSessionStore @Inject constructor() {
 
     private val sessions = ConcurrentHashMap<String, MutableStateFlow<List<ChatMessage>>>()
 
+    private val idCounter = java.util.concurrent.atomic.AtomicLong(1L)
+
     fun conversationIdFor(characterId: String): String = "chat_$characterId"
 
     fun messages(characterId: String): StateFlow<List<ChatMessage>> =
@@ -27,7 +29,8 @@ class ChatSessionStore @Inject constructor() {
 
     fun addMessage(characterId: String, message: ChatMessage) {
         val flow = session(characterId)
-        val stamped = message.copy(conversationId = conversationIdFor(characterId))
+        val uniqueId = if (message.id > 0) message.id else idCounter.getAndIncrement()
+        val stamped = message.copy(id = uniqueId, conversationId = conversationIdFor(characterId))
         flow.value = flow.value + stamped
     }
 

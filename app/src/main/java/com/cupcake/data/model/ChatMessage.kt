@@ -124,19 +124,20 @@ object InstantSerializer : KSerializer<Instant> {
 }
 
 data class ModelConfig(
-    val provider: ModelProvider = ModelProvider.CUSTOM_OLLAMA,
-    val modelName: String = "qwen2:0.5b",
+    val provider: ModelProvider = ModelProvider.LOCAL_LLAMA,
+    val modelName: String = "smollm-135m-instruct-q4_k_m.gguf",
     val customEndpoint: String = "",
     val apiKey: String = "",
     val temperature: Float = 0.7f,
     val topP: Float = 0.9f,
     val topK: Int = 40,
-    val maxTokens: Int = 2048,
+    val maxTokens: Int = 512,
     val systemPromptId: String? = null,
     val useStreaming: Boolean = true,
     val timeoutSeconds: Int = 60
 ) {
     enum class ModelProvider(val value: String) {
+        LOCAL_LLAMA("local_llama"),
         CUSTOM_OPENAI("custom_openai"),
         CUSTOM_OLLAMA("custom_ollama"),
         CUSTOM_VLLM("custom_vllm"),
@@ -147,12 +148,13 @@ data class ModelConfig(
         fun default(): ModelConfig = ModelConfig()
     }
 
-    fun isLocal(): Boolean = false
+    fun isLocal(): Boolean = provider == ModelProvider.LOCAL_LLAMA
 
-    fun isCustom(): Boolean = true
+    fun isCustom(): Boolean = provider != ModelProvider.LOCAL_LLAMA
 
     fun effectiveEndpoint(): String {
         return when (provider) {
+            ModelProvider.LOCAL_LLAMA -> ""
             ModelProvider.CUSTOM_OPENAI -> if (customEndpoint.isNotBlank()) customEndpoint else "https://api.openai.com/v1"
             ModelProvider.CUSTOM_OLLAMA -> if (customEndpoint.isNotBlank()) customEndpoint else "http://localhost:11434/v1"
             ModelProvider.CUSTOM_VLLM -> if (customEndpoint.isNotBlank()) customEndpoint else "http://localhost:8000/v1"
