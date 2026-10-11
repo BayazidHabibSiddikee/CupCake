@@ -97,12 +97,25 @@ fun ChatScreen(
                     )
                 }
                 is ChatViewModel.ModelLoadState.Error -> {
-                    Text(
-                        text = "❌ Something went wrong. Please restart the app.",
-                        fontSize = 12.sp,
-                        color = androidx.compose.material3.MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "⚠️ Ollama: ${state.message}",
+                            fontSize = 12.sp,
+                            color = androidx.compose.material3.MaterialTheme.colorScheme.error,
+                            modifier = Modifier.weight(1f)
+                        )
+                        androidx.compose.material3.TextButton(
+                            onClick = { viewModel.ensureModelLoaded() }
+                        ) {
+                            Text("Retry", fontSize = 12.sp)
+                        }
+                    }
                 }
                 else -> {}
             }

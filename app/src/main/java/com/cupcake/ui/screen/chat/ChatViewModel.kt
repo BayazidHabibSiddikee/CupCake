@@ -18,6 +18,8 @@ import kotlinx.coroutines.Dispatchers
 import android.content.Context
 import androidx.lifecycle.SavedStateHandle
 import com.cupcake.chat.ChatSessionStore
+import com.cupcake.domain.usecase.GetApiProvidersUseCase
+import com.cupcake.data.model.ApiProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,7 +40,8 @@ class ChatViewModel @Inject constructor(
     private val gameManager: GameManager,
     private val espServer: EspWebSocketServer,
     private val ttsManager: TtsManager,
-    private val energyManager: EnergyManager
+    private val energyManager: EnergyManager,
+    private val getApiProvidersUseCase: GetApiProvidersUseCase
 ) : ViewModel() {
 
     val characterId: String =
@@ -123,8 +126,27 @@ class ChatViewModel @Inject constructor(
             energyManager.energy.collect { energy ->
                 _energy.value = energy
             }
+        }
+        viewModelScope.launch {
             energyManager.isPro.collect { pro ->
                 _isPro.value = pro
+            }
+        }
+        viewModelScope.launch {
+            getApiProvidersUseCase().collect { providerList ->
+                val active = providerList.firstOrNull { it.isEnabled }
+                if (active != null) {
+                    val newConfig = _modelConfig.value.copy(
+                        provider = active.providerType,
+                        customEndpoint = active.baseUrl,
+                        apiKey = active.apiKey,
+                        modelName = active.models.firstOrNull() ?: _modelConfig.value.modelName
+                    )
+                    _modelConfig.value = newConfig
+                } else {
+                    _modelConfig.value = ModelConfig.default()
+                }
+                ensureModelLoaded()
             }
         }
     }
