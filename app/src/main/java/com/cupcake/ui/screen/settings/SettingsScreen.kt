@@ -64,6 +64,7 @@ fun SettingsScreen(
     val newProviderName by viewModel.newProviderName.collectAsStateWithLifecycle()
     val newProviderUrl by viewModel.newProviderUrl.collectAsStateWithLifecycle()
     val newProviderApiKey by viewModel.newProviderApiKey.collectAsStateWithLifecycle()
+    val newProviderModel by viewModel.newProviderModel.collectAsStateWithLifecycle()
     val statusMessage by viewModel.statusMessage.collectAsStateWithLifecycle()
 
     CupCakeTheme {
@@ -177,9 +178,16 @@ fun SettingsScreen(
     // Add provider dialog
     if (showAddProviderDialog) {
         AddProviderDialog(
-            onDismiss = { viewModel.showAddProviderDialog.value = false; viewModel.editingProviderId.value = null; viewModel.newProviderName.value = ""; viewModel.newProviderUrl.value = ""; viewModel.newProviderApiKey.value = "" },
-            onConfirm = { name, type, url, apiKey ->
-                viewModel.addProvider(name, type, url, apiKey)
+            onDismiss = {
+                viewModel.showAddProviderDialog.value = false
+                viewModel.editingProviderId.value = null
+                viewModel.newProviderName.value = ""
+                viewModel.newProviderUrl.value = ""
+                viewModel.newProviderApiKey.value = ""
+                viewModel.newProviderModel.value = ""
+            },
+            onConfirm = { name, type, url, apiKey, model ->
+                viewModel.addProvider(name, type, url, apiKey, model)
                 viewModel.showAddProviderDialog.value = false
             },
             providerType = selectedProviderType,
@@ -189,7 +197,9 @@ fun SettingsScreen(
             url = newProviderUrl,
             onUrlChange = { viewModel.newProviderUrl.value = it },
             apiKey = newProviderApiKey,
-            onApiKeyChange = { viewModel.newProviderApiKey.value = it }
+            onApiKeyChange = { viewModel.newProviderApiKey.value = it },
+            model = newProviderModel,
+            onModelChange = { viewModel.newProviderModel.value = it }
         )
     }
 }
@@ -300,7 +310,7 @@ fun ProviderTypeBadge(type: ModelConfig.ModelProvider) {
 @Composable
 fun AddProviderDialog(
     onDismiss: () -> Unit,
-    onConfirm: (String, ModelConfig.ModelProvider, String, String) -> Unit,
+    onConfirm: (String, ModelConfig.ModelProvider, String, String, String) -> Unit,
     providerType: ModelConfig.ModelProvider,
     onProviderTypeChange: (ModelConfig.ModelProvider) -> Unit,
     name: String,
@@ -308,13 +318,15 @@ fun AddProviderDialog(
     url: String,
     onUrlChange: (String) -> Unit,
     apiKey: String,
-    onApiKeyChange: (String) -> Unit
+    onApiKeyChange: (String) -> Unit,
+    model: String,
+    onModelChange: (String) -> Unit
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
-            Button(onClick = { onConfirm(name, providerType, url, apiKey) }, enabled = name.isNotBlank() && url.isNotBlank()) {
-                Text("Add")
+            Button(onClick = { onConfirm(name, providerType, url, apiKey, model) }, enabled = name.isNotBlank() && url.isNotBlank()) {
+                Text("Save")
             }
         },
         dismissButton = {
@@ -322,7 +334,7 @@ fun AddProviderDialog(
                 Text("Cancel")
             }
         },
-        title = { Text("Add Custom Provider") },
+        title = { Text("Add / Edit Provider") },
         text = {
             Column(Modifier.padding(16.dp).fillMaxWidth()) {
                 TextField(
@@ -330,7 +342,7 @@ fun AddProviderDialog(
                     onValueChange = onNameChange,
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text("Provider Name") },
-                    placeholder = { Text("e.g., My OpenAI, Local Ollama") },
+                    placeholder = { Text("e.g., My Ollama, OpenAI") },
                     singleLine = true
                 )
 
@@ -358,7 +370,8 @@ fun AddProviderDialog(
                         modifier = Modifier.fillMaxWidth(0.9f)
                     ) {
                         val types = listOf(
-                            ModelConfig.ModelProvider.CUSTOM_OLLAMA
+                            ModelConfig.ModelProvider.CUSTOM_OLLAMA,
+                            ModelConfig.ModelProvider.CUSTOM_OPENAI
                         )
                         types.forEach { type ->
                             androidx.compose.material3.DropdownMenuItem(
@@ -379,7 +392,19 @@ fun AddProviderDialog(
                     onValueChange = onUrlChange,
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text("Base URL") },
-                    placeholder = { Text("http://localhost:11434/v1 (Ollama default)") },
+                    placeholder = { Text("http://192.168.1.X:11434") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
+                )
+
+                androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(top = 16.dp))
+
+                TextField(
+                    value = model,
+                    onValueChange = onModelChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Model Name (optional)") },
+                    placeholder = { Text("e.g., qwen2.5:0.5b or smollm:135m") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
                 )

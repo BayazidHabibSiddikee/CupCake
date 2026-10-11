@@ -173,11 +173,13 @@ class ChatViewModel @Inject constructor(
             getApiProvidersUseCase().collect { providerList ->
                 val active = providerList.firstOrNull { it.isEnabled }
                 if (active != null) {
+                    val fallback = if (active.providerType == ModelConfig.ModelProvider.CUSTOM_OLLAMA) "qwen2.5:0.5b" else "gpt-3.5-turbo"
+                    val chosenModel = active.models.firstOrNull()?.takeIf { it.isNotBlank() } ?: fallback
                     val newConfig = _modelConfig.value.copy(
                         provider = active.providerType,
                         customEndpoint = active.baseUrl,
                         apiKey = active.apiKey,
-                        modelName = active.models.firstOrNull() ?: _modelConfig.value.modelName
+                        modelName = chosenModel
                     )
                     _modelConfig.value = newConfig
                 } else {

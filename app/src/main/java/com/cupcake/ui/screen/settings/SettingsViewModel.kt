@@ -7,6 +7,7 @@ import com.cupcake.data.model.ModelConfig
 import com.cupcake.domain.usecase.AddApiProviderUseCase
 import com.cupcake.domain.usecase.DeleteApiProviderUseCase
 import com.cupcake.domain.usecase.GetApiProvidersUseCase
+import com.cupcake.domain.usecase.GetProviderModelsUseCase
 import com.cupcake.domain.usecase.TestProviderConnectionUseCase
 import com.cupcake.domain.usecase.UpdateApiProviderUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,7 +24,8 @@ class SettingsViewModel @Inject constructor(
     private val addProviderUseCase: AddApiProviderUseCase,
     private val updateProviderUseCase: UpdateApiProviderUseCase,
     private val deleteProviderUseCase: DeleteApiProviderUseCase,
-    private val testConnectionUseCase: TestProviderConnectionUseCase
+    private val testConnectionUseCase: TestProviderConnectionUseCase,
+    private val getProviderModelsUseCase: GetProviderModelsUseCase
 ) : ViewModel() {
 
     val providers: StateFlow<List<ApiProvider>> = getProvidersUseCase()
@@ -35,6 +37,7 @@ class SettingsViewModel @Inject constructor(
     val newProviderName = MutableStateFlow("")
     val newProviderUrl = MutableStateFlow("")
     val newProviderApiKey = MutableStateFlow("")
+    val newProviderModel = MutableStateFlow("")
 
     val statusMessage = MutableStateFlow<String?>(null)
 
@@ -68,34 +71,51 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun addProvider(name: String, type: ModelConfig.ModelProvider, url: String, apiKey: String) {
+    fun addProvider(name: String, type: ModelConfig.ModelProvider, url: String, apiKey: String, model: String = "") {
         viewModelScope.launch {
             val idToEdit = editingProviderId.value
-            if (idToEdit != null) {
-                val provider = ApiProvider(
+            val initialModels = if (model.isNotBlank()) listOf(model.trim()) else emptyList()
+            val provider = if (idToEdit != null) {
+                ApiProvider(
                     id = idToEdit,
                     name = name,
                     providerType = type,
                     baseUrl = url,
-                    apiKey = apiKey
-                )
-                updateProviderUseCase(provider)
-                statusMessage.value = "Updated $name"
+                    apiKey = apiKey,
+                    models = initialModels
+                ).also { updateProviderUseCase(it) }
             } else {
-                val provider = ApiProvider(
+                ApiProvider(
                     name = name,
                     providerType = type,
                     baseUrl = url,
-                    apiKey = apiKey
-                )
-                addProviderUseCase(provider)
-                statusMessage.value = "Added $name"
+                    apiKey = apiKey,
+                    models = initialModels
+                ).let { addProviderUseCase(it) }
             }
+            statusMessage.value = if (idToEdit != null) "Updated $name" else "Added $name"
+
             // Clear form
             editingProviderId.value = null
             newProviderName.value = ""
             newProviderUrl.value = ""
             newProviderApiKey.value = ""
+            newProviderModel.value = ""
+
+            // Asynchronously fetch server models if none provided or to update list
+            try {
+                val fetched = getProviderModelsUseCase(provider)
+                if (fetched.isNotEmpty()) {
+                    val finalModels = if (model.isNotBlank() && fetched.contains(model.trim())) {
+                        listOf(model.trim()) + fetched.filter { it != model.trim() }
+                    } else if (model.isNotBlank()) {
+                        listOf(model.trim()) + fetched
+                    } else {
+                        fetched
+                    }
+                    updateProviderUseCase(provider.copy(models = finalModels))
+                }
+            } catch (_: Exception) {}
         }
     }
 
@@ -105,6 +125,7 @@ class SettingsViewModel @Inject constructor(
         newProviderName.value = provider.name
         newProviderUrl.value = provider.baseUrl
         newProviderApiKey.value = provider.apiKey
+        newProviderModel.value = provider.models.firstOrNull() ?: ""
         showAddProviderDialog.value = true
     }
 
@@ -119,10 +140,16 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             statusMessage.value = "Testing connection to ${provider.baseUrl}..."
             val success = testConnectionUseCase(provider)
-            statusMessage.value = if (success) {
-                "✓ Connected successfully to ${provider.name}"
+            if (success) {
+                val fetchedModels = getProviderModelsUseCase(provider)
+                if (fetchedModels.isNotEmpty()) {
+                    updateProviderUseCase(provider.copy(models = fetchedModels))
+                    statusMessage.value = "✓ Connected! Found ${fetchedModels.size} models: ${fetchedModels.take(3).joinToString(", ")}"
+                } else {
+                    statusMessage.value = "✓ Connected to ${provider.name} (no models returned by server)"
+                }
             } else {
-                "❌ Could not connect to ${provider.baseUrl}"
+                statusMessage.value = "❌ Could not connect to ${provider.baseUrl}"
             }
         }
     }
