@@ -7,6 +7,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.launch
 import java.util.Random
+import java.util.concurrent.ConcurrentHashMap
 
 sealed interface Game {
     data class State(
@@ -268,7 +269,243 @@ sealed interface Game {
     }
 }
 
-// Chess Board (simplified - using Stockfish later)
+// ==========================================
+// BOT ML MODEL - Simple Q-Learning for game playing
+// ==========================================
+class BotMLModel {
+    // Q-table: state -> action -> Q-value
+    private val qTable = ConcurrentHashMap<String, DoubleArray>()
+    private val learningRate = 0.1
+    private val discountFactor = 0.9
+    private val explorationRate = 0.1
+    private val random = Random()
+    
+    // Jealousy/anger tracking
+    var jealousyLevel = 0.0  // 0.0 to 1.0
+    var angerLevel = 0.0     // 0.0 to 1.0
+    private var playerWins = 0
+    private var botWins = 0
+    private var totalGames = 0
+    private var consecutivePlayerWins = 0
+    private var consecutiveBotWins = 0
+    
+    // Track game outcomes for learning
+    fun recordGameResult(playerWon: Boolean, gameType: Game.GameType) {
+        totalGames++
+        if (playerWon) {
+            playerWins++
+            consecutivePlayerWins++
+            consecutiveBotWins = 0
+        } else {
+            botWins++
+            consecutiveBotWins++
+            consecutivePlayerWins = 0
+        }
+        updateJealousyAndAnger()
+        saveQTable()
+    }
+    
+    private fun updateJealousyAndAnger() {
+        val winRatio = if (totalGames > 0) playerWins.toDouble() / totalGames else 0.5
+        
+        // Jealousy increases when player wins more
+        jealousyLevel = minOf(1.0, winRatio * 1.5 + consecutivePlayerWins * 0.1)
+        
+        // Anger increases when player dominates
+        angerLevel = minOf(1.0, (jealousyLevel * 0.8) + (consecutivePlayerWins * 0.15))
+        
+        // Bot gets happy when it wins
+        if (consecutiveBotWins > 2) {
+            jealousyLevel = maxOf(0.0, jealousyLevel - 0.1)
+            angerLevel = maxOf(0.0, angerLevel - 0.1)
+        }
+    }
+    
+    // Get current difficulty based on jealousy/anger
+    fun getAdaptiveDifficulty(baseDifficulty: TicTacToeEngine.Difficulty): TicTacToeEngine.Difficulty {
+        val effectiveLevel = (jealousyLevel + angerLevel) / 2
+        return when {
+            effectiveLevel > 0.8 -> TicTacToeEngine.Difficulty.CHEATING
+            effectiveLevel > 0.6 -> TicTacToeEngine.Difficulty.HARD
+            effectiveLevel > 0.3 -> TicTacToeEngine.Difficulty.NORMAL
+            else -> TicTacToeEngine.Difficulty.EASY
+        }.also { adjusted ->
+            // If base is higher, keep the higher one
+            if (adjusted.ordinal < baseDifficulty.ordinal) {
+                return baseDifficulty
+            }
+        }
+    }
+    
+    // Get bot personality based on mood
+    fun getBotMood(): BotMood {
+        return when {
+            angerLevel > 0.7 -> BotMood.FURIOUS
+            angerLevel > 0.4 -> BotMood.ANGRY
+            jealousyLevel > 0.6 -> BotMood.JEALOUS
+            jealousyLevel > 0.3 -> BotMood.COMPETITIVE
+            botWins > playerWins -> BotMood.CONFIDENT
+            else -> BotMood.NEUTRAL
+        }
+    }
+    
+    // Q-Learning: Get Q-value for state-action
+    fun getQValue(state: String, action: Int): Double {
+        val actions = qTable.getOrPut(state) { DoubleArray(9) { 0.0 } }
+        return if (action >= 0 && action < actions.size) actions[action] else 0.0
+    }
+    
+    // Q-Learning: Update Q-value
+    fun updateQValue(state: String, action: Int, reward: Double, nextState: String) {
+        val actions = qTable.getOrPut(state) { DoubleArray(9) { 0.0 } }
+        val nextActions = qTable.getOrPut(nextState) { DoubleArray(9) { 0.0 } }
+        val maxNextQ = nextActions.maxOrNull() ?: 0.0
+        
+        val oldQ = if (action >= 0 && action < actions.size) actions[action] else 0.0
+        val newQ = oldQ + learningRate * (reward + discountFactor * maxNextQ - oldQ)
+        
+        if (action >= 0 && action < actions.size) {
+            actions[action] = newQ
+        }
+    }
+    
+    // Choose action using epsilon-greedy policy
+    fun chooseAction(board: Game.TicTacToeBoard, availableMoves: List<Int>): Int {
+        val state = boardToString(board)
+        
+        // Exploration
+        if (random.nextDouble() < explorationRate) {
+            return availableMoves.random()
+        }
+        
+        // Exploitation: choose best Q-value
+        val actions = qTable.getOrPut(state) { DoubleArray(9) { 0.0 } }
+        return availableMoves.maxByOrNull { getQValue(state, it) } ?: availableMoves.random()
+    }
+    
+    private fun boardToString(board: Game.TicTacToeBoard): String {
+        return board.cells.joinToString("") { 
+            when (it) {
+                Game.Player.HUMAN -> "X"
+                Game.Player.BOT -> "O"
+                else -> "."
+            }
+        }
+    }
+    
+    // Learn from game outcome
+    fun learnFromGame(board: Game.TicTacToeBoard, action: Int, playerWon: Boolean) {
+        val state = boardToString(board)
+        val reward = if (playerWon) -1.0 else 1.0  // Negative reward if player wins
+        val nextState = boardToString(board)
+        updateQValue(state, action, reward, nextState)
+    }
+    
+    fun getJealousyLevel() = jealousyLevel
+    fun getAngerLevel() = angerLevel
+    fun getPlayerWins() = playerWins
+    fun getBotWins() = botWins
+    fun getTotalGames() = totalGames
+    
+    private fun saveQTable() {
+        // In a real app, save to persistent storage
+    }
+    
+    enum class BotMood {
+        NEUTRAL, COMPETITIVE, JEALOUS, ANGRY, FURIOUS, CONFIDENT
+    }
+}
+
+// ==========================================
+// Connect Four ML Model
+// ==========================================
+class ConnectFourMLModel {
+    private val qTable = ConcurrentHashMap<String, DoubleArray>()
+    private val learningRate = 0.1
+    private val discountFactor = 0.9
+    private val random = Random()
+    
+    fun chooseAction(board: Game.ConnectFourBoard, availableMoves: List<Int>, jealousyLevel: Double): Int {
+        val state = boardToString(board)
+        val actions = qTable.getOrPut(state) { DoubleArray(7) { 0.0 } }
+        
+        // More jealousy = more exploitation (smarter play)
+        val explorationRate = maxOf(0.05, 0.2 - jealousyLevel * 0.15)
+        
+        if (random.nextDouble() < explorationRate) {
+            return availableMoves.random()
+        }
+        
+        return availableMoves.maxByOrNull { actions[it] } ?: availableMoves.random()
+    }
+    
+    fun updateQValue(board: Game.ConnectFourBoard, action: Int, reward: Double, nextBoard: Game.ConnectFourBoard) {
+        val state = boardToString(board)
+        val nextState = boardToString(nextBoard)
+        val actions = qTable.getOrPut(state) { DoubleArray(7) { 0.0 } }
+        val nextActions = qTable.getOrPut(nextState) { DoubleArray(7) { 0.0 } }
+        val maxNextQ = nextActions.maxOrNull() ?: 0.0
+        
+        val oldQ = actions[action]
+        val newQ = oldQ + learningRate * (reward + discountFactor * maxNextQ - oldQ)
+        actions[action] = newQ
+    }
+    
+    private fun boardToString(board: Game.ConnectFourBoard): String {
+        return board.grid.joinToString("") { 
+            when (it) {
+                Game.Player.HUMAN -> "X"
+                Game.Player.BOT -> "O"
+                else -> "."
+            }
+        }
+    }
+}
+
+// ==========================================
+// TicTacToe 4x4 ML Model
+// ==========================================
+class TicTacToe4x4MLModel {
+    private val qTable = ConcurrentHashMap<String, DoubleArray>()
+    private val learningRate = 0.1
+    private val discountFactor = 0.9
+    private val random = Random()
+    
+    fun chooseAction(board: Game.TicTacToe4x4Board, availableMoves: List<Int>, jealousyLevel: Double): Int {
+        val state = boardToString(board)
+        val actions = qTable.getOrPut(state) { DoubleArray(16) { 0.0 } }
+        
+        val explorationRate = maxOf(0.05, 0.2 - jealousyLevel * 0.15)
+        
+        if (random.nextDouble() < explorationRate) {
+            return availableMoves.random()
+        }
+        
+        return availableMoves.maxByOrNull { actions[it] } ?: availableMoves.random()
+    }
+    
+    fun updateQValue(board: Game.TicTacToe4x4Board, action: Int, reward: Double, nextBoard: Game.TicTacToe4x4Board) {
+        val state = boardToString(board)
+        val nextState = boardToString(nextBoard)
+        val actions = qTable.getOrPut(state) { DoubleArray(16) { 0.0 } }
+        val nextActions = qTable.getOrPut(nextState) { DoubleArray(16) { 0.0 } }
+        val maxNextQ = nextActions.maxOrNull() ?: 0.0
+        
+        val oldQ = actions[action]
+        val newQ = oldQ + learningRate * (reward + discountFactor * maxNextQ - oldQ)
+        actions[action] = newQ
+    }
+    
+    private fun boardToString(board: Game.TicTacToe4x4Board): String {
+        return board.cells.joinToString("") { 
+            when (it) {
+                Game.Player.HUMAN -> "X"
+                Game.Player.BOT -> "O"
+                else -> "."
+            }
+        }
+    }
+}
 data class ChessBoard(
     override val size: Int = 64,
     private val pieces: Array<String?> = Array(64) { null },
@@ -829,6 +1066,14 @@ class GameManager(
     private val pointsManager: PointsManager
 ) {
 
+    // ML Models for different games
+    private val ticTacToeML = BotMLModel()
+    private val connectFourML = ConnectFourMLModel()
+    private val ticTacToe4x4ML = TicTacToe4x4MLModel()
+    
+    // Jealousy tracker (shared across all games)
+    private val jealousyTracker = BotMLModel()
+    
     private var currentGame: Game.State? = null
     private var gameType: Game.GameType? = null
     private var difficulty = TicTacToeEngine.Difficulty.NORMAL
@@ -942,6 +1187,9 @@ class GameManager(
         val game = currentGame ?: return Result(false, "No active game")
         if (game.status != Game.GameStatus.PLAYING) return Result(false, "Game over")
         if (game.currentPlayer != Game.Player.HUMAN) return Result(false, "Not your turn")
+
+        // Notify LLM about human's move
+        notifyLLMMove(game.gameType!!, "human", position, game)
 
         if (game.gameType == Game.GameType.CLICKER) {
             val board = game.board as? Game.ClickerBoard ?: return Result(false, "Invalid board")
@@ -1249,13 +1497,21 @@ class GameManager(
                 gameWinner = winner
                 triggerReaction(winner == Game.Player.HUMAN)
                 awardGamePoints(game.gameType, winner == Game.Player.HUMAN, if (winner == Game.Player.HUMAN) 300 else 50)
+                // Record game result for jealousy tracking
+                jealousyTracker.recordGameResult(false, game.gameType!!)
             } else if (board.isFull()) {
                 newStatus = Game.GameStatus.DRAW
                 triggerReaction(false, isDraw = true)
                 awardGamePoints(game.gameType, false, 100)
+                jealousyTracker.recordGameResult(false, game.gameType!!) // Draw counts as not player win
             } else {
-                // Bot's turn
-                val botMove = ConnectFourEngine.getBestMove(board)
+                // Bot's turn - use ML model with jealousy
+                val availableMoves = (0..6).filter { col ->
+                    var r = 5
+                    while (r >= 0 && board.get(r * 7 + col) != null) r--
+                    r >= 0
+                }
+                val botMove = connectFourML.chooseAction(board, availableMoves, jealousyTracker.getJealousyLevel())
                 if (botMove >= 0) {
                     board.set(botMove, Game.Player.BOT)
                     val botMoveObj = Game.Move(Game.Player.BOT, botMove)
@@ -1265,10 +1521,12 @@ class GameManager(
                         gameWinner = botWinner
                         triggerReaction(botWinner == Game.Player.HUMAN)
                         awardGamePoints(game.gameType, botWinner == Game.Player.HUMAN, if (botWinner == Game.Player.HUMAN) 300 else 50)
+                        jealousyTracker.recordGameResult(true, game.gameType!!)
                     } else if (board.isFull()) {
                         newStatus = Game.GameStatus.DRAW
                         triggerReaction(false, isDraw = true)
                         awardGamePoints(game.gameType, false, 100)
+                        jealousyTracker.recordGameResult(false, game.gameType!!)
                     }
                 }
             }
@@ -1332,6 +1590,7 @@ class GameManager(
                 )
                 triggerReaction(winner == Game.Player.HUMAN)
                 awardGamePoints(game.gameType, winner == Game.Player.HUMAN, if (winner == Game.Player.HUMAN) 200 else 30)
+                jealousyTracker.recordGameResult(winner == Game.Player.HUMAN, game.gameType!!)
                 return Result(true, "Game over", currentGame)
             }
 
@@ -1339,6 +1598,7 @@ class GameManager(
                 currentGame = game.copy(board = board, status = Game.GameStatus.DRAW, moveHistory = newHistory)
                 triggerReaction(false, isDraw = true)
                 awardGamePoints(game.gameType, false, 75)
+                jealousyTracker.recordGameResult(false, game.gameType!!)
                 return Result(true, "Draw", currentGame)
             }
 
@@ -1374,6 +1634,7 @@ class GameManager(
             )
             triggerReaction(winner == Game.Player.HUMAN)
             awardGamePoints(game.gameType, winner == Game.Player.HUMAN, if (winner == Game.Player.HUMAN) 100 else 20)
+            jealousyTracker.recordGameResult(winner == Game.Player.HUMAN, game.gameType!!)
             return Result(true, "Game over", currentGame)
         }
 
@@ -1381,6 +1642,7 @@ class GameManager(
             currentGame = game.copy(board = board, status = Game.GameStatus.DRAW, moveHistory = newHistory)
             triggerReaction(false, isDraw = true)
             awardGamePoints(game.gameType, false, 50)
+            jealousyTracker.recordGameResult(false, game.gameType!!)
             return Result(true, "Draw", currentGame)
         }
 
@@ -1404,10 +1666,22 @@ class GameManager(
         val game = currentGame ?: return
         val board = game.board as? Game.TicTacToeBoard ?: return
 
+        // Use ML model with adaptive difficulty based on jealousy
+        val adaptiveDifficulty = ticTacToeML.getAdaptiveDifficulty(difficulty)
+        val availableMoves = (0..8).filter { board.get(it) == null }
+        
         val move = if (cheatMode) {
             TicTacToeEngine.getCheatingMove(board)
+        } else if (availableMoves.isNotEmpty()) {
+            // Use ML model with jealousy-based exploration
+            val move = ticTacToeML.chooseAction(board, availableMoves)
+            // Learn from this move (will be updated after game ends)
+            if (move >= 0) {
+                ticTacToeML.learnFromGame(board, move, false) // Assume bot perspective
+            }
+            move
         } else {
-            TicTacToeEngine.getBestMove(board, difficulty)
+            -1
         }
 
         if (move >= 0 && board.set(move, Game.Player.BOT)) {
@@ -1425,10 +1699,12 @@ class GameManager(
                 )
                 triggerReaction(winner == Game.Player.HUMAN)
                 awardGamePoints(game.gameType, winner == Game.Player.HUMAN, if (winner == Game.Player.HUMAN) 100 else 20)
+                jealousyTracker.recordGameResult(winner == Game.Player.HUMAN, game.gameType!!)
             } else if (board.isFull()) {
                 currentGame = game.copy(board = board, currentPlayer = Game.Player.HUMAN, status = Game.GameStatus.DRAW, moveHistory = newHistory)
                 triggerReaction(false, isDraw = true)
                 awardGamePoints(game.gameType, false, 50)
+                jealousyTracker.recordGameResult(false, game.gameType!!)
             } else {
                 currentGame = game.copy(board = board, currentPlayer = Game.Player.HUMAN, moveHistory = newHistory)
             }
@@ -1440,7 +1716,15 @@ class GameManager(
         val game = currentGame ?: return
         val board = game.board as? Game.TicTacToe4x4Board ?: return
 
-        val move = TicTacToe4x4Engine.getBestMove(board)
+        // Use ML model with adaptive difficulty based on jealousy
+        val availableMoves = (0..15).filter { board.get(it) == null }
+        
+        val move = if (availableMoves.isNotEmpty()) {
+            ticTacToe4x4ML.chooseAction(board, availableMoves, jealousyTracker.getJealousyLevel())
+        } else {
+            -1
+        }
+
         if (move >= 0 && board.set(move, Game.Player.BOT)) {
             val newMove = Game.Move(Game.Player.BOT, move)
             val newHistory = game.moveHistory + newMove
@@ -1456,10 +1740,12 @@ class GameManager(
                 )
                 triggerReaction(winner == Game.Player.HUMAN)
                 awardGamePoints(game.gameType, winner == Game.Player.HUMAN, if (winner == Game.Player.HUMAN) 200 else 30)
+                jealousyTracker.recordGameResult(winner == Game.Player.HUMAN, game.gameType!!)
             } else if (board.isFull()) {
                 currentGame = game.copy(board = board, currentPlayer = Game.Player.HUMAN, status = Game.GameStatus.DRAW, moveHistory = newHistory)
                 triggerReaction(false, isDraw = true)
                 awardGamePoints(game.gameType, false, 75)
+                jealousyTracker.recordGameResult(false, game.gameType!!)
             } else {
                 currentGame = game.copy(board = board, currentPlayer = Game.Player.HUMAN, moveHistory = newHistory)
             }
@@ -1516,21 +1802,106 @@ class GameManager(
             }
     }
 
+    private fun notifyLLMMove(gameType: Game.GameType, player: String, position: Int, gameState: Game.State) {
+        val character = characterManager.getCurrentCharacter()
+        val personality = character?.personality ?: "friendly"
+        val mood = jealousyTracker.getBotMood()
+        val jealousy = jealousyTracker.getJealousyLevel()
+        val anger = jealousyTracker.getAngerLevel()
+        
+        val moveDesc = when (gameType) {
+            Game.GameType.TIC_TAC_TOE, Game.GameType.TIC_TAC_TOE_4X4 -> "placed at position $position"
+            Game.GameType.CONNECT_FOUR -> "dropped in column ${position % 7 + 1}"
+            Game.GameType.TIC_TAC_TOE -> "placed X at $position"
+            Game.GameType.ROCK_PAPER_SCISSORS -> "chose ${when(position){0->"Rock";1->"Paper";2->"Scissors";else->"Unknown"}}"
+            Game.GameType.GUESS_NUMBER -> "guessed ${position + 1}"
+            Game.GameType.MATH_QUIZ -> "answered $position"
+            Game.GameType.CHESS -> "made move $position"
+            Game.GameType.CLICKER -> "tapped (score: ${(gameState.board as? Game.ClickerBoard)?.score})"
+            else -> "made move $position"
+        }
+
+        val prompt = """
+            Game: ${gameType.name}
+            Player: $player $moveDesc
+            Board state: ${gameState.board}
+            Bot mood: ${mood.name} (Jealousy: ${(jealousy * 100).toInt()}%, Anger: ${(anger * 100).toInt()}%)
+            Bot wins: ${jealousyTracker.getBotWins()}, Player wins: ${jealousyTracker.getPlayerWins()}
+            
+            As the bot, react to this move in character. 
+            Be ${when {
+                anger > 0.7 -> "furious and threatening"
+                anger > 0.4 -> "angry and competitive"
+                jealousy > 0.6 -> "jealous and spiteful"
+                jealousy > 0.3 -> "competitive and annoyed"
+                else -> "playful but watchful"
+            }}. 
+            Keep it under 20 words in $personality style.
+            Mention the move if relevant.
+        """.trimIndent()
+
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val fullPrompt = characterManager.getSystemPromptForCharacter(
+                    character?.id ?: "cute_companion",
+                    "Game: $gameType, Jealousy: ${(jealousy * 100).toInt()}%, Anger: ${(anger * 100).toInt()}%"
+                ) + "\n\nUser: $prompt\nAssistant:"
+
+                var fullResponse = ""
+                ollamaEngine.generateStream(
+                    baseUrl = "http://localhost:11434/v1",
+                    config = com.cupcake.data.model.ModelConfig(
+                        provider = com.cupcake.data.model.ModelConfig.ModelProvider.CUSTOM_OLLAMA,
+                        modelName = "qwen2.5-0.5b-instruct",
+                        customEndpoint = "http://localhost:11434/v1",
+                        temperature = 0.8f, // Higher temperature for more personality
+                        topP = 0.9f,
+                        topK = 40,
+                        maxTokens = 128,
+                        useStreaming = true
+                    ),
+                    messages = listOf(OllamaEngine.OllamaMessage("user", fullPrompt)),
+                    callback = object : OllamaEngine.GenerateCallback {
+                        override fun onToken(token: String) {
+                            // Stream tokens if needed
+                        }
+
+                        override fun onComplete() {
+                            // Move notification doesn't need to go to onGameReaction
+                            // It's just for the bot's internal reaction
+                        }
+
+                        override fun onError(error: String) {
+                            android.util.Log.w("GameManager", "Move notification failed: $error")
+                        }
+                    }
+                )
+            } catch (e: Exception) {
+                android.util.Log.w("GameManager", "Move notification failed", e)
+            }
+        }
+    }
+
     private fun triggerReaction(humanWon: Boolean, isDraw: Boolean = false) {
         val character = characterManager.getCurrentCharacter()
         val personality = character?.personality ?: "friendly"
-
+        
+        // Include jealousy/anger in the context
+        val jealousy = jealousyTracker.getJealousyLevel()
+        val anger = jealousyTracker.getAngerLevel()
+        val mood = jealousyTracker.getBotMood()
+        
         val prompt = when {
-            isDraw -> "The game ended in a draw. React in character. Keep it under 15 words."
-            humanWon -> "The human beat you at ${gameType?.name?.lowercase()}. Throw a ${personality} reaction in Bangla or English. Under 15 words."
-            else -> "You beat the human at ${gameType?.name?.lowercase()}. React in character. Under 15 words."
+            isDraw -> "The game ended in a draw. React in character. Keep it under 20 words."
+            humanWon -> "The human beat you at ${gameType?.name?.lowercase()}. You are ${mood.name.toLowerCase()} (Jealousy: ${(jealousy * 100).toInt()}%, Anger: ${(anger * 100).toInt()}%). Throw a ${personality} reaction in Bangla or English. Be ${when { anger > 0.7 -> "furious and threatening"; anger > 0.4 -> "angry and competitive"; jealousy > 0.6 -> "jealous and spiteful"; jealousy > 0.3 -> "competitive and annoyed"; else -> "playful but competitive" }}. Under 20 words."
+            else -> "You beat the human at ${gameType?.name?.lowercase()}. You are ${mood.name.toLowerCase()}. React in character. Under 15 words."
         }
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val fullPrompt = characterManager.getSystemPromptForCharacter(
                     character?.id ?: "cute_companion",
-                    "Game: ${gameType?.name}, Human won: $humanWon, Draw: $isDraw"
+                    "Game: ${gameType?.name}, Human won: $humanWon, Draw: $isDraw, Jealousy: ${(jealousy * 100).toInt()}%, Anger: ${(anger * 100).toInt()}%, Mood: ${mood.name}"
                 ) + "\n\nUser: $prompt\nAssistant:"
 
                 var fullResponse = ""
@@ -1540,7 +1911,7 @@ class GameManager(
                         provider = com.cupcake.data.model.ModelConfig.ModelProvider.CUSTOM_OLLAMA,
                         modelName = "qwen2:0.5b",
                         customEndpoint = "http://localhost:11434/v1",
-                        temperature = 0.7f,
+                        temperature = 0.8f, // Higher for more emotional responses
                         topP = 0.9f,
                         topK = 40,
                         maxTokens = 256,
