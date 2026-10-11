@@ -240,14 +240,18 @@ class ApiClient @Inject constructor(
 
     suspend fun testConnection(provider: ApiProvider): Boolean {
         return try {
-            val url = "${provider.baseUrl}/models"
-            val request = Request.Builder()
-                .url(url)
-                .addHeader("Authorization", "Bearer ${provider.apiKey}")
-                .get()
-                .build()
+            val cleanBase = provider.baseUrl.removeSuffix("/")
+            val url = if (provider.providerType == ModelConfig.ModelProvider.CUSTOM_OLLAMA) {
+                if (cleanBase.endsWith("/v1")) "${cleanBase.removeSuffix("/v1")}/api/tags" else "$cleanBase/api/tags"
+            } else {
+                "$cleanBase/models"
+            }
+            val requestBuilder = Request.Builder().url(url).get()
+            if (provider.apiKey.isNotBlank()) {
+                requestBuilder.addHeader("Authorization", "Bearer ${provider.apiKey}")
+            }
 
-            okHttpClient.newCall(request).execute().use { response ->
+            okHttpClient.newCall(requestBuilder.build()).execute().use { response ->
                 response.isSuccessful
             }
         } catch (e: Exception) {
@@ -257,19 +261,32 @@ class ApiClient @Inject constructor(
 
     suspend fun fetchModels(provider: ApiProvider): List<String> {
         return try {
-            val url = "${provider.baseUrl}/models"
-            val request = Request.Builder()
-                .url(url)
-                .addHeader("Authorization", "Bearer ${provider.apiKey}")
-                .get()
-                .build()
+            val cleanBase = provider.baseUrl.removeSuffix("/")
+            val isOllama = provider.providerType == ModelConfig.ModelProvider.CUSTOM_OLLAMA
+            val url = if (isOllama) {
+                if (cleanBase.endsWith("/v1")) "${cleanBase.removeSuffix("/v1")}/api/tags" else "$cleanBase/api/tags"
+            } else {
+                "$cleanBase/models"
+            }
+            val requestBuilder = Request.Builder().url(url).get()
+            if (provider.apiKey.isNotBlank()) {
+                requestBuilder.addHeader("Authorization", "Bearer ${provider.apiKey}")
+            }
 
-            okHttpClient.newCall(request).execute().use { response ->
+            okHttpClient.newCall(requestBuilder.build()).execute().use { response ->
                 if (response.isSuccessful) {
-                    val json = JSONObject(response.body?.string() ?: "{}")
-                    val data = json.getJSONArray("data")
-                    (0 until data.length()).mapNotNull { i ->
-                        data.getJSONObject(i).optString("id")
+                    val bodyString = response.body?.string() ?: "{}"
+                    val json = JSONObject(bodyString)
+                    if (isOllama) {
+                        val models = json.optJSONArray("models") ?: JSONArray()
+                        (0 until models.length()).mapNotNull { i ->
+                            models.getJSONObject(i).optString("name").takeIf { it.isNotBlank() }
+                        }
+                    } else {
+                        val data = json.optJSONArray("data") ?: JSONArray()
+                        (0 until data.length()).mapNotNull { i ->
+                            data.getJSONObject(i).optString("id").takeIf { it.isNotBlank() }
+                        }
                     }
                 } else {
                     emptyList()

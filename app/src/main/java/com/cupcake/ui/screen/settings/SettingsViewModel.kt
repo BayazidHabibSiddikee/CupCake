@@ -36,15 +36,36 @@ class SettingsViewModel @Inject constructor(
     val newProviderUrl = MutableStateFlow("")
     val newProviderApiKey = MutableStateFlow("")
 
+    val statusMessage = MutableStateFlow<String?>(null)
+
     var onProviderSelected: ((ApiProvider) -> Unit)? = null
     var onLocalModelSelected: (() -> Unit)? = null
 
     fun selectProvider(provider: ApiProvider) {
-        onProviderSelected?.invoke(provider)
+        viewModelScope.launch {
+            // Enable this provider and disable others
+            val currentProviders = providers.value
+            currentProviders.forEach { p ->
+                if (p.id == provider.id && !p.isEnabled) {
+                    updateProviderUseCase(p.copy(isEnabled = true))
+                } else if (p.id != provider.id && p.isEnabled) {
+                    updateProviderUseCase(p.copy(isEnabled = false))
+                }
+            }
+            statusMessage.value = "Selected ${provider.name} (${provider.baseUrl})"
+            onProviderSelected?.invoke(provider)
+        }
     }
 
     fun selectLocalModel() {
-        onLocalModelSelected?.invoke()
+        viewModelScope.launch {
+            // Disable custom providers so local Ollama default is active
+            providers.value.filter { it.isEnabled }.forEach { p ->
+                updateProviderUseCase(p.copy(isEnabled = false))
+            }
+            statusMessage.value = "Selected default local Ollama (localhost:11434)"
+            onLocalModelSelected?.invoke()
+        }
     }
 
     fun addProvider(name: String, type: ModelConfig.ModelProvider, url: String, apiKey: String) {
@@ -59,6 +80,7 @@ class SettingsViewModel @Inject constructor(
                     apiKey = apiKey
                 )
                 updateProviderUseCase(provider)
+                statusMessage.value = "Updated $name"
             } else {
                 val provider = ApiProvider(
                     name = name,
@@ -67,6 +89,7 @@ class SettingsViewModel @Inject constructor(
                     apiKey = apiKey
                 )
                 addProviderUseCase(provider)
+                statusMessage.value = "Added $name"
             }
             // Clear form
             editingProviderId.value = null
@@ -88,13 +111,23 @@ class SettingsViewModel @Inject constructor(
     fun deleteProvider(id: String) {
         viewModelScope.launch {
             deleteProviderUseCase(id)
+            statusMessage.value = "Deleted provider"
         }
     }
 
     fun testConnection(provider: ApiProvider) {
         viewModelScope.launch {
+            statusMessage.value = "Testing connection to ${provider.baseUrl}..."
             val success = testConnectionUseCase(provider)
-            // Show result via snackbar or toast
+            statusMessage.value = if (success) {
+                "✓ Connected successfully to ${provider.name}"
+            } else {
+                "❌ Could not connect to ${provider.baseUrl}"
+            }
         }
+    }
+
+    fun clearStatusMessage() {
+        statusMessage.value = null
     }
 }

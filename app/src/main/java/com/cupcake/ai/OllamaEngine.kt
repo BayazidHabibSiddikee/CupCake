@@ -225,18 +225,18 @@ class OllamaEngine private constructor(
         }
     }
 
-    fun generateStream(
+    suspend fun generateStream(
         baseUrl: String,
         config: ModelConfig,
         messages: List<OllamaMessage>,
         callback: GenerateCallback
     ) {
-        CoroutineScope(Dispatchers.IO).launch {
-            if (!generateMutex.tryLock()) {
-                Log.w(TAG, "Engine busy, dropping generation request.")
-                callback.onError("Engine busy")
-                return@launch
-            }
+        if (!generateMutex.tryLock()) {
+            Log.w(TAG, "Engine busy, dropping generation request.")
+            callback.onError("Engine busy")
+            return
+        }
+        kotlinx.coroutines.withContext(Dispatchers.IO) {
             try {
                 val effectiveUrl = if (baseUrl.endsWith("/v1")) {
                     baseUrl.removeSuffix("/v1").removeSuffix("/")
@@ -326,7 +326,6 @@ class OllamaEngine private constructor(
 
                             val isDone = jsonObj["done"]?.jsonPrimitive?.booleanOrNull == true
                             if (isDone) {
-                                callback.onComplete()
                                 break
                             }
                         } catch (e: Exception) {

@@ -42,13 +42,10 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.CloudOff
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -67,6 +64,7 @@ fun SettingsScreen(
     val newProviderName by viewModel.newProviderName.collectAsStateWithLifecycle()
     val newProviderUrl by viewModel.newProviderUrl.collectAsStateWithLifecycle()
     val newProviderApiKey by viewModel.newProviderApiKey.collectAsStateWithLifecycle()
+    val statusMessage by viewModel.statusMessage.collectAsStateWithLifecycle()
 
     CupCakeTheme {
         Column(
@@ -82,6 +80,40 @@ fun SettingsScreen(
                 )
             )
 
+            // Status message feedback
+            statusMessage?.let { msg ->
+                androidx.compose.material3.Surface(
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.primaryContainer,
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = msg,
+                            fontSize = 13.sp,
+                            color = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.weight(1f)
+                        )
+                        IconButton(
+                            onClick = { viewModel.clearStatusMessage() },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                imageVector = androidx.compose.material.icons.Icons.Filled.Close,
+                                contentDescription = "Dismiss",
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
             // Providers list
             Column(
                 modifier = Modifier
@@ -92,8 +124,8 @@ fun SettingsScreen(
                 // Default Ollama model section
                 ProviderSection(
                     title = "Ollama (Local Server)",
-                    subtitle = "smollm / qwen2:0.5b via Ollama",
-                    isEnabled = true,
+                    subtitle = "smollm / qwen2:0.5b via Ollama (http://localhost:11434)",
+                    isEnabled = providers.none { it.isEnabled },
                     onClick = { viewModel.selectLocalModel() }
                 )
 

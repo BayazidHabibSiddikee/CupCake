@@ -253,20 +253,24 @@ viewModelScope.launch {
 
                         override fun onError(error: String) {
                             Log.e("ChatViewModel", "Generation failed: $error")
-                            fullResponse = ""
+                            addMessage(
+                                ChatMessage.system(
+                                    "❌ Ollama request failed: $error",
+                                    conversationId
+                                )
+                            )
                         }
                     }
                 )
             } catch (e: Exception) {
                 Log.e("ChatViewModel", "Generation failed", e)
-                fullResponse = ""
                 addMessage(
                     ChatMessage.system(
                         "❌ Generation failed: ${e.message}",
                         conversationId
                     )
                 )
-            }.also {
+            } finally {
                 _isGenerating.value = false
                 _currentResponse.value = ""
 
