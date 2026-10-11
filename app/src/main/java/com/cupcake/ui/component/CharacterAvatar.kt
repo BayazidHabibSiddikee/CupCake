@@ -27,9 +27,18 @@ fun CharacterAvatar(
             avatar.startsWith("/") ||
             avatar.startsWith("http://") ||
             avatar.startsWith("https://") ||
+            avatar.startsWith("android.resource://") ||
             avatar.endsWith(".png", ignoreCase = true) ||
             avatar.endsWith(".jpg", ignoreCase = true) ||
+            avatar.endsWith(".jpeg", ignoreCase = true) ||
+            avatar.endsWith(".gif", ignoreCase = true) ||
             avatar.endsWith(".webp", ignoreCase = true)
+
+    val imageModel = when {
+        avatar == "companion_hero" -> "file:///android_asset/companion_hero.jpg"
+        avatar.startsWith("/") -> "file://$avatar"
+        else -> avatar
+    }
 
     Box(
         modifier = modifier
@@ -37,9 +46,9 @@ fun CharacterAvatar(
             .background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center
     ) {
-        if (isImageUri) {
+        if (isImageUri || avatar == "companion_hero") {
             AsyncImage(
-                model = avatar,
+                model = imageModel,
                 contentDescription = contentDescription,
                 modifier = Modifier
                     .fillMaxSize()

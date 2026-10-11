@@ -85,6 +85,30 @@ fun HomeScreen(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Row(verticalAlignment = Alignment.CenterVertically) {
+                            val context = androidx.compose.ui.platform.LocalContext.current
+                            val activeCompanion = characters.firstOrNull { it.isSelected } ?: characters.firstOrNull()
+                            
+                            IconButton(onClick = {
+                                if (android.provider.Settings.canDrawOverlays(context)) {
+                                    if (activeCompanion != null) {
+                                        com.cupcake.service.ShimejiPetService.start(
+                                            context = context,
+                                            avatar = activeCompanion.avatar,
+                                            gif = activeCompanion.customGif,
+                                            name = activeCompanion.name
+                                        )
+                                        com.cupcake.service.ShimejiPetService.showSpeech(context, "✨ Desktop pet activated!")
+                                    }
+                                } else {
+                                    val intent = android.content.Intent(
+                                        android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                        android.net.Uri.parse("package:${context.packageName}")
+                                    )
+                                    context.startActivity(intent)
+                                }
+                            }) {
+                                Text("🐾", fontSize = 20.sp)
+                            }
                             IconButton(onClick = onNavigateToPoints) {
                                 Icon(
                                     imageVector = Icons.Filled.EmojiEvents,

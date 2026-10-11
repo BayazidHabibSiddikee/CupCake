@@ -5,10 +5,15 @@ import androidx.room.Room
 import com.cupcake.ai.CharacterManager
 import com.cupcake.ai.EnergyManager
 import com.cupcake.data.source.local.AppDatabase
+import android.os.Build
+import coil.ImageLoader
+import coil.ImageLoaderFactory
+import coil.decode.GifDecoder
+import coil.decode.ImageDecoderDecoder
 import dagger.hilt.android.HiltAndroidApp
 
 @HiltAndroidApp
-class CupCakeApplication : Application() {
+class CupCakeApplication : Application(), ImageLoaderFactory {
 
     override fun onCreate() {
         super.onCreate()
@@ -40,5 +45,18 @@ class CupCakeApplication : Application() {
                 android.util.Log.i("EspServer", "ESP32 $sessionId ${if (connected) "connected" else "disconnected"}")
             }
         )
+    }
+
+    override fun newImageLoader(): ImageLoader {
+        return ImageLoader.Builder(this)
+            .components {
+                if (Build.VERSION.SDK_INT >= 28) {
+                    add(ImageDecoderDecoder.Factory())
+                } else {
+                    add(GifDecoder.Factory())
+                }
+            }
+            .respectCacheHeaders(false)
+            .build()
     }
 }

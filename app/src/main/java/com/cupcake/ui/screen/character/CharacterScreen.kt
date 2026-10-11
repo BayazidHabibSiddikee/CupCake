@@ -48,12 +48,19 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.filled.Image
 import com.cupcake.ui.component.CharacterAvatar
 
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
+import androidx.compose.ui.platform.LocalContext
+import com.cupcake.service.ShimejiPetService
+
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun CharacterScreen(
     onClose: () -> Unit,
     viewModel: CharacterViewModel = hiltViewModel()
 ) {
+    val context = LocalContext.current
     val characters by viewModel.characters.collectAsStateWithLifecycle()
     val showCreateDialog by viewModel.showCreateDialog.collectAsStateWithLifecycle()
     val newCharName by viewModel.newCharName.collectAsStateWithLifecycle()
@@ -61,11 +68,22 @@ fun CharacterScreen(
     val newCharPrompt by viewModel.newCharPrompt.collectAsStateWithLifecycle()
     val newCharPersonality by viewModel.newCharPersonality.collectAsStateWithLifecycle()
     val newCharAvatar by viewModel.newCharAvatar.collectAsStateWithLifecycle()
+    val newCharGif by viewModel.newCharGif.collectAsStateWithLifecycle()
+    val newCharShimejiActive by viewModel.newCharShimejiActive.collectAsStateWithLifecycle()
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
         uri?.let { viewModel.newCharAvatar.value = it.toString() }
+    }
+
+    val gifPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let { 
+            viewModel.newCharGif.value = it.toString()
+            viewModel.newCharAvatar.value = it.toString()
+        }
     }
 
     CupCakeTheme {
@@ -74,7 +92,7 @@ fun CharacterScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             androidx.compose.material3.TopAppBar(
-                title = { Text("Characters") },
+                title = { Text("Characters & Mascot") },
                 navigationIcon = { IconButton(onClick = onClose) { Icon(imageVector = androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } },
                 actions = {
                     IconButton(onClick = { viewModel.showCreateDialog.value = true }) {
@@ -98,7 +116,28 @@ fun CharacterScreen(
                         isSelected = character.isSelected,
                         onSelect = { viewModel.selectCharacter(character.id) },
                         onEdit = { if (!character.isBuiltIn) viewModel.editCharacter(character) },
-                        onDelete = { if (!character.isBuiltIn) viewModel.deleteCharacter(character.id) }
+                        onDelete = { if (!character.isBuiltIn) viewModel.deleteCharacter(character.id) },
+                        onToggleShimeji = { enabled ->
+                            if (enabled && !Settings.canDrawOverlays(context)) {
+                                val intent = Intent(
+                                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                    Uri.parse("package:${context.packageName}")
+                                )
+                                context.startActivity(intent)
+                            } else {
+                                viewModel.toggleShimeji(character.id, enabled)
+                                if (enabled) {
+                                    ShimejiPetService.start(
+                                        context = context,
+                                        avatar = character.avatar,
+                                        gif = character.customGif,
+                                        name = character.name
+                                    )
+                                } else {
+                                    ShimejiPetService.stop(context)
+                                }
+                            }
+                        }
                     )
                 }
             }
@@ -158,7 +197,16 @@ fun CharacterScreen(
                             ) {
                                 Icon(imageVector = Icons.Default.Image, contentDescription = null, modifier = Modifier.size(16.dp))
                                 androidx.compose.foundation.layout.Spacer(Modifier.size(6.dp))
-                                Text("Choose Image / Art", fontSize = 12.sp)
+                                Text("Choose Image / Avatar", fontSize = 12.sp)
+                            }
+                            androidx.compose.material3.OutlinedButton(
+                                onClick = { gifPickerLauncher.launch("image/gif") },
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("🐾", fontSize = 16.sp)
+                                androidx.compose.foundation.layout.Spacer(Modifier.size(6.dp))
+                                Text(if (newCharGif != null) "GIF Selected ✓" else "Choose Animated GIF Pet", fontSize = 12.sp)
                             }
                             TextField(
                                 value = newCharAvatar,
@@ -220,7 +268,8 @@ fun CharacterCard(
     isSelected: Boolean,
     onSelect: () -> Unit,
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onToggleShimeji: (Boolean) -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -242,18 +291,20 @@ fun CharacterCard(
             ) {
                 androidx.compose.foundation.layout.Row(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
                 ) {
-                    // Avatar with custom image support
+                    // Avatar with custom image / GIF support
                     CharacterAvatar(
-                        avatar = character.avatar,
+                        avatar = character.customGif ?: character.avatar,
                         modifier = Modifier.size(48.dp),
                         emojiSize = 26.sp
                     )
 
                     androidx.compose.foundation.layout.Column {
                         androidx.compose.foundation.layout.Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(character.name, fontWeight = FontWeight.Medium, fontSize = 16.sp)
                             if (character.isBuiltIn) {
@@ -288,9 +339,18 @@ fun CharacterCard(
                     }
                 }
 
-                // Actions
-                if (!character.isBuiltIn) {
-                    androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                // Desktop Shimeji Floating Mascot Toggle & Edit Actions
+                androidx.compose.foundation.layout.Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    androidx.compose.material3.IconButton(
+                        onClick = { onToggleShimeji(!character.isShimejiActive) }
+                    ) {
+                        Text(if (character.isShimejiActive) "🐾" else "💤", fontSize = 20.sp)
+                    }
+
+                    if (!character.isBuiltIn) {
                         IconButton(onClick = onEdit) {
                             Icon(imageVector = androidx.compose.material.icons.Icons.Filled.Edit, contentDescription = "Edit")
                         }

@@ -240,6 +240,7 @@ dependencies {
     val serialization = libs.kotlinx.serialization.json.get()
     val serializationCore = libs.kotlinx.serialization.core.get()
     val coil = libs.coil.compose.get()
+    val coilGif = libs.coil.gif.get()
     val retrofit = libs.retrofit.retrofit.get()
     val retrofitScalars = libs.retrofit.converter.scalars.get()
     val okhttp = libs.okhttp.okhttp.get()
@@ -297,6 +298,7 @@ dependencies {
     implementation(serializationCore)
 
     implementation(coil)
+    implementation(coilGif)
 
     implementation(retrofit)
     implementation(retrofitScalars)

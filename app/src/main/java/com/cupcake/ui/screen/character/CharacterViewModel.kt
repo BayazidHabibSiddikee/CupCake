@@ -25,6 +25,8 @@ class CharacterViewModel @Inject constructor(
     val newCharPrompt = MutableStateFlow("")
     val newCharPersonality = MutableStateFlow("friendly")
     val newCharAvatar = MutableStateFlow("🎭")
+    val newCharGif = MutableStateFlow<String?>(null)
+    val newCharShimejiActive = MutableStateFlow(false)
 
     private fun refresh() {
         _characters.value = characterManager.getAllCharacters()
@@ -35,6 +37,13 @@ class CharacterViewModel @Inject constructor(
         refresh()
     }
 
+    fun toggleShimeji(characterId: String, enable: Boolean) {
+        val char = characterManager.getCharacter(characterId) ?: return
+        val updated = char.copy(isShimejiActive = enable)
+        characterManager.saveCustomCharacter(updated)
+        refresh()
+    }
+
     fun editCharacter(character: Character) {
         editingCharacterId.value = character.id
         newCharName.value = character.name
@@ -42,6 +51,8 @@ class CharacterViewModel @Inject constructor(
         newCharPrompt.value = character.systemPrompt
         newCharPersonality.value = character.personality
         newCharAvatar.value = character.avatar
+        newCharGif.value = character.customGif
+        newCharShimejiActive.value = character.isShimejiActive
         showCreateDialog.value = true
     }
 
@@ -56,6 +67,8 @@ class CharacterViewModel @Inject constructor(
         val personality = newCharPersonality.value.trim()
         val description = newCharDescription.value.trim()
         val avatar = newCharAvatar.value.trim().ifEmpty { "🎭" }
+        val gif = newCharGif.value?.trim()?.ifEmpty { null }
+        val isShimeji = newCharShimejiActive.value
         
         if (name.isBlank() || prompt.isBlank()) return
 
@@ -68,7 +81,9 @@ class CharacterViewModel @Inject constructor(
             personality = personality.ifEmpty { "friendly" },
             languages = listOf("en", "bn"),
             isBuiltIn = false,
-            isSelected = false
+            isSelected = false,
+            customGif = gif,
+            isShimejiActive = isShimeji
         )
 
         characterManager.saveCustomCharacter(character)
@@ -83,5 +98,7 @@ class CharacterViewModel @Inject constructor(
         newCharPrompt.value = ""
         newCharPersonality.value = "friendly"
         newCharAvatar.value = "🎭"
+        newCharGif.value = null
+        newCharShimejiActive.value = false
     }
 }

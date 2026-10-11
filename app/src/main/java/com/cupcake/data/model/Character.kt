@@ -12,7 +12,9 @@ data class Character(
     val personality: String,
     val languages: List<String> = listOf("en"),
     val isBuiltIn: Boolean = false,
-    var isSelected: Boolean = false
+    var isSelected: Boolean = false,
+    val customGif: String? = null,
+    val isShimejiActive: Boolean = false
 ) {
     fun withPromptAddition(addition: String): Character {
         return copy(systemPrompt = "$systemPrompt\n\n$addition")
