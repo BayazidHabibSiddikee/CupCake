@@ -121,7 +121,24 @@ class ShimejiPetService : Service() {
         val speechBubble = view.findViewById<View>(R.id.speech_bubble)
         val speechText = view.findViewById<TextView>(R.id.speech_text)
 
+        val closeBtn = view.findViewById<View>(R.id.pet_close_btn)
+        closeBtn?.setOnClickListener {
+            Log.i(TAG, "Dismissing floating pet via close button")
+            stopSelf()
+        }
+
         updatePetVisual(avatar, customGif)
+
+        // Emotion rotation for Marin on click
+        val marinEmotions = listOf(
+            "file:///android_asset/marin/emotions/normal.png",
+            "file:///android_asset/marin/emotions/excited.png",
+            "file:///android_asset/marin/emotions/laugh.png",
+            "file:///android_asset/marin/emotions/lovely.png",
+            "file:///android_asset/marin/emotions/confident.png",
+            "file:///android_asset/marin/emotions/flirty.png"
+        )
+        var emotionIndex = 0
 
         // Drag & Click Logic
         view.setOnTouchListener(object : View.OnTouchListener {
@@ -161,13 +178,18 @@ class ShimejiPetService : Service() {
                                 // Double Click -> Open App
                                 openApp()
                             } else {
-                                // Single Click -> Cute Reaction Speech Bubble
+                                // Single Click -> Emotion reaction + Cute Quote
+                                if (customGif?.contains("marin") == true || avatar?.contains("marin") == true) {
+                                    emotionIndex = (emotionIndex + 1) % marinEmotions.size
+                                    updatePetVisual(marinEmotions[emotionIndex], null)
+                                }
+
                                 val cuteQuotes = listOf(
-                                    "✨ I'm here with you!",
-                                    "💖 Thinking of something fun?",
-                                    "🐾 Need help? Double tap me!",
-                                    "🍰 Let's chat or play a game!",
-                                    "⭐ Keep going, you're doing great!"
+                                    "✨ I'm right here with you!",
+                                    "💖 Kyaa! What are we doing next?",
+                                    "🐾 Need help? Double tap to chat!",
+                                    "🍰 Let's chat or play a game together!",
+                                    "⭐ You're doing amazing today!"
                                 )
                                 showSpeechBubble(cuteQuotes.random())
                             }

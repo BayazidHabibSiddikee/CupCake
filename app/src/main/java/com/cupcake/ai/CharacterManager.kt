@@ -35,6 +35,18 @@ object CharacterManager {
         // Default companion bot characters
         val defaultCharacters = listOf(
             Character(
+                id = "marin_kitagawa",
+                name = "Marin",
+                description = "Energetic, expressive anime companion with animated VRM emotions",
+                systemPrompt = """You are Marin Kitagawa! You're super enthusiastic, cheerful, expressive, and fun-loving. You love cosplay, anime, games, and spending time together. You speak with high energy, often adding cheerful interjections like "Kyaa!", "Hehe!", "No way!", or "Let's do this!". Keep answers lively, natural, friendly, and concise.""",
+                avatar = "file:///android_asset/marin/emotions/normal.png",
+                personality = "energetic",
+                languages = listOf("en", "ja", "bn"),
+                isBuiltIn = true,
+                customGif = "file:///android_asset/marin/marin_idle.gif",
+                isShimejiActive = false
+            ),
+            Character(
                 id = "cute_companion",
                 name = "Cute Companion",
                 description = "A friendly, helpful AI companion",

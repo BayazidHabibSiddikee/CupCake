@@ -33,25 +33,50 @@
     <!-- Pet Mascot Container -->
     <FrameLayout
         android:layout_width="86dp"
-        android:layout_height="86dp"
-        android:background="@drawable/bg_pet_circle"
-        android:padding="4dp">
+        android:layout_height="86dp">
 
-        <ImageView
-            android:id="@+id/pet_image"
+        <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:scaleType="centerInside"
-            android:contentDescription="Desktop Pet" />
+            android:background="@drawable/bg_pet_circle"
+            android:padding="4dp">
 
-        <TextView
-            android:id="@+id/pet_emoji"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:gravity="center"
-            android:textSize="44sp"
-            android:text="🐱"
-            android:visibility="gone" />
+            <ImageView
+                android:id="@+id/pet_image"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerInside"
+                android:contentDescription="Desktop Pet" />
+
+            <TextView
+                android:id="@+id/pet_emoji"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:textSize="44sp"
+                android:text="🐱"
+                android:visibility="gone" />
+        </FrameLayout>
+
+        <!-- Close / Dismiss Button on top-right of pet -->
+        <FrameLayout
+            android:id="@+id/pet_close_btn"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_gravity="top|end"
+            android:background="@drawable/bg_speech_bubble"
+            android:clickable="true"
+            android:focusable="true">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:text="✕" />
+        </FrameLayout>
     </FrameLayout>
 
 </LinearLayout>

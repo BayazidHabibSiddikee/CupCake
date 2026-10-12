@@ -281,6 +281,30 @@ fun CharacterHeader(
             }
             
             Row(verticalAlignment = Alignment.CenterVertically) {
+                val context = androidx.compose.ui.platform.LocalContext.current
+                androidx.compose.material3.IconButton(
+                    onClick = {
+                        if (android.provider.Settings.canDrawOverlays(context)) {
+                            // If running, we can start with current character or toggle
+                            com.cupcake.service.ShimejiPetService.start(
+                                context = context,
+                                avatar = characterAvatar,
+                                gif = if (characterName.contains("Marin", ignoreCase = true)) "file:///android_asset/marin/marin_idle.gif" else null,
+                                name = characterName
+                            )
+                            com.cupcake.service.ShimejiPetService.showSpeech(context, "✨ Activated on screen!")
+                        } else {
+                            val intent = android.content.Intent(
+                                android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                android.net.Uri.parse("package:${context.packageName}")
+                            )
+                            context.startActivity(intent)
+                        }
+                    },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Text("🐾", fontSize = 18.sp)
+                }
                 androidx.compose.material3.IconButton(
                     onClick = onSwitchClick,
                     modifier = Modifier.size(36.dp)
