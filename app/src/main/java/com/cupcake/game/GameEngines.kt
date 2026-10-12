@@ -228,6 +228,16 @@ object MemoryMatchEngine {
             moves = newMoves
         )
     }
+
+    fun unflip(board: Game.MemoryMatchBoard, indices: List<Int>): Game.MemoryMatchBoard {
+        val newCards = board.cards.toMutableList()
+        for (i in indices) {
+            if (i in newCards.indices && !newCards[i].isMatched) {
+                newCards[i] = newCards[i].copy(isFlipped = false)
+            }
+        }
+        return board.copy(cards = newCards.toList())
+    }
 }
 
 object HangmanEngine {
@@ -308,7 +318,11 @@ object NumberBaseEngine {
         val number = (1..255).random()
         val fromBase = BASES.random()
         val toBase = BASES.filter { it != fromBase }.random()
-        val correctAnswer = convertBase(number.toString(), fromBase, toBase)
+        // Render the decimal number in the source base first, then convert that
+        // representation to the target base (parsing a decimal string as e.g. binary
+        // would throw NumberFormatException).
+        val sourceRepresentation = formatInBase(number, fromBase)
+        val correctAnswer = convertBase(sourceRepresentation, fromBase, toBase)
         return Game.NumberBaseBoard.NumberBaseQuestion(number, fromBase, toBase, correctAnswer.uppercase())
     }
 
@@ -341,6 +355,9 @@ object NumberBaseEngine {
     }
 
     fun getBaseName(base: Int): String = BASE_NAMES[base] ?: base.toString()
+
+    /** Renders a decimal number in the given base (e.g. 182 in base 2 -> "10110110"). */
+    fun formatInBase(number: Int, base: Int): String = number.toString(base).uppercase()
 }
 
 object ReactionTimeEngine {

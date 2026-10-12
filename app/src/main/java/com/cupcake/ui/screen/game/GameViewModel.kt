@@ -60,6 +60,20 @@ class GameViewModel @Inject constructor(
         }
     }
 
+    fun submitTextAnswer(answer: String) {
+        val result = gameManager.submitTextAnswer(answer)
+        _gameState.value = gameManager.getCurrentState()?.let {
+            com.cupcake.game.GameManager.Result(result.success, result.message, it)
+        }
+    }
+
+    fun submitMastermindGuess(guess: List<Int>) {
+        val result = gameManager.submitMastermindGuess(guess)
+        _gameState.value = gameManager.getCurrentState()?.let {
+            com.cupcake.game.GameManager.Result(result.success, result.message, it)
+        }
+    }
+
     fun endGame() {
         gameManager.startGame(com.cupcake.game.Game.GameType.TIC_TAC_TOE) // reset
         _gameState.value = null

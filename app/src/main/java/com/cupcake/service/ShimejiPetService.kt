@@ -8,6 +8,7 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.graphics.Color
 import android.graphics.PixelFormat
 import android.net.Uri
 import android.os.Build
@@ -21,6 +22,10 @@ import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
+import android.webkit.WebChromeClient
+import android.webkit.WebSettings
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import android.widget.ImageView
 import android.widget.TextView
 import coil.load
@@ -31,12 +36,13 @@ import kotlin.math.abs
 
 /**
  * Shimeji Desktop-Pet Floating Overlay Service.
- * Renders a draggable, animated desktop pet mascot on top of Android apps.
+ * Renders a draggable, animated desktop pet mascot on top of Android apps with 3D VRM support.
  */
 class ShimejiPetService : Service() {
 
     private var windowManager: WindowManager? = null
     private var floatView: View? = null
+    private var petVrmView: WebView? = null
     private var layoutParams: WindowManager.LayoutParams? = null
 
     private var initialX = 0
@@ -127,17 +133,27 @@ class ShimejiPetService : Service() {
             stopSelf()
         }
 
+        // Initialize 3D VRM Mascot WebView
+        petVrmView = view.findViewById<WebView>(R.id.pet_vrm_view)?.apply {
+            setBackgroundColor(Color.TRANSPARENT)
+            settings.apply {
+                javaScriptEnabled = true
+                domStorageEnabled = true
+                allowFileAccess = true
+                allowContentAccess = true
+                allowFileAccessFromFileURLs = true
+                allowUniversalAccessFromFileURLs = true
+                cacheMode = WebSettings.LOAD_NO_CACHE
+            }
+            webChromeClient = WebChromeClient()
+            webViewClient = object : WebViewClient() {}
+            loadUrl("file:///android_asset/vrm/vrm_viewer.html")
+        }
+
         updatePetVisual(avatar, customGif)
 
-        // Emotion rotation for Marin on click
-        val marinEmotions = listOf(
-            "file:///android_asset/marin/emotions/normal.png",
-            "file:///android_asset/marin/emotions/excited.png",
-            "file:///android_asset/marin/emotions/laugh.png",
-            "file:///android_asset/marin/emotions/lovely.png",
-            "file:///android_asset/marin/emotions/confident.png",
-            "file:///android_asset/marin/emotions/flirty.png"
-        )
+        // VRM expression cycle on tap
+        val vrmExpressions = listOf("happy", "surprised", "angry", "relaxed")
         var emotionIndex = 0
 
         // Drag & Click Logic
@@ -161,7 +177,11 @@ class ShimejiPetService : Service() {
                         val dy = (event.rawY - initialTouchY).toInt()
 
                         if (abs(dx) > 10 || abs(dy) > 10) {
-                            isDragging = true
+                            if (!isDragging) {
+                                isDragging = true
+                                // Trigger VRM walking motion when moving around screen
+                                petVrmView?.evaluateJavascript("window.setWalking && window.setWalking(true);", null)
+                            }
                         }
 
                         if (isDragging) {
@@ -172,6 +192,8 @@ class ShimejiPetService : Service() {
                         return true
                     }
                     MotionEvent.ACTION_UP -> {
+                        petVrmView?.evaluateJavascript("window.setWalking && window.setWalking(false);", null)
+
                         if (isDragging) {
                             val displayMetrics = resources.displayMetrics
                             val screenHeight = displayMetrics.heightPixels
@@ -188,17 +210,16 @@ class ShimejiPetService : Service() {
                                 openApp()
                             } else {
                                 // Single Click -> Emotion reaction + Cute Quote
-                                if (customGif?.contains("marin") == true || avatar?.contains("marin") == true) {
-                                    emotionIndex = (emotionIndex + 1) % marinEmotions.size
-                                    updatePetVisual(marinEmotions[emotionIndex], null)
-                                }
+                                val exp = vrmExpressions[emotionIndex % vrmExpressions.size]
+                                petVrmView?.evaluateJavascript("window.setExpression && window.setExpression('$exp', 1.0);", null)
+                                emotionIndex++
 
                                 val cuteQuotes = listOf(
-                                    "✨ I'm right here with you!",
-                                    "💖 Kyaa! What are we doing next?",
-                                    "🐾 Need help? Double tap to chat!",
-                                    "🍰 Let's chat or play a game together!",
-                                    "⭐ You're doing amazing today!"
+                                    "✨ Kyaa! I'm right here on your screen!",
+                                    "💖 Don't ignore me! Let's play or chat!",
+                                    "🐾 Need me? Double tap to open CupCake!",
+                                    "🍰 Win a game against me today!",
+                                    "⭐ You're doing great! Keep going!"
                                 )
                                 showSpeechBubble(cuteQuotes.random())
                             }
@@ -252,8 +273,12 @@ class ShimejiPetService : Service() {
         speechText.text = text
         speechBubble.visibility = View.VISIBLE
 
+        // Trigger VRM talking animation
+        petVrmView?.evaluateJavascript("window.setTalking && window.setTalking(true);", null)
+
         speechBubbleDismissRunnable = Runnable {
             speechBubble.visibility = View.GONE
+            petVrmView?.evaluateJavascript("window.setTalking && window.setTalking(false);", null)
         }
         handler.postDelayed(speechBubbleDismissRunnable!!, 4000)
     }
@@ -315,6 +340,8 @@ class ShimejiPetService : Service() {
             }
             floatView = null
         }
+        petVrmView?.destroy()
+        petVrmView = null
         speechBubbleDismissRunnable?.let { handler.removeCallbacks(it) }
         super.onDestroy()
     }

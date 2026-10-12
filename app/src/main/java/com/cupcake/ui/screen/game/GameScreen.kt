@@ -173,6 +173,46 @@ fun GameScreen(
                         state = boardState,
                         onRestart = { viewModel.restartGame() }
                     )
+                    com.cupcake.game.Game.GameType.TIC_TAC_TOE_4X4 -> TicTacToe4x4BoardUI(
+                        state = boardState,
+                        onCellClick = { pos -> viewModel.makeMove(pos) },
+                        onRestart = { viewModel.restartGame() }
+                    )
+                    com.cupcake.game.Game.GameType.CONNECT_FOUR -> ConnectFourBoardUI(
+                        state = boardState,
+                        onColumnClick = { col -> viewModel.makeMove(col) },
+                        onRestart = { viewModel.restartGame() }
+                    )
+                    com.cupcake.game.Game.GameType.MEMORY_MATCH -> MemoryMatchBoardUI(
+                        state = boardState,
+                        onCardClick = { pos -> viewModel.makeMove(pos) },
+                        onRestart = { viewModel.restartGame() }
+                    )
+                    com.cupcake.game.Game.GameType.HANGMAN -> HangmanBoardUI(
+                        state = boardState,
+                        onGuess = { pos -> viewModel.makeMove(pos) },
+                        onRestart = { viewModel.restartGame() }
+                    )
+                    com.cupcake.game.Game.GameType.WORD_SCRAMBLE -> WordScrambleBoardUI(
+                        state = boardState,
+                        onSubmit = { answer -> viewModel.submitTextAnswer(answer) },
+                        onRestart = { viewModel.restartGame() }
+                    )
+                    com.cupcake.game.Game.GameType.NUMBER_BASE -> NumberBaseBoardUI(
+                        state = boardState,
+                        onSubmit = { answer -> viewModel.submitTextAnswer(answer) },
+                        onRestart = { viewModel.restartGame() }
+                    )
+                    com.cupcake.game.Game.GameType.REACTION_TIME -> ReactionTimeBoardUI(
+                        state = boardState,
+                        onTap = { viewModel.makeMove(0) },
+                        onRestart = { viewModel.restartGame() }
+                    )
+                    com.cupcake.game.Game.GameType.MASTERMIND -> MastermindBoardUI(
+                        state = boardState,
+                        onSubmit = { guess -> viewModel.submitMastermindGuess(guess) },
+                        onRestart = { viewModel.restartGame() }
+                    )
                     else -> {
                         Box(
                             modifier = Modifier.fillMaxSize(),

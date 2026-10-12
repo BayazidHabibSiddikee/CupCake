@@ -31,11 +31,13 @@ class GameManager(
     private var gameType: Game.GameType? = null
     private var difficulty = TicTacToeEngine.Difficulty.NORMAL
     private var cheatMode = false
+    private var pendingMemoryUnflip: List<Int>? = null
 
     fun startGame(type: Game.GameType, diff: TicTacToeEngine.Difficulty = TicTacToeEngine.Difficulty.NORMAL): Game.State {
         gameType = type
         difficulty = diff
         cheatMode = (diff == TicTacToeEngine.Difficulty.CHEATING)
+        pendingMemoryUnflip = null
 
         currentGame = when (type) {
             Game.GameType.TIC_TAC_TOE -> Game.State(
@@ -285,6 +287,7 @@ class GameManager(
         }
 
         if (game.gameType == Game.GameType.MEMORY_MATCH) {
+            if (pendingMemoryUnflip != null) return Result(false, "Cards are flipping back")
             val board = game.board as? Game.MemoryMatchBoard ?: return Result(false, "Invalid board")
             val newBoard = MemoryMatchEngine.flipCard(board, position)
             val newHistory = game.moveHistory + Game.Move(Game.Player.HUMAN, position)
@@ -303,6 +306,19 @@ class GameManager(
                 winner = winner,
                 moveHistory = newHistory
             )
+
+            // Two cards face up with no match: flip them back after a short delay
+            val mismatched = newBoard.cards.indices.filter {
+                newBoard.cards[it].isFlipped && !newBoard.cards[it].isMatched
+            }
+            if (mismatched.size == 2) {
+                pendingMemoryUnflip = mismatched
+                CoroutineScope(Dispatchers.IO).launch {
+                    kotlinx.coroutines.delay(900)
+                    unflipMemoryCards()
+                }
+            }
+
             onGameStateChanged?.invoke(currentGame)
             return Result(true, "Flipped card ${position + 1}", currentGame)
         }
@@ -613,6 +629,134 @@ class GameManager(
         }
 
         return Result(true, "Move made", currentGame)
+    }
+
+    /**
+     * Submit a typed answer for games that need one (Word Scramble, Number Base).
+     * Unlike [makeHumanMove] this carries the actual text instead of a board position,
+     * so the engine can really check the answer.
+     */
+    fun submitTextAnswer(answer: String): Result {
+        val game = currentGame ?: return Result(false, "No active game")
+        if (game.status != Game.GameStatus.PLAYING) return Result(false, "Game over")
+
+        return when (game.gameType) {
+            Game.GameType.WORD_SCRAMBLE -> {
+                val board = game.board as? Game.WordScrambleBoard ?: return Result(false, "Invalid board")
+                notifyLLMMove(game.gameType, "human", answer.length, game)
+                val newBoard = WordScrambleEngine.checkAnswer(board, answer)
+                val newHistory = game.moveHistory + Game.Move(Game.Player.HUMAN, answer.length)
+
+                val (newStatus, winner) = if (newBoard.isFull()) {
+                    triggerReaction(newBoard.solved)
+                    if (newBoard.solved) {
+                        awardGamePoints(game.gameType, true, 120 - newBoard.attempts * 30)
+                        Game.GameStatus.HUMAN_WON to Game.Player.HUMAN
+                    } else {
+                        awardGamePoints(game.gameType, false, 15)
+                        Game.GameStatus.BOT_WON to Game.Player.BOT
+                    }
+                } else {
+                    Game.GameStatus.PLAYING to null
+                }
+
+                currentGame = game.copy(
+                    board = newBoard,
+                    status = newStatus,
+                    winner = winner,
+                    moveHistory = newHistory
+                )
+                onGameStateChanged?.invoke(currentGame)
+                Result(
+                    true,
+                    if (newBoard.solved) "Solved in ${newBoard.attempts} attempt(s)!"
+                    else "Attempt ${newBoard.attempts}/${newBoard.maxAttempts}",
+                    currentGame
+                )
+            }
+
+            Game.GameType.NUMBER_BASE -> {
+                val board = game.board as? Game.NumberBaseBoard ?: return Result(false, "Invalid board")
+                notifyLLMMove(game.gameType, "human", answer.length, game)
+                val newBoard = NumberBaseEngine.checkAnswer(board, answer)
+                val newHistory = game.moveHistory + Game.Move(Game.Player.HUMAN, answer.length)
+
+                val (newStatus, winner) = if (newBoard.isFull()) {
+                    val humanWon = newBoard.correctAnswers > (newBoard.questionsAnswered - newBoard.correctAnswers)
+                    triggerReaction(humanWon)
+                    if (humanWon) {
+                        awardGamePoints(game.gameType, true, newBoard.correctAnswers * 20)
+                        Game.GameStatus.HUMAN_WON to Game.Player.HUMAN
+                    } else {
+                        awardGamePoints(game.gameType, false, newBoard.correctAnswers * 10)
+                        Game.GameStatus.BOT_WON to Game.Player.BOT
+                    }
+                } else {
+                    Game.GameStatus.PLAYING to null
+                }
+
+                currentGame = game.copy(
+                    board = newBoard,
+                    status = newStatus,
+                    winner = winner,
+                    moveHistory = newHistory
+                )
+                onGameStateChanged?.invoke(currentGame)
+                Result(true, "Answer ${newBoard.questionsAnswered}/10", currentGame)
+            }
+
+            else -> Result(false, "This game does not take text answers")
+        }
+    }
+
+    /**
+     * Submit a full 4-color guess for Mastermind with real answer checking.
+     * Each color is an index into the 6-color palette (0-5).
+     */
+    fun submitMastermindGuess(guess: List<Int>): Result {
+        val game = currentGame ?: return Result(false, "No active game")
+        if (game.status != Game.GameStatus.PLAYING) return Result(false, "Game over")
+        if (game.gameType != Game.GameType.MASTERMIND) return Result(false, "Mastermind is not the active game")
+        if (guess.size != 4 || guess.any { it !in 0..5 }) return Result(false, "Guess must be 4 colors (0-5)")
+
+        val board = game.board as? Game.MastermindBoard ?: return Result(false, "Invalid board")
+        notifyLLMMove(game.gameType, "human", guess.first(), game)
+        val newBoard = MastermindEngine.checkWin(board, guess)
+        val newHistory = game.moveHistory + Game.Move(Game.Player.HUMAN, guess.first())
+
+        val (newStatus, winner) = if (newBoard.isFull()) {
+            val won = newBoard.solved
+            triggerReaction(won)
+            if (won) {
+                awardGamePoints(game.gameType, true, 400 - newBoard.guesses.size * 30)
+                Game.GameStatus.HUMAN_WON to Game.Player.HUMAN
+            } else {
+                awardGamePoints(game.gameType, false, 25)
+                Game.GameStatus.BOT_WON to Game.Player.BOT
+            }
+        } else {
+            Game.GameStatus.PLAYING to null
+        }
+
+        currentGame = game.copy(
+            board = newBoard,
+            status = newStatus,
+            winner = winner,
+            moveHistory = newHistory
+        )
+        onGameStateChanged?.invoke(currentGame)
+        val last = newBoard.guesses.lastOrNull()
+        return Result(true, "Exact: ${last?.exactMatches ?: 0}, Color: ${last?.colorMatches ?: 0}", currentGame)
+    }
+
+    private fun unflipMemoryCards() {
+        val indices = pendingMemoryUnflip ?: return
+        pendingMemoryUnflip = null
+        val game = currentGame ?: return
+        if (game.gameType != Game.GameType.MEMORY_MATCH) return
+        val board = game.board as? Game.MemoryMatchBoard ?: return
+        currentGame = game.copy(board = MemoryMatchEngine.unflip(board, indices))
+        onGameStateChanged?.invoke(currentGame)
     }
 
     private fun makeBotMove() {
