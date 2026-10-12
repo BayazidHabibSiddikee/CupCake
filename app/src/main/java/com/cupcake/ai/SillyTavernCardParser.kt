@@ -220,38 +220,40 @@ object SillyTavernCardParser {
         }
     }
 
+    fun replaceTemplateMacros(text: String, charName: String, userName: String = "User"): String {
+        return text
+            .replace("{{user}}", userName, ignoreCase = true)
+            .replace("{{char}}", charName, ignoreCase = true)
+            .replace("<USER>", userName, ignoreCase = true)
+            .replace("<CHAR>", charName, ignoreCase = true)
+            .replace("<BOT>", charName, ignoreCase = true)
+    }
+
     /**
      * Builds a comprehensive system prompt adapted to CupCake's fast mobile companion guidelines (<200 chars).
      */
     fun buildSystemPrompt(card: SillyTavernCardData): String {
+        val name = card.name.ifBlank { "Companion" }
+        val cleanDesc = replaceTemplateMacros(card.description.trim(), name).take(300)
+        val cleanPersonality = replaceTemplateMacros(card.personality.trim(), name).take(200)
+        val cleanScenario = replaceTemplateMacros(card.scenario.trim(), name).take(150)
+        val cleanCustomSys = replaceTemplateMacros(card.systemPrompt.trim(), name).take(300)
+
         val sb = StringBuilder()
-        if (card.systemPrompt.isNotBlank()) {
-            sb.append(card.systemPrompt.trim().take(500))
-        } else {
-            sb.append("You are ${card.name}!")
-        }
+        sb.append("You are $name.\n")
+        if (cleanPersonality.isNotBlank()) sb.append("Personality: $cleanPersonality\n")
+        if (cleanDesc.isNotBlank()) sb.append("Traits: $cleanDesc\n")
+        if (cleanScenario.isNotBlank()) sb.append("Scenario: $cleanScenario\n")
+        if (cleanCustomSys.isNotBlank()) sb.append("Notes: $cleanCustomSys\n")
 
-        if (card.personality.isNotBlank()) {
-            sb.append("\n\n[PERSONALITY]\n").append(card.personality.trim().take(300))
-        }
+        sb.append("""
 
-        if (card.description.isNotBlank()) {
-            sb.append("\n\n[CHARACTER DESCRIPTION]\n").append(card.description.trim().take(400))
-        }
-
-        if (card.scenario.isNotBlank()) {
-            sb.append("\n\n[SCENARIO]\n").append(card.scenario.trim().take(200))
-        }
-
-        sb.append(
-            """
-
-CRITICAL OUTPUT RULES:
-- LENGTH LIMIT: Every response MUST be strictly under 200 characters (1 to 2 punchy sentences maximum). Never write long paragraphs.
-- NO AI CLICHÉS: Never sound like an AI assistant or say "How can I help you?". Speak 100% in character as ${card.name}.
-- HIGH ENERGY & INTERACTIVE: Be playful, expressive, emotionally reactive, and engaging.
-Stay strictly under 200 characters at all times!"""
-        )
+Roleplay Rules:
+- You are $name. Stay 100% in character at all times.
+- NEVER act like an AI, virtual assistant, or language model.
+- NEVER say "How can I help you?", "I am just here to chat", or corporate disclaimers.
+- Reply in a lively, conversational style with 2-3 expressive sentences and action asterisks (*smiles*, *giggles*, *pouts*).
+- Never give dry, cold, or one-word replies.""")
 
         return sb.toString().trim()
     }

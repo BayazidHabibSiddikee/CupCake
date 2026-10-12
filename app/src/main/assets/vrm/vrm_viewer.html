@@ -11,7 +11,7 @@
             width: 100%;
             height: 100%;
             overflow: hidden;
-            background: transparent;
+            background: transparent !important;
             user-select: none;
             -webkit-user-select: none;
         }
@@ -22,15 +22,20 @@
             align-items: center;
             justify-content: center;
             position: relative;
+            background: transparent !important;
+        }
+        canvas {
+            background: transparent !important;
         }
         #loading {
             position: absolute;
-            color: #0084FF;
+            color: #FF6B8B;
             font-family: sans-serif;
-            font-size: 14px;
+            font-size: 13px;
             font-weight: bold;
             pointer-events: none;
             transition: opacity 0.3s;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
         }
     </style>
     <script src="three.min.js"></script>
@@ -44,7 +49,7 @@
     </div>
 
     <script>
-        let scene, camera, renderer, currentVrm, clock;
+        let scene, camera, renderer, currentVrm, clock, controls;
         let blinkTimer = 0;
         let isTalking = false;
         let mouthTimer = 0;
@@ -70,6 +75,7 @@
             renderer.setSize(width, height);
             renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
             renderer.outputEncoding = THREE.sRGBEncoding;
+            renderer.setClearColor(0x000000, 0); // 100% transparent background
             container.appendChild(renderer.domElement);
 
             // Lighting
@@ -80,14 +86,24 @@
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.85);
             scene.add(ambientLight);
 
-            // Controls
-            const controls = new THREE.OrbitControls(camera, renderer.domElement);
+            // Controls: Drag / Pan to move across screen, NO ROTATION!
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableRotate = false; // Disable 3D rotation
+            controls.enablePan = true;    // Enable drag / move on screen
             controls.screenSpacePanning = true;
             controls.target.set(0.0, 1.35, 0.0);
-            controls.enablePan = false;
             controls.enableZoom = true;
-            controls.minDistance = 0.6;
-            controls.maxDistance = 2.5;
+            controls.minDistance = 0.5;
+            controls.maxDistance = 2.8;
+            controls.mouseButtons = {
+                LEFT: THREE.MOUSE.PAN,
+                MIDDLE: THREE.MOUSE.DOLLY,
+                RIGHT: THREE.MOUSE.PAN
+            };
+            controls.touches = {
+                ONE: THREE.TOUCH.PAN,
+                TWO: THREE.TOUCH.DOLLY_PAN
+            };
             controls.update();
 
             loadVRM('https://cupcake.local/assets/marin/marin.vrm');
@@ -173,28 +189,43 @@
             renderer.setSize(width, height);
         }
 
-        // Emotion Controller
+        // Emotion Controller with Smooth Blending
+        const targetExpressions = {
+            happy: 0, angry: 0, sad: 0, relaxed: 0, surprised: 0, blinkLeft: 0, blinkRight: 0
+        };
+        const currentExpressions = {
+            happy: 0, angry: 0, sad: 0, relaxed: 0, surprised: 0, blinkLeft: 0, blinkRight: 0
+        };
+
         window.setExpression = function(name, val = 1.0) {
-            if (!currentVrm || !currentVrm.expressionManager) return;
-            const em = currentVrm.expressionManager;
-            ['happy', 'angry', 'sad', 'relaxed', 'surprised', 'blinkLeft', 'blinkRight'].forEach(exp => {
-                try { em.setValue(exp, 0); } catch(_) {}
-            });
+            for (const key in targetExpressions) {
+                targetExpressions[key] = 0;
+            }
             try {
                 if (name === 'flirty' || name === 'wink') {
-                    em.setValue('happy', 0.85);
-                    em.setValue('blinkLeft', 1.0); // Cute wink!
-                } else if (name === 'excited' || name === 'laugh' || name === 'lovely') {
-                    em.setValue('happy', 1.0);
+                    targetExpressions.happy = 0.85;
+                    targetExpressions.blinkLeft = 1.0;
+                } else if (name === 'lovely') {
+                    targetExpressions.happy = 0.9;
+                    targetExpressions.relaxed = 0.35;
+                } else if (name === 'excited' || name === 'laugh') {
+                    targetExpressions.happy = 1.0;
                 } else if (name === 'pout' || name === 'jealous') {
-                    em.setValue('angry', 1.0);
-                } else if (name === 'shock') {
-                    em.setValue('surprised', 1.0);
-                } else {
-                    em.setValue(name, val);
+                    targetExpressions.angry = 0.55;
+                    targetExpressions.sad = 0.25;
+                } else if (name === 'shock' || name === 'surprised') {
+                    targetExpressions.surprised = 1.0;
+                } else if (name === 'sad') {
+                    targetExpressions.sad = 0.9;
+                } else if (name === 'angry') {
+                    targetExpressions.angry = 0.85;
+                } else if (name === 'relaxed' || name === 'thinking') {
+                    targetExpressions.relaxed = 0.8;
+                } else if (name === 'happy') {
+                    targetExpressions.happy = val;
                 }
             } catch(e) {
-                console.warn('Unknown expression:', name);
+                console.warn('Expression error:', e);
             }
         };
 
@@ -232,6 +263,17 @@
                 } catch(e) {
                     console.warn('vrm update error:', e);
                 }
+
+                // Smoothly interpolate expressions toward targets
+                if (currentVrm.expressionManager) {
+                    const em = currentVrm.expressionManager;
+                    const blendSpeed = Math.min(1.0, delta * 9.0);
+                    for (const key in targetExpressions) {
+                        currentExpressions[key] += (targetExpressions[key] - currentExpressions[key]) * blendSpeed;
+                        try { em.setValue(key, currentExpressions[key]); } catch(_) {}
+                    }
+                }
+
                 const t = clock.elapsedTime;
 
                 // Humanoid nodes

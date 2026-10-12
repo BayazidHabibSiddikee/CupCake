@@ -7,6 +7,7 @@ import com.cupcake.ai.CharacterManager
 import com.cupcake.ai.EnergyManager
 import com.cupcake.ai.LlamaEngine
 import com.cupcake.ai.OllamaEngine
+import com.cupcake.ai.SillyTavernCardParser
 import com.cupcake.data.model.Character
 import com.cupcake.data.model.ChatMessage
 import com.cupcake.data.model.ModelConfig
@@ -245,11 +246,14 @@ class ChatViewModel @Inject constructor(
         _currentCharacter.value = character
         if (character != null) {
             systemPromptCache = characterManager.getSystemPromptForCharacter(character.id)
-            if (sessionStore.messages(character.id).value.isEmpty() && !character.firstMessage.isNullOrBlank()) {
+            val rawFirst = character.firstMessage?.ifBlank { null }
+                ?: "*smiles cheerfully and waves* Hey! I was waiting for you! What's on your mind today?"
+            if (sessionStore.messages(character.id).value.isEmpty()) {
+                val cleanFirst = SillyTavernCardParser.replaceTemplateMacros(rawFirst, character.name, "User")
                 sessionStore.addMessage(
                     character.id,
                     ChatMessage.assistant(
-                        content = character.firstMessage,
+                        content = cleanFirst,
                         conversationId = sessionStore.conversationIdFor(character.id)
                     )
                 )
@@ -258,16 +262,26 @@ class ChatViewModel @Inject constructor(
     }
 
     private fun buildOllamaMessages(): List<OllamaEngine.OllamaMessage> {
+        val charName = _currentCharacter.value?.name ?: "Companion"
         val messageList = mutableListOf<OllamaEngine.OllamaMessage>()
         
         // Add system prompt if available
-        val systemPrompt = _systemPrompt.value?.fullPrompt() ?: systemPromptCache
-        if (systemPrompt.isNotBlank()) {
-            messageList.add(OllamaEngine.OllamaMessage(role = "system", content = systemPrompt))
+        val rawSys = _systemPrompt.value?.fullPrompt() ?: systemPromptCache
+        if (rawSys.isNotBlank()) {
+            val cleanSys = SillyTavernCardParser.replaceTemplateMacros(rawSys, charName, "User")
+            messageList.add(OllamaEngine.OllamaMessage(role = "system", content = cleanSys))
         }
         
         // Add conversation messages
         val conversationMessages = messages.value
+        val hasAssistant = conversationMessages.any { it.role == ChatMessage.MessageRole.ASSISTANT }
+        if (!hasAssistant) {
+            val defaultGreeting = _currentCharacter.value?.firstMessage?.ifBlank { null }
+                ?: "*smiles cheerfully and waves* Hey! I was waiting for you! What's on your mind today?"
+            val cleanGreeting = SillyTavernCardParser.replaceTemplateMacros(defaultGreeting, charName, "User")
+            messageList.add(OllamaEngine.OllamaMessage(role = "assistant", content = cleanGreeting))
+        }
+
         for (msg in conversationMessages) {
             val role = when (msg.role) {
                 ChatMessage.MessageRole.USER -> "user"
@@ -275,7 +289,8 @@ class ChatViewModel @Inject constructor(
                 ChatMessage.MessageRole.SYSTEM -> "system"
                 ChatMessage.MessageRole.TOOL -> "tool"
             }
-            messageList.add(OllamaEngine.OllamaMessage(role = role, content = msg.content))
+            val cleanContent = SillyTavernCardParser.replaceTemplateMacros(msg.content, charName, "User")
+            messageList.add(OllamaEngine.OllamaMessage(role = role, content = cleanContent))
         }
         
         return messageList
@@ -382,6 +397,7 @@ class ChatViewModel @Inject constructor(
     }
 
     private fun buildPrompt(): String {
+        val charName = _currentCharacter.value?.name ?: "Marin Kitagawa"
         val customSys = _systemPrompt.value?.fullPrompt()
         val rawSystemPrompt = if (!customSys.isNullOrBlank()) {
             customSys
@@ -391,25 +407,45 @@ class ChatViewModel @Inject constructor(
             )
         }
         
-        // Compact system prompt if very large (external character cards can be 5000+ chars)
-        val systemPrompt = if (rawSystemPrompt.length > 1200) {
-            rawSystemPrompt.take(1200) + "\n[Stay strictly under 200 characters!]"
+        // Compact system prompt and sanitize macros
+        val cleanSystemPrompt = SillyTavernCardParser.replaceTemplateMacros(rawSystemPrompt, charName, "User")
+        val systemPrompt = if (cleanSystemPrompt.length > 900) {
+            cleanSystemPrompt.take(900)
         } else {
-            rawSystemPrompt
+            cleanSystemPrompt
         }
         
         val builder = StringBuilder()
-        builder.append("<|im_start|>system\n").append(systemPrompt).append("<|im_end|>\n")
+        builder.append("<|im_start|>system\n")
+        builder.append(systemPrompt)
+        builder.append("<|im_end|>\n")
         
-        // Take recent dialogue messages budgeted to fit within context
+        // Take recent dialogue messages budgeted to fit within context (last 6 messages)
         val recentMessages = messages.value.filter {
             it.role == ChatMessage.MessageRole.USER || it.role == ChatMessage.MessageRole.ASSISTANT
-        }.takeLast(8)
+        }.takeLast(6)
+
+        // Cold-start anchor: If no prior assistant message exists in history,
+        // provide the character's initial greeting so small models learn the voice, formatting, and length.
+        val hasAssistantHistory = recentMessages.any { it.role == ChatMessage.MessageRole.ASSISTANT }
+        if (!hasAssistantHistory) {
+            val defaultGreeting = _currentCharacter.value?.firstMessage?.ifBlank { null }
+                ?: "*smiles cheerfully and waves* Hey! I was waiting for you! What's on your mind today?"
+            val cleanGreeting = SillyTavernCardParser.replaceTemplateMacros(defaultGreeting, charName, "User")
+            builder.append("<|im_start|>assistant\n")
+            builder.append(cleanGreeting)
+            builder.append("<|im_end|>\n")
+        }
 
         for (msg in recentMessages) {
-            val content = if (msg.content.length > 300) msg.content.take(300) else msg.content
-            builder.append("<|im_start|>").append(msg.role.value).append("\n")
-                .append(content).append("<|im_end|>\n")
+            val rawContent = if (msg.content.length > 400) msg.content.take(400) else msg.content
+            val cleanContent = SillyTavernCardParser.replaceTemplateMacros(rawContent, charName, "User")
+            val role = if (msg.role == ChatMessage.MessageRole.USER) "user" else "assistant"
+            builder.append("<|im_start|>")
+            builder.append(role)
+            builder.append("\n")
+            builder.append(cleanContent)
+            builder.append("<|im_end|>\n")
         }
 
         builder.append("<|im_start|>assistant\n")

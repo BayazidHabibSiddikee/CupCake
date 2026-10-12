@@ -151,21 +151,23 @@ Stay strictly under 200 characters at all times!""",
             ?: sourceFileName?.substringBeforeLast('.')?.replace('_', ' ')?.trim()?.ifBlank { null }
             ?: "Custom Companion"
 
-        val description = cardData?.description?.ifBlank { null }
+        val rawDesc = cardData?.description?.ifBlank { null }
             ?: cardData?.personality?.take(80)?.ifBlank { null }
             ?: "Imported SillyTavern companion"
+        val description = SillyTavernCardParser.replaceTemplateMacros(rawDesc, name, "User")
 
         val personality = cardData?.personality?.ifBlank { "friendly" } ?: "friendly"
 
         val systemPrompt = if (cardData != null) {
             SillyTavernCardParser.buildSystemPrompt(cardData)
         } else {
-            """You are $name! You are friendly, cheerful, expressive, and fun.
+            """You are $name!
             
-CRITICAL OUTPUT RULES:
-- LENGTH LIMIT: Every response MUST be strictly under 200 characters (1 to 2 punchy sentences maximum). Never write long paragraphs.
-- NO AI CLICHÉS: Never sound like an AI assistant. Speak 100% in character as $name.
-Stay strictly under 200 characters at all times!"""
+Roleplay Rules:
+- Always stay 100% in character as $name.
+- NEVER act like an AI or customer service assistant.
+- NEVER say "How can I help you?" or corporate disclaimers.
+- Keep each reply strictly under 200 characters (1 to 2 short sentences)."""
         }
 
         val character = Character(
@@ -180,9 +182,9 @@ Stay strictly under 200 characters at all times!"""
             isSelected = true,
             customGif = null,
             isShimejiActive = false,
-            firstMessage = cardData?.firstMes?.takeIf { it.isNotBlank() },
-            scenario = cardData?.scenario?.takeIf { it.isNotBlank() },
-            mesExample = cardData?.mesExample?.takeIf { it.isNotBlank() },
+            firstMessage = cardData?.firstMes?.let { SillyTavernCardParser.replaceTemplateMacros(it, name, "User") }?.takeIf { it.isNotBlank() },
+            scenario = cardData?.scenario?.let { SillyTavernCardParser.replaceTemplateMacros(it, name, "User") }?.takeIf { it.isNotBlank() },
+            mesExample = cardData?.mesExample?.let { SillyTavernCardParser.replaceTemplateMacros(it, name, "User") }?.takeIf { it.isNotBlank() },
             creator = cardData?.creator?.takeIf { it.isNotBlank() }
         )
 

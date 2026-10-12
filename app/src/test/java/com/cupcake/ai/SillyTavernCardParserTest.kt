@@ -96,8 +96,8 @@ class SillyTavernCardParserTest {
         val prompt = SillyTavernCardParser.buildSystemPrompt(card)
         assertThat(prompt).contains("Marin")
         assertThat(prompt).contains("High school gyaru")
-        assertThat(prompt).contains("strictly under 200 characters")
-        assertThat(prompt).contains("NO AI CLICHÉS")
+        assertThat(prompt).contains("Stay 100% in character")
+        assertThat(prompt).contains("Never give dry, cold, or one-word replies")
     }
 
     @Test
@@ -146,7 +146,7 @@ class SillyTavernCardParserTest {
         assertThat(imported.personality).isEqualTo("smug, dramatic, crying easily")
         assertThat(imported.isSelected).isTrue()
         assertThat(imported.avatar).startsWith("file://")
-        assertThat(imported.systemPrompt).contains("strictly under 200 characters")
+        assertThat(imported.systemPrompt).contains("Stay 100% in character")
 
         // Check it's retrievable from CharacterManager
         val fetched = CharacterManager.getCharacter(imported.id)

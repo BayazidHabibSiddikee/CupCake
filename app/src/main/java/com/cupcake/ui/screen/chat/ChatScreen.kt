@@ -83,16 +83,22 @@ fun ChatScreen(
             if (showVrm3dView) {
                 var isWalkingMode by remember { mutableStateOf(false) }
                 val detectedEmotion = remember(currentResponse, messages.size) {
-                    val lastText = if (currentResponse.isNotBlank()) currentResponse else messages.lastOrNull()?.content ?: ""
-                    com.cupcake.ai.EmotionClassifier.detectEmotion(lastText)
+                    val companionText = if (currentResponse.isNotBlank()) {
+                        currentResponse
+                    } else {
+                        messages.lastOrNull { it.role == com.cupcake.data.model.ChatMessage.MessageRole.ASSISTANT }?.content
+                            ?: messages.lastOrNull()?.content
+                            ?: ""
+                    }
+                    com.cupcake.ai.EmotionClassifier.detectEmotion(companionText)
                 }
 
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(300.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerLowest,
-                    tonalElevation = 2.dp
+                    color = androidx.compose.ui.graphics.Color.Transparent,
+                    tonalElevation = 0.dp
                 ) {
                     Box(modifier = Modifier.fillMaxSize()) {
                         com.cupcake.ui.component.VrmViewer(

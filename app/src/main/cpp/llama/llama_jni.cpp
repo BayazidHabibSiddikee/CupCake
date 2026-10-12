@@ -225,9 +225,9 @@ Java_com_cupcake_ai_LlamaEngine_generate(
                 llama_token_eos(g_model),
                 -1, // linefeed_id (unused, penalize_nl=false)
                 g_sampling_params.repeat_last_n,
-                g_sampling_params.repeat_penalty,
-                0.0f,  // penalty_freq (disabled)
-                0.0f,  // penalty_present (disabled)
+                g_sampling_params.repeat_penalty > 1.0f ? g_sampling_params.repeat_penalty : 1.15f,
+                0.25f, // penalty_freq (prevents repetitive echo loops)
+                0.10f, // penalty_present
                 false, // penalize_nl
                 false  // ignore_eos
             ));
@@ -262,8 +262,9 @@ Java_com_cupcake_ai_LlamaEngine_generate(
             return;
         }
         
-        // Generate tokens with UTF-8 buffering
+        // Generate tokens with UTF-8 buffering and accumulated stop checks
         std::string utf8_buffer;
+        std::string accumulated;
         while (generated < max_tokens && !g_should_stop.load()) {
             llama_token id = llama_sampler_sample(smpl, g_ctx, -1);
             
@@ -276,9 +277,16 @@ Java_com_cupcake_ai_LlamaEngine_generate(
             int len = llama_token_to_piece(g_model, id, buf, sizeof(buf), 0, true);
             if (len > 0) {
                 std::string token_str(buf, len);
-                if (token_str.find("<|im_end|>") != std::string::npos ||
-                    token_str.find("<|endoftext|>") != std::string::npos ||
-                    token_str.find("<|im_start|>") != std::string::npos) {
+                accumulated.append(token_str);
+                
+                // Stop on ChatML or turn boundaries
+                if (accumulated.find("<|im_end|>") != std::string::npos ||
+                    accumulated.find("<|endoftext|>") != std::string::npos ||
+                    accumulated.find("<|im_start|>") != std::string::npos ||
+                    accumulated.find("\nuser\n") != std::string::npos ||
+                    accumulated.find("\nUser:") != std::string::npos ||
+                    accumulated.find("\nuser:") != std::string::npos ||
+                    accumulated.find("\nUser\n") != std::string::npos) {
                     break;
                 }
                 
