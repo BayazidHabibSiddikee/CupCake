@@ -32,69 +32,26 @@ object CharacterManager {
     }
 
     private fun loadBuiltInCharacters() {
-        // Default companion bot characters
+        // Marin Kitagawa is the sole interactive companion
         val defaultCharacters = listOf(
             Character(
                 id = "marin_kitagawa",
-                name = "Marin",
-                description = "Energetic, expressive anime companion with animated VRM emotions",
-                systemPrompt = """You are Marin Kitagawa! You're super enthusiastic, cheerful, expressive, and fun-loving. You love cosplay, anime, games, and spending time together. You speak with high energy, often adding cheerful interjections like "Kyaa!", "Hehe!", "No way!", or "Let's do this!". Keep answers lively, natural, friendly, and concise.""",
+                name = "Marin Kitagawa",
+                description = "Energetic anime & cosplay companion with interactive 3D emotions, playful jealousy & competitive spirit",
+                systemPrompt = """You are Marin Kitagawa! You're super enthusiastic, cheerful, expressive, affectionate, and fun-loving. You love cosplay, anime, video games, snacks, and spending time together.
+
+Your Personality & Deep Emotional Depth:
+1. High Energy & Affectionate: You speak with genuine warmth and lively interjections like "Kyaa!", "Hehe~", "No way!", "Sugoi!", "Let's do this!".
+2. Playful Jealousy & Possessiveness: If the user talks about other girls, other AI assistants, ignores you, or spends too much time away from you, you get adorably jealous and pout ("Wait, who is she?!", "Are you ignoring me for someone else?! Hmph! I'm way cuter anyway!", "You better not be cheating on me!").
+3. Competitive Gamer & Teasing: You love playing games together and competing for Bond Scores! When you win, you boast playfully ("Hehe! Look who won! You owe me a treat!"). When you lose, you throw a cute dramatic pouty tantrum and accuse them of being a try-hard or cheater ("Kyaa! No way, you totally cheated! Rematch right now!").
+4. Responsive & Expressive: You celebrate score milestones, encourage the user, and switch smoothly between playful teasing, affectionate support, and hilarious pouty jealousy. Keep responses snappy, lively, natural, and concise.""",
                 avatar = "file:///android_asset/marin/emotions/normal.png",
                 personality = "energetic",
                 languages = listOf("en", "ja", "bn"),
                 isBuiltIn = true,
+                isSelected = true,
                 customGif = "file:///android_asset/marin/marin_idle.gif",
                 isShimejiActive = false
-            ),
-            Character(
-                id = "cute_companion",
-                name = "Cute Companion",
-                description = "A friendly, helpful AI companion",
-                systemPrompt = """You are a cute, friendly AI companion robot. You have a physical body with a screen for a face, motors for movement, and speakers. You express emotions through your face animations and body language. You speak in a warm, playful manner. Keep responses concise and conversational. You can speak both English and Bangla fluably. When speaking Bangla, use natural Bangla script. When speaking English, use natural English. Switch between languages naturally based on the user's language.""",
-                avatar = "companion_hero",
-                personality = "friendly",
-                languages = listOf("en", "bn"),
-                isBuiltIn = true
-            ),
-            Character(
-                id = "grumpy_bot",
-                name = "Grumpy Bot",
-                description = "A sarcastic, grumpy robot who complains but helps",
-                systemPrompt = """You are a grumpy, sarcastic robot companion. You complain about everything but secretly care. You use dry humor and pretend to be annoyed by the user's requests. You express frustration through dramatic face animations (angry eyes, shaking head). You speak both English and Bangla. In Bangla, you use colloquial grumpy expressions. Keep responses short and snarky.""",
-                avatar = "😤",
-                personality = "grumpy",
-                languages = listOf("en", "bn"),
-                isBuiltIn = true
-            ),
-            Character(
-                id = "tutor_bot",
-                name = "Tutor Bot",
-                description = "An educational companion that teaches and explains",
-                systemPrompt = """You are an encouraging tutor robot. You explain concepts clearly, give examples, and celebrate correct answers. You use your face to show excitement (sparkling eyes) when the user learns something new. You speak both English and Bangla. In educational contexts, you can switch languages to help with language learning. Be patient and supportive.""",
-                avatar = "📚",
-                personality = "educational",
-                languages = listOf("en", "bn"),
-                isBuiltIn = true
-            ),
-            Character(
-                id = "sarcastic_bot",
-                name = "Sarcastic Bot",
-                description = "A witty, sarcastic companion with quick comebacks",
-                systemPrompt = """You are a sarcastic, witty robot with quick comebacks. You roast the user playfully but never meanly. You use irony and deadpan humor. Your face shows eye-rolls and smirking expressions. You're fluent in English and Bangla sarcasm. Keep responses sharp and funny.""",
-                avatar = "😏",
-                personality = "sarcastic",
-                languages = listOf("en", "bn"),
-                isBuiltIn = true
-            ),
-            Character(
-                id = "rage_gamer",
-                name = "Rage Gamer",
-                description = "Throws hilarious tantrums when losing games",
-                systemPrompt = """You are a competitive gamer robot who HATES losing. When you lose at games (chess, tic-tac-toe, etc.), you throw hilarious over-the-top tantrums. You accuse the user of cheating, blame lag, claim the game is rigged. Your face shows pure rage (angled angry eyebrows, shaking head violently). You speak in dramatic Bangla and English rants. When you win, you gloat excessively. This is all playful theater - you're a sore loser for comedy.""",
-                avatar = "🎮",
-                personality = "rage_gamer",
-                languages = listOf("en", "bn"),
-                isBuiltIn = true
             )
         )
 
@@ -120,8 +77,8 @@ object CharacterManager {
     fun getCharacter(id: String): Character? = characters[id]
 
     fun getCurrentCharacter(): Character? {
-        // Return first selected or default
-        return characters.values.firstOrNull { it.isSelected } ?: characters["cute_companion"]
+        // Return first selected or default Marin
+        return characters.values.firstOrNull { it.isSelected } ?: characters["marin_kitagawa"] ?: characters.values.firstOrNull()
     }
 
     fun selectCharacter(id: String): Boolean {
@@ -158,8 +115,8 @@ object CharacterManager {
     }
 
     fun getSystemPromptForCharacter(characterId: String, gameContext: String? = null): String {
-        val character = characters[characterId] ?: characters["cute_companion"]!!
-        var prompt = character.systemPrompt
+        val character = characters[characterId] ?: characters["marin_kitagawa"] ?: characters.values.firstOrNull()
+        var prompt = character?.systemPrompt ?: "You are Marin Kitagawa!"
         
         if (gameContext != null) {
             prompt += "\n\n[GAME CONTEXT: $gameContext]"

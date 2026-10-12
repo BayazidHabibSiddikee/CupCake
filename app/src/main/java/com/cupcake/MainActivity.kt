@@ -27,7 +27,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             CupCakeTheme {
                 val navController = rememberNavController()
-                val homeViewModel: HomeViewModel = viewModel()
+                val homeViewModel: HomeViewModel = androidx.hilt.navigation.compose.hiltViewModel()
                 
                 NavHost(navController, startDestination = "home") {
                     composable("home") {

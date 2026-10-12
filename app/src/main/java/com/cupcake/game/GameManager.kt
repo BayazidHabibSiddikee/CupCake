@@ -749,7 +749,7 @@ class GameManager(
         CoroutineScope(Dispatchers.IO).launch {
                 try {
                     val fullPrompt = characterManager.getSystemPromptForCharacter(
-                        character?.id ?: "cute_companion",
+                        character?.id ?: "marin_kitagawa",
                         "Game: CLICKER, Score: $score"
                     ) + "\n\nUser: $prompt\nAssistant:"
 
@@ -829,7 +829,7 @@ class GameManager(
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val fullPrompt = characterManager.getSystemPromptForCharacter(
-                    character?.id ?: "cute_companion",
+                    character?.id ?: "marin_kitagawa",
                     "Game: $gameType, Jealousy: ${(jealousy * 100).toInt()}%, Anger: ${(anger * 100).toInt()}%"
                 ) + "\n\nUser: $prompt\nAssistant:"
 
@@ -886,7 +886,7 @@ class GameManager(
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val fullPrompt = characterManager.getSystemPromptForCharacter(
-                    character?.id ?: "cute_companion",
+                    character?.id ?: "marin_kitagawa",
                     "Game: ${gameType?.name}, Human won: $humanWon, Draw: $isDraw, Jealousy: ${(jealousy * 100).toInt()}%, Anger: ${(anger * 100).toInt()}%, Mood: ${mood.name}"
                 ) + "\n\nUser: $prompt\nAssistant:"
 
@@ -916,11 +916,23 @@ class GameManager(
 
                         override fun onError(error: String) {
                             android.util.Log.w("GameManager", "Reaction generation failed: $error")
+                            val fallback = when {
+                                isDraw -> "A draw?! No way, next round I'm definitely taking the win!"
+                                humanWon -> if (jealousy > 0.4) "Kyaa! You totally cheated! Hmph, I'm pouting now! 😤" else "No way! Rematch right now, you big bully!"
+                                else -> "Hehe! Look who won! You owe me a cosplay treat! ✨"
+                            }
+                            onGameReaction(fallback, humanWon, isDraw)
                         }
                     }
                 )
             } catch (e: Exception) {
                 android.util.Log.w("GameManager", "Reaction generation failed", e)
+                val fallback = when {
+                    isDraw -> "A draw?! Next round I'm definitely winning!"
+                    humanWon -> "Kyaa! No way, you cheated! Rematch right now! 😤"
+                    else -> "Hehe! Look who won! You can't beat me! ✨"
+                }
+                onGameReaction(fallback, humanWon, isDraw)
             }
         }
     }

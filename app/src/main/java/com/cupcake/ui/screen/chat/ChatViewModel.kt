@@ -47,7 +47,7 @@ class ChatViewModel @Inject constructor(
 ) : ViewModel() {
 
     val characterId: String =
-        savedStateHandle.get<String>("characterId") ?: "cute_companion"
+        savedStateHandle.get<String>("characterId") ?: "marin_kitagawa"
 
     val conversationId: String = sessionStore.conversationIdFor(characterId)
 

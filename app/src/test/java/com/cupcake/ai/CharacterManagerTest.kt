@@ -17,36 +17,34 @@ class CharacterManagerTest {
     @Test
     fun `built in characters load`() {
         val all = CharacterManager.getAllCharacters()
-        assertThat(all.map { it.id }).containsAtLeast(
-            "cute_companion", "grumpy_bot", "tutor_bot", "sarcastic_bot", "rage_gamer"
-        )
-        assertThat(all).hasSize(5)
+        assertThat(all.map { it.id }).containsExactly("marin_kitagawa")
+        assertThat(all).hasSize(1)
     }
 
     @Test
-    fun `default current character is cute companion`() {
-        // Reset selection state first
-        CharacterManager.selectCharacter("cute_companion")
-        assertThat(CharacterManager.getCurrentCharacter()?.id).isEqualTo("cute_companion")
+    fun `default current character is marin kitagawa`() {
+        CharacterManager.selectCharacter("marin_kitagawa")
+        assertThat(CharacterManager.getCurrentCharacter()?.id).isEqualTo("marin_kitagawa")
     }
 
     @Test
     fun `select character switches selection`() {
-        assertThat(CharacterManager.selectCharacter("grumpy_bot")).isTrue()
-        assertThat(CharacterManager.getCurrentCharacter()?.id).isEqualTo("grumpy_bot")
-        assertThat(CharacterManager.selectCharacter("nope")).isFalse()
+        assertThat(CharacterManager.selectCharacter("marin_kitagawa")).isTrue()
+        assertThat(CharacterManager.getCurrentCharacter()?.id).isEqualTo("marin_kitagawa")
+        assertThat(CharacterManager.selectCharacter("non_existent")).isFalse()
     }
 
     @Test
     fun `system prompt contains character instructions`() {
-        val prompt = CharacterManager.getSystemPromptForCharacter("tutor_bot")
-        assertThat(prompt).contains("tutor")
+        val prompt = CharacterManager.getSystemPromptForCharacter("marin_kitagawa")
+        assertThat(prompt).contains("Marin")
+        assertThat(prompt).contains("Jealousy")
     }
 
     @Test
     fun `system prompt appends game context`() {
         val prompt = CharacterManager.getSystemPromptForCharacter(
-            "rage_gamer",
+            "marin_kitagawa",
             "Game: TIC_TAC_TOE, Human won: true"
         )
         assertThat(prompt).contains("GAME CONTEXT")
@@ -76,7 +74,7 @@ class CharacterManagerTest {
 
     @Test
     fun `cannot delete built in character`() {
-        assertThat(CharacterManager.deleteCharacter("cute_companion")).isFalse()
-        assertThat(CharacterManager.getCharacter("cute_companion")).isNotNull()
+        assertThat(CharacterManager.deleteCharacter("marin_kitagawa")).isFalse()
+        assertThat(CharacterManager.getCharacter("marin_kitagawa")).isNotNull()
     }
 }
