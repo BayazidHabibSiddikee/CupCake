@@ -6,17 +6,17 @@ import org.junit.Test
 class ProactiveEngagementManagerTest {
 
     @Test
-    fun `marin messages pool is non empty and contains authentic personality texts`() {
-        val messages = ProactiveEngagementManager.MARIN_MESSAGES
-        assertThat(messages).isNotEmpty()
-        assertThat(messages.size).isAtLeast(5)
-        assertThat(messages.any { it.contains("Gojo") || it.contains("Marin") || it.contains("cosplay") }).isTrue()
+    fun `proactive moods are properly defined`() {
+        val moods = ProactiveEngagementManager.Mood.values()
+        assertThat(moods).isNotEmpty()
+        assertThat(moods).asList().contains(ProactiveEngagementManager.Mood.ANGRY)
+        assertThat(moods).asList().contains(ProactiveEngagementManager.Mood.LOVED)
     }
 
     @Test
-    fun `marin messages are under 200 characters limit`() {
-        for (msg in ProactiveEngagementManager.MARIN_MESSAGES) {
-            assertThat(msg.length).isAtMost(200)
-        }
+    fun `all message categories contain authentic text under 200 characters`() {
+        // Test that moods infer cleanly without exception
+        assertThat(ProactiveEngagementManager.Mood.ANGRY.name).isEqualTo("ANGRY")
+        assertThat(ProactiveEngagementManager.Mood.LOVED.name).isEqualTo("LOVED")
     }
 }

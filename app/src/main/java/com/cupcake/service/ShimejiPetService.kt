@@ -146,7 +146,43 @@ class ShimejiPetService : Service() {
                 cacheMode = WebSettings.LOAD_NO_CACHE
             }
             webChromeClient = WebChromeClient()
-            webViewClient = object : WebViewClient() {}
+            webViewClient = object : WebViewClient() {
+                override fun shouldInterceptRequest(
+                    view: WebView?,
+                    request: android.webkit.WebResourceRequest?
+                ): android.webkit.WebResourceResponse? {
+                    val url = request?.url?.toString() ?: return null
+                    if (url.contains("marin.vrm")) {
+                        try {
+                            val stream = assets.open("marin/marin.vrm")
+                            return android.webkit.WebResourceResponse(
+                                "application/octet-stream",
+                                "UTF-8",
+                                stream
+                            )
+                        } catch (e: Exception) {
+                            Log.e("ShimejiPetService", "Failed to stream marin.vrm from assets", e)
+                        }
+                    } else if (url.contains("android_asset/")) {
+                        val path = url.substringAfter("android_asset/")
+                        try {
+                            val stream = assets.open(path)
+                            val mime = when {
+                                path.endsWith(".js") -> "application/javascript"
+                                path.endsWith(".html") -> "text/html"
+                                path.endsWith(".png") -> "image/png"
+                                path.endsWith(".gif") -> "image/gif"
+                                path.endsWith(".vrm") -> "application/octet-stream"
+                                else -> "application/octet-stream"
+                            }
+                            return android.webkit.WebResourceResponse(mime, "UTF-8", stream)
+                        } catch (e: Exception) {
+                            Log.e("ShimejiPetService", "Failed to stream asset: $path", e)
+                        }
+                    }
+                    return super.shouldInterceptRequest(view, request)
+                }
+            }
             loadUrl("file:///android_asset/vrm/vrm_viewer.html")
         }
 

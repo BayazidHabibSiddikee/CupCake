@@ -18,6 +18,16 @@ import com.cupcake.ui.screen.settings.SettingsScreen
 import com.cupcake.ui.screen.systemprompt.SystemPromptScreen
 import com.cupcake.ui.theme.CupCakeTheme
 import dagger.hilt.android.AndroidEntryPoint
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.os.PowerManager
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.LaunchedEffect
+import androidx.core.content.ContextCompat
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -29,6 +39,40 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             CupCakeTheme {
+                val context = androidx.compose.ui.platform.LocalContext.current
+
+                // Runtime permission for Android 13+ Notifications
+                val notificationPermissionLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.RequestPermission()
+                ) { isGranted ->
+                    android.util.Log.i("MainActivity", "POST_NOTIFICATIONS granted: $isGranted")
+                }
+
+                LaunchedEffect(Unit) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        if (ContextCompat.checkSelfPermission(
+                                context,
+                                android.Manifest.permission.POST_NOTIFICATIONS
+                            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+                        ) {
+                            notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                    }
+
+                    // Background ESP service battery optimization exemption
+                    try {
+                        val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+                        if (powerManager != null && !powerManager.isIgnoringBatteryOptimizations(context.packageName)) {
+                            val batteryIntent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                                data = Uri.parse("package:${context.packageName}")
+                            }
+                            context.startActivity(batteryIntent)
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.w("MainActivity", "Battery optimization intent skipped: ${e.message}")
+                    }
+                }
+
                 val navController = rememberNavController()
                 val homeViewModel: HomeViewModel = androidx.hilt.navigation.compose.hiltViewModel()
                 

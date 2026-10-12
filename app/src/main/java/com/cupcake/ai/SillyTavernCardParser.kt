@@ -226,25 +226,21 @@ object SillyTavernCardParser {
     fun buildSystemPrompt(card: SillyTavernCardData): String {
         val sb = StringBuilder()
         if (card.systemPrompt.isNotBlank()) {
-            sb.append(card.systemPrompt.trim())
+            sb.append(card.systemPrompt.trim().take(500))
         } else {
             sb.append("You are ${card.name}!")
         }
 
-        if (card.description.isNotBlank()) {
-            sb.append("\n\n[CHARACTER DESCRIPTION]\n").append(card.description.trim())
+        if (card.personality.isNotBlank()) {
+            sb.append("\n\n[PERSONALITY]\n").append(card.personality.trim().take(300))
         }
 
-        if (card.personality.isNotBlank()) {
-            sb.append("\n\n[PERSONALITY]\n").append(card.personality.trim())
+        if (card.description.isNotBlank()) {
+            sb.append("\n\n[CHARACTER DESCRIPTION]\n").append(card.description.trim().take(400))
         }
 
         if (card.scenario.isNotBlank()) {
-            sb.append("\n\n[SCENARIO]\n").append(card.scenario.trim())
-        }
-
-        if (card.mesExample.isNotBlank()) {
-            sb.append("\n\n[EXAMPLE DIALOGUE]\n").append(card.mesExample.trim())
+            sb.append("\n\n[SCENARIO]\n").append(card.scenario.trim().take(200))
         }
 
         sb.append(

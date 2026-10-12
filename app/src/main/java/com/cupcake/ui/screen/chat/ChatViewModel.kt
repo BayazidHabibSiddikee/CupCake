@@ -383,7 +383,7 @@ class ChatViewModel @Inject constructor(
 
     private fun buildPrompt(): String {
         val customSys = _systemPrompt.value?.fullPrompt()
-        val systemPrompt = if (!customSys.isNullOrBlank()) {
+        val rawSystemPrompt = if (!customSys.isNullOrBlank()) {
             customSys
         } else {
             characterManager.getSystemPromptForCharacter(
@@ -391,17 +391,25 @@ class ChatViewModel @Inject constructor(
             )
         }
         
+        // Compact system prompt if very large (external character cards can be 5000+ chars)
+        val systemPrompt = if (rawSystemPrompt.length > 1200) {
+            rawSystemPrompt.take(1200) + "\n[Stay strictly under 200 characters!]"
+        } else {
+            rawSystemPrompt
+        }
+        
         val builder = StringBuilder()
         builder.append("<|im_start|>system\n").append(systemPrompt).append("<|im_end|>\n")
         
-        // Take up to 14 dialogue messages, excluding system toasts/errors to maintain valid ChatML
+        // Take recent dialogue messages budgeted to fit within context
         val recentMessages = messages.value.filter {
             it.role == ChatMessage.MessageRole.USER || it.role == ChatMessage.MessageRole.ASSISTANT
-        }.takeLast(14)
+        }.takeLast(8)
 
         for (msg in recentMessages) {
+            val content = if (msg.content.length > 300) msg.content.take(300) else msg.content
             builder.append("<|im_start|>").append(msg.role.value).append("\n")
-                .append(msg.content).append("<|im_end|>\n")
+                .append(content).append("<|im_end|>\n")
         }
 
         builder.append("<|im_start|>assistant\n")

@@ -93,36 +93,57 @@
         function loadVRM(url) {
             const loader = new THREE.GLTFLoader();
             loader.crossOrigin = 'anonymous';
-            loader.register((parser) => new THREE.VRMLoaderPlugin(parser));
+            
+            const vrmPluginClass = (window.THREE_VRM && window.THREE_VRM.VRMLoaderPlugin) ||
+                                   (THREE && THREE.VRMLoaderPlugin) ||
+                                   window.VRMLoaderPlugin;
+            if (vrmPluginClass) {
+                loader.register((parser) => new vrmPluginClass(parser));
+            } else {
+                console.error("VRMLoaderPlugin not found in THREE_VRM or THREE!");
+            }
 
             loader.load(
                 url,
                 (gltf) => {
                     const vrm = gltf.userData.vrm;
-                    if (!vrm) return;
+                    if (!vrm) {
+                        console.error('gltf loaded but no vrm in userData:', gltf);
+                        document.getElementById('loading').innerText = 'VRM Parsing Failed';
+                        return;
+                    }
 
                     currentVrm = vrm;
                     scene.add(vrm.scene);
                     vrm.scene.rotation.y = Math.PI; // Face camera
 
                     // Relax arms naturally
-                    const lArm = vrm.humanoid.getNormalizedBoneNode('leftUpperArm');
-                    const rArm = vrm.humanoid.getNormalizedBoneNode('rightUpperArm');
-                    if (lArm) lArm.rotation.z = 1.35;
-                    if (rArm) rArm.rotation.z = -1.35;
+                    try {
+                        const lArm = vrm.humanoid?.getNormalizedBoneNode('leftUpperArm');
+                        const rArm = vrm.humanoid?.getNormalizedBoneNode('rightUpperArm');
+                        if (lArm) lArm.rotation.z = 1.35;
+                        if (rArm) rArm.rotation.z = -1.35;
 
-                    const lLower = vrm.humanoid.getNormalizedBoneNode('leftLowerArm');
-                    const rLower = vrm.humanoid.getNormalizedBoneNode('rightLowerArm');
-                    if (lLower) lLower.rotation.z = 0.15;
-                    if (rLower) rLower.rotation.z = -0.15;
+                        const lLower = vrm.humanoid?.getNormalizedBoneNode('leftLowerArm');
+                        const rLower = vrm.humanoid?.getNormalizedBoneNode('rightLowerArm');
+                        if (lLower) lLower.rotation.z = 0.15;
+                        if (rLower) rLower.rotation.z = -0.15;
+                    } catch(e) {
+                        console.warn('Arm positioning warning:', e);
+                    }
 
                     document.getElementById('loading').style.opacity = '0';
                     console.log('Marin VRM loaded successfully!');
                 },
-                (progress) => {},
+                (progress) => {
+                    if (progress.total > 0) {
+                        const pct = Math.round((progress.loaded / progress.total) * 100);
+                        document.getElementById('loading').innerText = 'Loading Marin ' + pct + '%...';
+                    }
+                },
                 (error) => {
                     console.error('Failed to load VRM:', error);
-                    document.getElementById('loading').innerText = 'VRM Load Error';
+                    document.getElementById('loading').innerText = 'VRM Load Error: ' + (error.message || error.statusText || error);
                 }
             );
         }

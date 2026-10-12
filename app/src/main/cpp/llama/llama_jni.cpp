@@ -19,6 +19,7 @@ static llama_model* g_model = nullptr;
 static std::vector<llama_token> g_tokens;
 static std::atomic<bool> g_is_generating{false};
 static std::atomic<bool> g_should_stop{false};
+static int g_n_batch = 512;
 
 // Sampling parameters
 struct SamplingParams {
@@ -111,12 +112,42 @@ Java_com_cupcake_ai_LlamaEngine_setSamplingParams(
     g_sampling_params.max_tokens = max_tokens > 0 ? max_tokens : 128;
 }
 
+static bool is_valid_utf8(const std::string& str) {
+    int expected = 0;
+    for (unsigned char c : str) {
+        if (expected == 0) {
+            if ((c & 0x80) == 0) continue; // 1-byte ASCII
+            else if ((c & 0xE0) == 0xC0) expected = 1; // 2-byte
+            else if ((c & 0xF0) == 0xE0) expected = 2; // 3-byte
+            else if ((c & 0xF8) == 0xF0) expected = 3; // 4-byte
+            else return false;
+        } else {
+            if ((c & 0xC0) != 0x80) return false;
+            expected--;
+        }
+    }
+    return expected == 0;
+}
+
 static void emit_token(JNIEnv* env, const std::string& token) {
-    if (!g_callback || !g_on_token) return;
+    if (!g_callback || !g_on_token || token.empty()) return;
     
-    jstring jtoken = env->NewStringUTF(token.c_str());
-    env->CallVoidMethod(g_callback, g_on_token, jtoken);
-    env->DeleteLocalRef(jtoken);
+    jbyteArray bytes = env->NewByteArray(token.length());
+    if (!bytes) return;
+    env->SetByteArrayRegion(bytes, 0, token.length(), (const jbyte*)token.data());
+    
+    jclass strClass = env->FindClass("java/lang/String");
+    jmethodID strCtor = env->GetMethodID(strClass, "<init>", "([BLjava/lang/String;)V");
+    jstring utf8Charset = env->NewStringUTF("UTF-8");
+    jstring jtoken = (jstring)env->NewObject(strClass, strCtor, bytes, utf8Charset);
+    
+    if (jtoken) {
+        env->CallVoidMethod(g_callback, g_on_token, jtoken);
+        env->DeleteLocalRef(jtoken);
+    }
+    env->DeleteLocalRef(utf8Charset);
+    env->DeleteLocalRef(strClass);
+    env->DeleteLocalRef(bytes);
 }
 
 static void emit_complete(JNIEnv* env, int status) {
@@ -156,13 +187,19 @@ Java_com_cupcake_ai_LlamaEngine_generate(
     int n_tokens = llama_tokenize(g_model, prompt_str, strlen(prompt_str), tokens.data(), tokens.size(), true, true);
     if (n_tokens < 0) {
         int needed = -n_tokens;
-        if (needed <= n_ctx) {
-            tokens.resize(needed);
-            n_tokens = llama_tokenize(g_model, prompt_str, strlen(prompt_str), tokens.data(), tokens.size(), true, true);
+        tokens.resize(needed);
+        n_tokens = llama_tokenize(g_model, prompt_str, strlen(prompt_str), tokens.data(), tokens.size(), true, true);
+        if (n_tokens > n_ctx) {
+            // Keep the most recent tokens to avoid exceeding context
+            int max_keep = n_ctx - 140;
+            if (max_keep > 0 && n_tokens > max_keep) {
+                tokens.erase(tokens.begin(), tokens.begin() + (n_tokens - max_keep));
+                n_tokens = (int)tokens.size();
+            }
         }
     }
-    if (n_tokens < 0) {
-        LOGE("Tokenization failed, prompt exceeds context limit or error");
+    if (n_tokens <= 0) {
+        LOGE("Tokenization failed or prompt empty");
         env->ReleaseStringUTFChars(prompt, prompt_str);
         g_is_generating = false;
         return -3;
@@ -208,8 +245,16 @@ Java_com_cupcake_ai_LlamaEngine_generate(
         const int max_tokens = g_sampling_params.max_tokens > 0 ? g_sampling_params.max_tokens : 128;
         int generated = 0;
         
-        // Process prompt
-        if (llama_decode(g_ctx, llama_batch_get_one(g_tokens.data(), (int32_t) g_tokens.size()))) {
+        // Process prompt in chunks of g_n_batch
+        bool decode_err = false;
+        for (size_t i = 0; i < g_tokens.size(); i += g_n_batch) {
+            int32_t chunk = std::min((int32_t)(g_tokens.size() - i), (int32_t)g_n_batch);
+            if (llama_decode(g_ctx, llama_batch_get_one(g_tokens.data() + i, chunk))) {
+                decode_err = true;
+                break;
+            }
+        }
+        if (decode_err) {
             emit_error(env, "Failed to process prompt");
             g_is_generating = false;
             llama_sampler_free(smpl);
@@ -217,7 +262,8 @@ Java_com_cupcake_ai_LlamaEngine_generate(
             return;
         }
         
-        // Generate tokens
+        // Generate tokens with UTF-8 buffering
+        std::string utf8_buffer;
         while (generated < max_tokens && !g_should_stop.load()) {
             llama_token id = llama_sampler_sample(smpl, g_ctx, -1);
             
@@ -225,7 +271,7 @@ Java_com_cupcake_ai_LlamaEngine_generate(
                 break;
             }
             
-            // Convert token to string first to check for stop sequences like <|im_end|>
+            // Convert token to piece
             char buf[256];
             int len = llama_token_to_piece(g_model, id, buf, sizeof(buf), 0, true);
             if (len > 0) {
@@ -235,7 +281,12 @@ Java_com_cupcake_ai_LlamaEngine_generate(
                     token_str.find("<|im_start|>") != std::string::npos) {
                     break;
                 }
-                emit_token(env, token_str);
+                
+                utf8_buffer.append(token_str);
+                if (is_valid_utf8(utf8_buffer)) {
+                    emit_token(env, utf8_buffer);
+                    utf8_buffer.clear();
+                }
             }
             
             // Add to context
@@ -251,6 +302,12 @@ Java_com_cupcake_ai_LlamaEngine_generate(
             
             // Accept token for next iteration
             llama_sampler_accept(smpl, id);
+        }
+        
+        // Flush any remaining buffered bytes if valid
+        if (!utf8_buffer.empty()) {
+            emit_token(env, utf8_buffer);
+            utf8_buffer.clear();
         }
         
         llama_sampler_free(smpl);
