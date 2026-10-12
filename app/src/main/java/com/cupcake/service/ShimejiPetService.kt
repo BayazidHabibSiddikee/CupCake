@@ -153,7 +153,7 @@ class ShimejiPetService : Service() {
         updatePetVisual(avatar, customGif)
 
         // VRM expression cycle on tap
-        val vrmExpressions = listOf("happy", "surprised", "angry", "relaxed")
+        val vrmExpressions = listOf("happy", "flirty", "excited", "pout", "surprised", "relaxed")
         var emotionIndex = 0
 
         // Drag & Click Logic
@@ -212,12 +212,21 @@ class ShimejiPetService : Service() {
                                 // Single Click -> Emotion reaction + Cute Quote
                                 val exp = vrmExpressions[emotionIndex % vrmExpressions.size]
                                 petVrmView?.evaluateJavascript("window.setExpression && window.setExpression('$exp', 1.0);", null)
+
+                                if (exp == "excited" || exp == "flirty") {
+                                    petVrmView?.evaluateJavascript("window.setDancing && window.setDancing(true);", null)
+                                    handler.postDelayed({
+                                        petVrmView?.evaluateJavascript("window.setDancing && window.setDancing(false);", null)
+                                    }, 4000)
+                                }
+
                                 emotionIndex++
 
                                 val cuteQuotes = listOf(
                                     "✨ Kyaa! I'm right here on your screen!",
                                     "💖 Don't ignore me! Let's play or chat!",
                                     "🐾 Need me? Double tap to open CupCake!",
+                                    "💃 Look at my dance! Let's celebrate!",
                                     "🍰 Win a game against me today!",
                                     "⭐ You're doing great! Keep going!"
                                 )

@@ -140,11 +140,22 @@
         window.setExpression = function(name, val = 1.0) {
             if (!currentVrm || !currentVrm.expressionManager) return;
             const em = currentVrm.expressionManager;
-            ['happy', 'angry', 'sad', 'relaxed', 'surprised'].forEach(exp => {
+            ['happy', 'angry', 'sad', 'relaxed', 'surprised', 'blinkLeft', 'blinkRight'].forEach(exp => {
                 try { em.setValue(exp, 0); } catch(_) {}
             });
             try {
-                em.setValue(name, val);
+                if (name === 'flirty' || name === 'wink') {
+                    em.setValue('happy', 0.85);
+                    em.setValue('blinkLeft', 1.0); // Cute wink!
+                } else if (name === 'excited' || name === 'laugh' || name === 'lovely') {
+                    em.setValue('happy', 1.0);
+                } else if (name === 'pout' || name === 'jealous') {
+                    em.setValue('angry', 1.0);
+                } else if (name === 'shock') {
+                    em.setValue('surprised', 1.0);
+                } else {
+                    em.setValue(name, val);
+                }
             } catch(e) {
                 console.warn('Unknown expression:', name);
             }
@@ -204,17 +215,25 @@
                     if (lArm) lArm.rotation.x = -sway * 0.35;
                     if (rArm) rArm.rotation.x = sway * 0.35;
                 } else if (isDancing || audioAmplitude > 0.05) {
-                    // 2. Audio beat reactivity / Dance groove to music
-                    const beat = Math.sin(t * 8.0) * (audioAmplitude > 0 ? audioAmplitude : 0.4);
+                    // 2. Audio beat reactivity / Lively dance groove
+                    const danceSpeed = 7.0;
                     if (hips) {
-                        hips.position.y = Math.abs(Math.sin(t * 8.0)) * 0.08;
-                        hips.rotation.y = Math.sin(t * 4.0) * 0.2;
+                        hips.position.y = Math.abs(Math.sin(t * danceSpeed * 2.0)) * 0.06;
+                        hips.position.x = Math.sin(t * danceSpeed) * 0.08;
+                        hips.rotation.y = Math.sin(t * 3.5) * 0.25;
                     }
                     if (spine) {
-                        spine.rotation.z = Math.sin(t * 4.0) * 0.1;
+                        spine.rotation.z = Math.sin(t * 3.5) * 0.12;
+                        spine.rotation.x = Math.abs(Math.sin(t * 7.0)) * 0.05;
                     }
-                    if (lArm) lArm.rotation.z = 1.35 + Math.sin(t * 8.0) * 0.3;
-                    if (rArm) rArm.rotation.z = -1.35 - Math.sin(t * 8.0) * 0.3;
+                    const neck = humanoid.getNormalizedBoneNode('neck');
+                    if (neck) {
+                        neck.rotation.z = -Math.sin(t * 3.5) * 0.08;
+                    }
+                    if (lArm) lArm.rotation.z = 1.2 + Math.sin(t * danceSpeed) * 0.45;
+                    if (rArm) rArm.rotation.z = -1.2 - Math.sin(t * danceSpeed) * 0.45;
+                    if (lLeg) lLeg.rotation.x = Math.sin(t * danceSpeed) * 0.2;
+                    if (rLeg) rLeg.rotation.x = -Math.sin(t * danceSpeed) * 0.2;
                 } else {
                     // 3. Relaxed natural breathing
                     if (spine) {

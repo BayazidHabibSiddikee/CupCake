@@ -60,6 +60,7 @@ fun GameScreen(
     val availableGames by viewModel.availableGames.collectAsStateWithLifecycle()
     val showGameSelector by viewModel.showGameSelector.collectAsStateWithLifecycle()
     val selectedDifficulty by viewModel.selectedDifficulty.collectAsStateWithLifecycle()
+    val botComment by viewModel.botComment.collectAsStateWithLifecycle()
 
     CupCakeTheme {
         Column(Modifier.fillMaxSize()) {
@@ -85,6 +86,35 @@ fun GameScreen(
                     containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerLow
                 )
             )
+
+            // Live bot commentary — the bot's reply to your move / game-ending reaction
+            botComment?.let { comment ->
+                androidx.compose.material3.Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    colors = androidx.compose.material3.CardDefaults.cardColors(
+                        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.tertiaryContainer
+                    ),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(text = "🤖", fontSize = 20.sp)
+                        Text(
+                            text = comment,
+                            modifier = Modifier.weight(1f),
+                            fontSize = 15.sp,
+                            color = androidx.compose.material3.MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                    }
+                }
+            }
 
             val activeGameState = gameState
             if (activeGameState == null) {

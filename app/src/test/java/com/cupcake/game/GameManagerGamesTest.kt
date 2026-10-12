@@ -2,6 +2,7 @@ package com.cupcake.game
 
 import com.cupcake.ai.CharacterManager
 import com.cupcake.ai.OllamaEngine
+import com.cupcake.chat.ChatSessionStore
 import com.google.common.truth.Truth.assertThat
 import io.mockk.mockk
 import org.junit.Before
@@ -11,13 +12,16 @@ class GameManagerGamesTest {
 
     private lateinit var gameManager: GameManager
     private lateinit var pointsManager: PointsManager
+    private lateinit var sessionStore: ChatSessionStore
 
     @Before
     fun setUp() {
+        sessionStore = ChatSessionStore()
         gameManager = GameManager(
             mockk<OllamaEngine>(relaxed = true),
             CharacterManager,
-            PointsManager().also { pointsManager = it }
+            PointsManager().also { pointsManager = it },
+            sessionStore
         )
     }
 

@@ -306,28 +306,35 @@ fun HomeScreen(
 
                             Spacer(Modifier.height(14.dp))
 
-                            // Interactive Micro-Action Chips (Pat, Snack, Pout)
+                            // Interactive Micro-Action Chips (Pat, Snack, Pout, Dance)
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceEvenly
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 AssistChip(
                                     onClick = { viewModel.interactWithMarin("pat") },
-                                    label = { Text("Headpat 💕", fontSize = 12.sp) },
+                                    label = { Text("Headpat 💕", fontSize = 11.5.sp) },
                                     colors = AssistChipDefaults.assistChipColors(
                                         containerColor = MaterialTheme.colorScheme.surface
                                     )
                                 )
                                 AssistChip(
                                     onClick = { viewModel.interactWithMarin("snack") },
-                                    label = { Text("Snack 🍰", fontSize = 12.sp) },
+                                    label = { Text("Snack 🍰", fontSize = 11.5.sp) },
+                                    colors = AssistChipDefaults.assistChipColors(
+                                        containerColor = MaterialTheme.colorScheme.surface
+                                    )
+                                )
+                                AssistChip(
+                                    onClick = { viewModel.interactWithMarin("dance") },
+                                    label = { Text("Dance 💃", fontSize = 11.5.sp) },
                                     colors = AssistChipDefaults.assistChipColors(
                                         containerColor = MaterialTheme.colorScheme.surface
                                     )
                                 )
                                 AssistChip(
                                     onClick = { viewModel.interactWithMarin("pout") },
-                                    label = { Text("Tease 💢", fontSize = 12.sp) },
+                                    label = { Text("Tease 💢", fontSize = 11.5.sp) },
                                     colors = AssistChipDefaults.assistChipColors(
                                         containerColor = MaterialTheme.colorScheme.surface
                                     )

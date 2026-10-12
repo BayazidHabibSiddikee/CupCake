@@ -24,6 +24,7 @@ fun VrmViewer(
     isGenerating: Boolean = false,
     emotion: String = "neutral",
     isWalking: Boolean = false,
+    isDancing: Boolean = false,
     audioBeat: Float = 0f
 ) {
     val context = LocalContext.current
@@ -57,10 +58,14 @@ fun VrmViewer(
     // React to emotion changes
     LaunchedEffect(emotion) {
         val exp = when (emotion.lowercase()) {
-            "happy", "laugh", "excited", "lovely" -> "happy"
+            "flirty", "wink" -> "flirty"
+            "lovely" -> "lovely"
+            "excited" -> "excited"
+            "pout", "jealous" -> "pout"
+            "happy", "laugh" -> "happy"
             "angry" -> "angry"
-            "sad" -> "sad"
-            "relaxed", "confident" -> "relaxed"
+            "sad", "sorrow" -> "sad"
+            "relaxed", "confident", "thinking" -> "relaxed"
             "surprised", "shock" -> "surprised"
             else -> "neutral"
         }
@@ -70,6 +75,11 @@ fun VrmViewer(
     // React to walking animation
     LaunchedEffect(isWalking) {
         webView.evaluateJavascript("window.setWalking && window.setWalking($isWalking);", null)
+    }
+
+    // React to dancing animation
+    LaunchedEffect(isDancing) {
+        webView.evaluateJavascript("window.setDancing && window.setDancing($isDancing);", null)
     }
 
     // React to audio beats / music motions

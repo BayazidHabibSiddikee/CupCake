@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.cupcake.ai.EnergyManager
 import com.cupcake.game.GameManager
 import com.cupcake.game.PointsManager
+import com.cupcake.network.EspWebSocketServer
+import com.cupcake.tts.TtsManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -15,7 +17,9 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 class GameViewModel @Inject constructor(
     private val gameManager: GameManager,
     private val energyManager: EnergyManager,
-    private val pointsManager: PointsManager
+    private val pointsManager: PointsManager,
+    private val ttsManager: TtsManager,
+    private val espServer: EspWebSocketServer
 ) : ViewModel() {
 
     private val _gameState = MutableStateFlow<GameManager.Result?>(null)
@@ -27,6 +31,10 @@ class GameViewModel @Inject constructor(
     private val _showGameSelector = MutableStateFlow(false)
     val showGameSelector = _showGameSelector.asStateFlow()
 
+    /** The bot's latest comment about the game — shown as a bubble above the board. */
+    private val _botComment = MutableStateFlow<String?>(null)
+    val botComment = _botComment.asStateFlow()
+
     val points = pointsManager.points
     val level = pointsManager.level
     val xpProgress = pointsManager.xpProgress
@@ -37,6 +45,37 @@ class GameViewModel @Inject constructor(
                 com.cupcake.game.GameManager.Result(true, "Bot moved", it)
             }
         }
+        // Live commentary about each move the bot receives
+        viewModelScope.launch {
+            gameManager.gameComments.collect { comment ->
+                _botComment.value = comment
+            }
+        }
+        // Game-ending reactions: show in the bubble, speak them, and animate the ESP32 face
+        viewModelScope.launch {
+            gameManager.gameReactions.collect { reaction ->
+                _botComment.value = reaction.text
+
+                val expression = if (reaction.humanWon) EspWebSocketServer.FaceExpression.RAGE
+                else if (reaction.isDraw) EspWebSocketServer.FaceExpression.THINKING
+                else EspWebSocketServer.FaceExpression.HAPPY
+                espServer.sendFaceExpression(expression, 3000)
+
+                val motorAction = if (reaction.humanWon) EspWebSocketServer.MotorAction.TANTUM
+                else EspWebSocketServer.MotorAction.DANCE
+                espServer.sendMotorAction(motorAction)
+
+                viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                    ttsManager.speakStreaming(reaction.text) { audioChunk ->
+                        espServer.sendAudio(audioChunk)
+                    }
+                }
+            }
+        }
+    }
+
+    fun clearBotComment() {
+        _botComment.value = null
     }
 
     fun setShowGameSelector(visible: Boolean) {
@@ -48,6 +87,7 @@ class GameViewModel @Inject constructor(
     fun startGame(gameOption: GameOption, difficulty: com.cupcake.game.TicTacToeEngine.Difficulty) {
         if (!energyManager.consumeEnergy(com.cupcake.ai.EnergyManager.ENERGY_PER_GAME)) return
 
+        clearBotComment()
         val result = gameManager.startGame(gameOption.type, difficulty)
         _gameState.value = com.cupcake.game.GameManager.Result(true, "Game started", result)
         _showGameSelector.value = false
@@ -75,6 +115,7 @@ class GameViewModel @Inject constructor(
     }
 
     fun endGame() {
+        clearBotComment()
         gameManager.startGame(com.cupcake.game.Game.GameType.TIC_TAC_TOE) // reset
         _gameState.value = null
         _showGameSelector.value = true

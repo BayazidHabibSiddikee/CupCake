@@ -57,6 +57,11 @@ class HomeViewModel @Inject constructor(
                     _companionEmotion.value = "angry"
                     _companionQuote.value = "Are you looking at other games?! Look only at me! Hmph! 💢"
                 }
+                "dance" -> {
+                    pointsManager.awardPoints(30, Game.GameType.CLICKER, true)
+                    _companionEmotion.value = "excited"
+                    _companionQuote.value = "Kyaa! Look at my dance moves! Are you grooving with me?! 💃✨ (+30 Bond XP)"
+                }
                 else -> {
                     _companionEmotion.value = "happy"
                     _companionQuote.value = "Let's level up our bond! Pick a game below! 🎮"

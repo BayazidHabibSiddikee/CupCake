@@ -16,8 +16,55 @@ import java.util.concurrent.ConcurrentHashMap
 class GameManager(
     private val ollamaEngine: OllamaEngine,
     private val characterManager: CharacterManager,
-    private val pointsManager: PointsManager
+    private val pointsManager: PointsManager,
+    private val sessionStore: com.cupcake.chat.ChatSessionStore = com.cupcake.chat.ChatSessionStore()
 ) {
+
+    /**
+     * Live bot commentary about individual moves. Collected by the Games screen
+     * (bubble above the board) and persisted to the character's chat session.
+     */
+    val gameComments = kotlinx.coroutines.flow.MutableSharedFlow<String>(extraBufferCapacity = 32)
+
+    /** Game-ending / milestone reactions: outcome flags drive TTS + ESP32 expressions. */
+    val gameReactions = kotlinx.coroutines.flow.MutableSharedFlow<GameReaction>(extraBufferCapacity = 32)
+
+    data class GameReaction(val text: String, val humanWon: Boolean, val isDraw: Boolean)
+
+    init {
+        // Persist everything the bot says about the game into the character's
+        // chat session, regardless of which screen is open.
+        val persistScope = CoroutineScope(Dispatchers.IO)
+        persistScope.launch {
+            gameComments.collect { text -> persistBotUtterance(text) }
+        }
+        persistScope.launch {
+            gameReactions.collect { reaction -> persistBotUtterance(reaction.text) }
+        }
+    }
+
+    private fun persistBotUtterance(text: String) {
+        if (text.isBlank()) return
+        val characterId = characterManager.getCurrentCharacter()?.id ?: "marin_kitagawa"
+        sessionStore.addMessage(
+            characterId,
+            com.cupcake.data.model.ChatMessage.assistant(
+                text,
+                sessionStore.conversationIdFor(characterId),
+                modelUsed = "game"
+            )
+        )
+    }
+
+    // Games where per-move LLM notifications are skipped:
+    // - CLICKER / REACTION_TIME: taps are too rapid (milestone/end reactions still fire)
+    // - TIC_TAC_TOE(_4X4): the bot replies with its own move, which notifies instead (one call per round)
+    private val MOVE_NOTIFY_EXEMPT = setOf(
+        Game.GameType.CLICKER,
+        Game.GameType.REACTION_TIME,
+        Game.GameType.TIC_TAC_TOE,
+        Game.GameType.TIC_TAC_TOE_4X4
+    )
 
     // ML Models for different games
     private val ticTacToeML = BotMLModel()
@@ -143,8 +190,25 @@ class GameManager(
         if (game.status != Game.GameStatus.PLAYING) return Result(false, "Game over")
         if (game.currentPlayer != Game.Player.HUMAN) return Result(false, "Not your turn")
 
-        // Notify LLM about human's move
-        notifyLLMMove(game.gameType!!, "human", position, game)
+        val gameType = game.gameType
+        val result = applyHumanMove(position)
+
+        // Send the move to the bot AFTER the board has been updated, so the
+        // prompt contains the real position of every piece/card/disc.
+        // Game-ending moves trigger triggerReaction() instead (one bot message per event).
+        if (result.success &&
+            gameType !in MOVE_NOTIFY_EXEMPT &&
+            currentGame?.status == Game.GameStatus.PLAYING
+        ) {
+            notifyLLMMove(gameType, "human", position, currentGame ?: game)
+        }
+        return result
+    }
+
+    private fun applyHumanMove(position: Int): Result {
+        val game = currentGame ?: return Result(false, "No active game")
+        if (game.status != Game.GameStatus.PLAYING) return Result(false, "Game over")
+        if (game.currentPlayer != Game.Player.HUMAN) return Result(false, "Not your turn")
 
         if (game.gameType == Game.GameType.CLICKER) {
             val board = game.board as? Game.ClickerBoard ?: return Result(false, "Invalid board")
@@ -643,7 +707,6 @@ class GameManager(
         return when (game.gameType) {
             Game.GameType.WORD_SCRAMBLE -> {
                 val board = game.board as? Game.WordScrambleBoard ?: return Result(false, "Invalid board")
-                notifyLLMMove(game.gameType, "human", answer.length, game)
                 val newBoard = WordScrambleEngine.checkAnswer(board, answer)
                 val newHistory = game.moveHistory + Game.Move(Game.Player.HUMAN, answer.length)
 
@@ -667,6 +730,9 @@ class GameManager(
                     moveHistory = newHistory
                 )
                 onGameStateChanged?.invoke(currentGame)
+                if (newStatus == Game.GameStatus.PLAYING) {
+                    notifyLLMMove(game.gameType, "human", answer.length, currentGame ?: game, detail = answer)
+                }
                 Result(
                     true,
                     if (newBoard.solved) "Solved in ${newBoard.attempts} attempt(s)!"
@@ -677,7 +743,6 @@ class GameManager(
 
             Game.GameType.NUMBER_BASE -> {
                 val board = game.board as? Game.NumberBaseBoard ?: return Result(false, "Invalid board")
-                notifyLLMMove(game.gameType, "human", answer.length, game)
                 val newBoard = NumberBaseEngine.checkAnswer(board, answer)
                 val newHistory = game.moveHistory + Game.Move(Game.Player.HUMAN, answer.length)
 
@@ -702,6 +767,9 @@ class GameManager(
                     moveHistory = newHistory
                 )
                 onGameStateChanged?.invoke(currentGame)
+                if (newStatus == Game.GameStatus.PLAYING) {
+                    notifyLLMMove(game.gameType, "human", answer.length, currentGame ?: game, detail = answer)
+                }
                 Result(true, "Answer ${newBoard.questionsAnswered}/10", currentGame)
             }
 
@@ -720,7 +788,6 @@ class GameManager(
         if (guess.size != 4 || guess.any { it !in 0..5 }) return Result(false, "Guess must be 4 colors (0-5)")
 
         val board = game.board as? Game.MastermindBoard ?: return Result(false, "Invalid board")
-        notifyLLMMove(game.gameType, "human", guess.first(), game)
         val newBoard = MastermindEngine.checkWin(board, guess)
         val newHistory = game.moveHistory + Game.Move(Game.Player.HUMAN, guess.first())
 
@@ -746,6 +813,14 @@ class GameManager(
         )
         onGameStateChanged?.invoke(currentGame)
         val last = newBoard.guesses.lastOrNull()
+        if (newStatus == Game.GameStatus.PLAYING) {
+            val palette = listOf("🔴", "🔵", "🟢", "🟡", "🟣", "🟠")
+            notifyLLMMove(
+                game.gameType, "human", guess.first(), currentGame ?: game,
+                detail = guess.joinToString("") { palette[it] } +
+                    " (exact=${last?.exactMatches ?: 0}, color=${last?.colorMatches ?: 0})"
+            )
+        }
         return Result(true, "Exact: ${last?.exactMatches ?: 0}, Color: ${last?.colorMatches ?: 0}", currentGame)
     }
 
@@ -834,6 +909,10 @@ class GameManager(
                 currentGame = game.copy(board = board, currentPlayer = Game.Player.HUMAN, moveHistory = newHistory)
             }
             onGameStateChanged?.invoke(currentGame)
+            // Tell the bot about its own completed round (human move + bot reply)
+            if (currentGame?.status == Game.GameStatus.PLAYING) {
+                currentGame?.let { notifyLLMMove(game.gameType, "bot", move, it) }
+            }
         }
     }
 
@@ -880,6 +959,10 @@ class GameManager(
                 currentGame = game.copy(board = board, currentPlayer = Game.Player.HUMAN, moveHistory = newHistory)
             }
             onGameStateChanged?.invoke(currentGame)
+            // Tell the bot about its own completed round (human move + bot reply)
+            if (currentGame?.status == Game.GameStatus.PLAYING) {
+                currentGame?.let { notifyLLMMove(game.gameType, "bot", move, it) }
+            }
         }
     }
 
@@ -918,7 +1001,7 @@ class GameManager(
 
                             override fun onComplete() {
                                 val translated = com.cupcake.ai.BanglishTranslator.translate(fullResponse.trim(), personality)
-                                onGameReaction(translated, false, false)
+                                gameReactions.tryEmit(GameReaction(translated, false, false))
                             }
 
                             override fun onError(error: String) {
@@ -932,24 +1015,20 @@ class GameManager(
             }
     }
 
-    private fun notifyLLMMove(gameType: Game.GameType, player: String, position: Int, gameState: Game.State) {
+    private fun notifyLLMMove(
+        gameType: Game.GameType,
+        player: String,
+        position: Int,
+        gameState: Game.State,
+        detail: String? = null
+    ) {
         val character = characterManager.getCurrentCharacter()
         val personality = character?.personality ?: "friendly"
         val mood = jealousyTracker.getBotMood()
         val jealousy = jealousyTracker.getJealousyLevel()
         val anger = jealousyTracker.getAngerLevel()
         
-        val moveDesc = when (gameType) {
-            Game.GameType.TIC_TAC_TOE, Game.GameType.TIC_TAC_TOE_4X4 -> "placed at position $position"
-            Game.GameType.CONNECT_FOUR -> "dropped in column ${position % 7 + 1}"
-            Game.GameType.TIC_TAC_TOE -> "placed X at $position"
-            Game.GameType.ROCK_PAPER_SCISSORS -> "chose ${when(position){0->"Rock";1->"Paper";2->"Scissors";else->"Unknown"}}"
-            Game.GameType.GUESS_NUMBER -> "guessed ${position + 1}"
-            Game.GameType.MATH_QUIZ -> "answered $position"
-            Game.GameType.CHESS -> "made move $position"
-            Game.GameType.CLICKER -> "tapped (score: ${(gameState.board as? Game.ClickerBoard)?.score})"
-            else -> "made move $position"
-        }
+        val moveDesc = describeMove(gameType, player, position, gameState, detail)
 
         val prompt = """
             Game: ${gameType.name}
@@ -993,24 +1072,35 @@ class GameManager(
                     messages = listOf(OllamaEngine.OllamaMessage("user", fullPrompt)),
                     callback = object : OllamaEngine.GenerateCallback {
                         override fun onToken(token: String) {
-                            // Stream tokens if needed
+                            fullResponse += token
                         }
 
                         override fun onComplete() {
-                            // Move notification doesn't need to go to onGameReaction
-                            // It's just for the bot's internal reaction
+                            // Deliver the bot's reply about the move to the UI/chat
+                            val translated = com.cupcake.ai.BanglishTranslator.translate(fullResponse.trim(), personality)
+                            val comment = translated.ifBlank { fallbackMoveComment(player) }
+                            gameComments.tryEmit(comment)
                         }
 
                         override fun onError(error: String) {
                             android.util.Log.w("GameManager", "Move notification failed: $error")
+                            gameComments.tryEmit(fallbackMoveComment(player))
                         }
                     }
                 )
             } catch (e: Exception) {
                 android.util.Log.w("GameManager", "Move notification failed", e)
+                gameComments.tryEmit(fallbackMoveComment(player))
             }
         }
     }
+
+    private fun fallbackMoveComment(player: String): String =
+        if (player == "bot") {
+            listOf("Hehe, my turn! ✨", "Watch this! 😏", "Too easy! 🙄").random()
+        } else {
+            listOf("Hmm... interesting 🤔", "Hmph, we'll see 😤", "Kyaa, you're actually trying! 😏").random()
+        }
 
     private fun triggerReaction(humanWon: Boolean, isDraw: Boolean = false) {
         val character = characterManager.getCurrentCharacter()
@@ -1055,7 +1145,7 @@ class GameManager(
 
                         override fun onComplete() {
                             val translated = com.cupcake.ai.BanglishTranslator.translate(fullResponse.trim(), personality)
-                            onGameReaction(translated, humanWon, isDraw)
+                            gameReactions.tryEmit(GameReaction(translated, humanWon, isDraw))
                         }
 
                         override fun onError(error: String) {
@@ -1065,7 +1155,7 @@ class GameManager(
                                 humanWon -> if (jealousy > 0.4) "Kyaa! You totally cheated! Hmph, I'm pouting now! 😤" else "No way! Rematch right now, you big bully!"
                                 else -> "Hehe! Look who won! You owe me a cosplay treat! ✨"
                             }
-                            onGameReaction(fallback, humanWon, isDraw)
+                            gameReactions.tryEmit(GameReaction(fallback, humanWon, isDraw))
                         }
                     }
                 )
@@ -1076,13 +1166,10 @@ class GameManager(
                     humanWon -> "Kyaa! No way, you cheated! Rematch right now! 😤"
                     else -> "Hehe! Look who won! You can't beat me! ✨"
                 }
-                onGameReaction(fallback, humanWon, isDraw)
+                gameReactions.tryEmit(GameReaction(fallback, humanWon, isDraw))
             }
         }
     }
-
-    // Callback for ESP32 reactions
-    var onGameReaction: (String, Boolean, Boolean) -> Unit = { _, _, _ -> }
 
     private fun triggerGameReaction(message: String) {
         val character = characterManager.getCurrentCharacter()
@@ -1116,7 +1203,7 @@ class GameManager(
 
                         override fun onComplete() {
                             val translated = com.cupcake.ai.BanglishTranslator.translate(fullResponse.trim(), personality)
-                            onGameReaction(translated, false, false)
+                            gameReactions.tryEmit(GameReaction(translated, false, false))
                         }
 
                         override fun onError(error: String) {
@@ -1144,4 +1231,37 @@ class GameManager(
         val message: String,
         val state: Game.State? = null
     )
+}
+
+/**
+ * Human-readable description of a move for the bot's LLM prompt.
+ * Covers every [Game.GameType] so the bot always knows exactly what happened on the board.
+ *
+ * @param player "human" or "bot"
+ * @param detail extra text for games without board positions (typed answers, color guesses)
+ */
+internal fun describeMove(
+    gameType: Game.GameType,
+    player: String,
+    position: Int,
+    gameState: Game.State,
+    detail: String? = null
+): String = when (gameType) {
+    Game.GameType.TIC_TAC_TOE ->
+        "placed ${if (player == "bot") "O" else "X"} at cell ${position + 1}"
+    Game.GameType.TIC_TAC_TOE_4X4 ->
+        "placed ${if (player == "bot") "O" else "X"} at cell ${position + 1} of the 4x4 board"
+    Game.GameType.CHESS -> "made chess move $position"
+    Game.GameType.ROCK_PAPER_SCISSORS ->
+        "chose ${when (position) { 0 -> "Rock"; 1 -> "Paper"; 2 -> "Scissors"; else -> "Unknown" }}"
+    Game.GameType.GUESS_NUMBER -> "guessed ${position + 1}"
+    Game.GameType.MATH_QUIZ -> "answered $position"
+    Game.GameType.CLICKER -> "tapped the cupcake (score: ${(gameState.board as? Game.ClickerBoard)?.score})"
+    Game.GameType.MEMORY_MATCH -> "flipped card ${position + 1}"
+    Game.GameType.HANGMAN -> "guessed the letter '${'A' + position}'"
+    Game.GameType.WORD_SCRAMBLE -> "answered \"${detail ?: "?"}\""
+    Game.GameType.NUMBER_BASE -> "answered \"${detail ?: "?"}\" (in base conversion)"
+    Game.GameType.REACTION_TIME -> "tapped (reaction round)"
+    Game.GameType.CONNECT_FOUR -> "dropped a disc in column ${position % 7 + 1}"
+    Game.GameType.MASTERMIND -> "guessed ${detail ?: position}"
 }

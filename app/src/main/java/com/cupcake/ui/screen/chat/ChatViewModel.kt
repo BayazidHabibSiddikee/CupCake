@@ -208,22 +208,24 @@ class ChatViewModel @Inject constructor(
     }
 
     private fun setupGameReactions() {
-        gameManager.onGameReaction = { reactionText, humanWon, isDraw ->
-            viewModelScope.launch {
+        // GameManager persists every reaction/comment into this character's chat
+        // session itself, so we only handle the live effects here (TTS + ESP32).
+        viewModelScope.launch {
+            gameManager.gameReactions.collect { reaction ->
                 // Send to ESP32 for face animation
-                val expression = if (humanWon) EspWebSocketServer.FaceExpression.RAGE
-                else if (isDraw) EspWebSocketServer.FaceExpression.THINKING
+                val expression = if (reaction.humanWon) EspWebSocketServer.FaceExpression.RAGE
+                else if (reaction.isDraw) EspWebSocketServer.FaceExpression.THINKING
                 else EspWebSocketServer.FaceExpression.HAPPY
-                
+
                 espServer.sendFaceExpression(expression, 3000)
-                
+
                 // Motor action
-                val motorAction = if (humanWon) EspWebSocketServer.MotorAction.TANTUM
+                val motorAction = if (reaction.humanWon) EspWebSocketServer.MotorAction.TANTUM
                 else EspWebSocketServer.MotorAction.DANCE
                 espServer.sendMotorAction(motorAction)
-                
+
                 // TTS
-                speakResponse(reactionText)
+                speakResponse(reaction.text)
             }
         }
     }

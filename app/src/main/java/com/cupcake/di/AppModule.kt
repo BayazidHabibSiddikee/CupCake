@@ -80,9 +80,10 @@ object AppModule {
     fun provideGameManager(
         ollamaEngine: OllamaEngine,
         characterManager: CharacterManager,
-        pointsManager: PointsManager
+        pointsManager: PointsManager,
+        sessionStore: com.cupcake.chat.ChatSessionStore
     ): GameManager {
-        return GameManager(ollamaEngine, characterManager, pointsManager)
+        return GameManager(ollamaEngine, characterManager, pointsManager, sessionStore)
     }
 
     @Provides

@@ -60,15 +60,6 @@ class ModelDownloadManager @Inject constructor(
                 isBundled = true
             ),
             GgufModelInfo(
-                fileName = "smollm-135m-instruct-q4_k_m.gguf",
-                displayName = "SmolLM 135M Instruct",
-                tag = "Bundled • Ultra Fast",
-                description = "Tiny 135M model for instant responses with minimal RAM. Built-in.",
-                sizeBytes = 101_000_000L,
-                downloadUrl = null,
-                isBundled = true
-            ),
-            GgufModelInfo(
                 fileName = "qwen2.5-1.5b-instruct-q2_k.gguf",
                 displayName = "Qwen 2.5 1.5B Instruct (Q2_K)",
                 tag = "2B Class • Recommended",
