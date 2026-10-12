@@ -14,7 +14,11 @@ data class Character(
     val isBuiltIn: Boolean = false,
     var isSelected: Boolean = false,
     val customGif: String? = null,
-    val isShimejiActive: Boolean = false
+    val isShimejiActive: Boolean = false,
+    val firstMessage: String? = null,
+    val scenario: String? = null,
+    val mesExample: String? = null,
+    val creator: String? = null
 ) {
     fun withPromptAddition(addition: String): Character {
         return copy(systemPrompt = "$systemPrompt\n\n$addition")

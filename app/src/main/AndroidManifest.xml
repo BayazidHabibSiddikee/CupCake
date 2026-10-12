@@ -66,6 +66,17 @@
                 android:value="Floating desktop companion overlay" />
         </service>
 
+        <!-- FileProvider for exporting and sharing Character Cards -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
         <!-- Hilt -->
         <meta-data
             android:name="dagger.hilt.android.internal.DISABLE_HILT_CODE_GENERATION"

@@ -254,6 +254,15 @@ class ShimejiPetService : Service() {
         val petImageView = view.findViewById<ImageView>(R.id.pet_image) ?: return
         val petEmojiView = view.findViewById<TextView>(R.id.pet_emoji) ?: return
 
+        val isVrm = avatar?.contains("marin") == true || avatar?.endsWith(".vrm") == true
+        if (isVrm) {
+            petVrmView?.visibility = View.VISIBLE
+            petImageView.visibility = View.GONE
+            petEmojiView.visibility = View.GONE
+            return
+        }
+
+        petVrmView?.visibility = View.GONE
         val imageSource = customGif?.takeIf { it.isNotBlank() } ?: avatar?.takeIf { it.isNotBlank() }
 
         if (imageSource != null && (imageSource.startsWith("http") || imageSource.startsWith("content://") || imageSource.startsWith("file://") || imageSource.endsWith(".gif") || imageSource.endsWith(".png") || imageSource.endsWith(".webp") || imageSource.endsWith(".jpg"))) {

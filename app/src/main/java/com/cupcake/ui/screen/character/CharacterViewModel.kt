@@ -91,6 +91,28 @@ class CharacterViewModel @Inject constructor(
         clearForm()
     }
 
+    val snackbarMessage = MutableStateFlow<String?>(null)
+
+    fun importSillyTavernCard(bytes: ByteArray, fileName: String?) {
+        viewModelScope.launch {
+            try {
+                val character = characterManager.importSillyTavernCard(bytes, fileName)
+                refresh()
+                snackbarMessage.value = "Imported ${character.name} successfully! ✨"
+            } catch (e: Exception) {
+                snackbarMessage.value = "Failed to import card: ${e.message}"
+            }
+        }
+    }
+
+    fun exportSillyTavernCard(characterId: String): ByteArray? {
+        return characterManager.exportSillyTavernCard(characterId)
+    }
+
+    fun clearSnackbar() {
+        snackbarMessage.value = null
+    }
+
     fun clearForm() {
         editingCharacterId.value = null
         newCharName.value = ""

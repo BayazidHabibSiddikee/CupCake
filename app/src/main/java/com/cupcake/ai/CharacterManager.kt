@@ -24,6 +24,7 @@ object CharacterManager {
     }
 
     fun initialize(appFilesDir: File) {
+        characters.clear()
         charactersDir = File(appFilesDir, "characters")
         charactersDir?.mkdirs()
         loadBuiltInCharacters()
@@ -112,8 +113,104 @@ Stay strictly under 200 characters at all times!""",
         if (character.isBuiltIn) return false
         characters.remove(id)
         File(charactersDir, "$id.json").delete()
+        File(charactersDir, "$id.png").delete()
         updateFlow()
         return true
+    }
+
+    /**
+     * Imports a SillyTavern character card (PNG with embedded metadata or raw JSON text).
+     * Saves the avatar PNG locally and configures the Character persona.
+     */
+    fun importSillyTavernCard(bytes: ByteArray, sourceFileName: String? = null): Character {
+        val charId = generateId()
+        val dir = charactersDir ?: File("/tmp").also { it.mkdirs() }
+        val imageFile = File(dir, "$charId.png")
+
+        val cardData = SillyTavernCardParser.extractFromPng(bytes)
+            ?: try {
+                SillyTavernCardParser.parseCardText(String(bytes, Charsets.UTF_8))
+            } catch (e: Exception) {
+                null
+            }
+
+        // Save PNG bytes if valid PNG; otherwise create default avatar
+        val avatarUri = if (SillyTavernCardParser.isPng(bytes)) {
+            imageFile.writeBytes(bytes)
+            "file://${imageFile.absolutePath}"
+        } else {
+            val defaultPng = SillyTavernCardParser.createDefaultAvatarPng(
+                cardData?.name ?: "Companion",
+                "🎭"
+            )
+            imageFile.writeBytes(defaultPng)
+            "file://${imageFile.absolutePath}"
+        }
+
+        val name = cardData?.name?.ifBlank { null }
+            ?: sourceFileName?.substringBeforeLast('.')?.replace('_', ' ')?.trim()?.ifBlank { null }
+            ?: "Custom Companion"
+
+        val description = cardData?.description?.ifBlank { null }
+            ?: cardData?.personality?.take(80)?.ifBlank { null }
+            ?: "Imported SillyTavern companion"
+
+        val personality = cardData?.personality?.ifBlank { "friendly" } ?: "friendly"
+
+        val systemPrompt = if (cardData != null) {
+            SillyTavernCardParser.buildSystemPrompt(cardData)
+        } else {
+            """You are $name! You are friendly, cheerful, expressive, and fun.
+            
+CRITICAL OUTPUT RULES:
+- LENGTH LIMIT: Every response MUST be strictly under 200 characters (1 to 2 punchy sentences maximum). Never write long paragraphs.
+- NO AI CLICHÉS: Never sound like an AI assistant. Speak 100% in character as $name.
+Stay strictly under 200 characters at all times!"""
+        }
+
+        val character = Character(
+            id = charId,
+            name = name,
+            description = description,
+            systemPrompt = systemPrompt,
+            avatar = avatarUri,
+            personality = personality,
+            languages = listOf("en", "ja", "bn"),
+            isBuiltIn = false,
+            isSelected = true,
+            customGif = null,
+            isShimejiActive = false,
+            firstMessage = cardData?.firstMes?.takeIf { it.isNotBlank() },
+            scenario = cardData?.scenario?.takeIf { it.isNotBlank() },
+            mesExample = cardData?.mesExample?.takeIf { it.isNotBlank() },
+            creator = cardData?.creator?.takeIf { it.isNotBlank() }
+        )
+
+        // Select the new character
+        characters.values.forEach { it.isSelected = false }
+        characters[character.id] = character
+        saveCharacter(character)
+        updateFlow()
+        return character
+    }
+
+    /**
+     * Exports a character as a SillyTavern PNG Character Card byte array.
+     */
+    fun exportSillyTavernCard(characterId: String): ByteArray? {
+        val character = characters[characterId] ?: return null
+        val basePngBytes = try {
+            if (character.avatar.startsWith("file://")) {
+                val f = File(character.avatar.removePrefix("file://"))
+                if (f.exists() && SillyTavernCardParser.isPng(f.readBytes())) {
+                    f.readBytes()
+                } else null
+            } else null
+        } catch (e: Exception) {
+            null
+        } ?: SillyTavernCardParser.createDefaultAvatarPng(character.name, character.avatar)
+
+        return SillyTavernCardParser.exportToPng(character, basePngBytes)
     }
 
     fun getSystemPromptForCharacter(characterId: String, gameContext: String? = null): String {

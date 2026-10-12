@@ -245,6 +245,15 @@ class ChatViewModel @Inject constructor(
         _currentCharacter.value = character
         if (character != null) {
             systemPromptCache = characterManager.getSystemPromptForCharacter(character.id)
+            if (sessionStore.messages(character.id).value.isEmpty() && !character.firstMessage.isNullOrBlank()) {
+                sessionStore.addMessage(
+                    character.id,
+                    ChatMessage.assistant(
+                        content = character.firstMessage,
+                        conversationId = sessionStore.conversationIdFor(character.id)
+                    )
+                )
+            }
         }
     }
 
