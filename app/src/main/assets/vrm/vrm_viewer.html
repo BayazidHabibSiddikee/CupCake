@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Marin VRM Viewer</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: transparent;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        #vrm-canvas-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        #loading {
+            position: absolute;
+            color: #0084FF;
+            font-family: sans-serif;
+            font-size: 14px;
+            font-weight: bold;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+    </style>
+    <script src="three.min.js"></script>
+    <script src="GLTFLoader.js"></script>
+    <script src="OrbitControls.js"></script>
+    <script src="three-vrm.js"></script>
+</head>
+<body>
+    <div id="vrm-canvas-container">
+        <div id="loading">Loading Marin...</div>
+    </div>
+
+    <script>
+        let scene, camera, renderer, currentVrm, clock;
+        let blinkTimer = 0;
+        let isTalking = false;
+        let mouthTimer = 0;
+
+        function init() {
+            const container = document.getElementById('vrm-canvas-container');
+            const width = container.clientWidth || window.innerWidth;
+            const height = container.clientHeight || window.innerHeight;
+
+            clock = new THREE.Clock();
+            scene = new THREE.Scene();
+
+            camera = new THREE.PerspectiveCamera(30, width / height, 0.1, 20.0);
+            camera.position.set(0.0, 1.35, 1.15); // Focused on Marin's upper body / head
+
+            renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+            renderer.setSize(width, height);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.outputEncoding = THREE.sRGBEncoding;
+            container.appendChild(renderer.domElement);
+
+            // Lighting
+            const light = new THREE.DirectionalLight(0xffffff, 1.4);
+            light.position.set(1.0, 2.0, 1.0).normalize();
+            scene.add(light);
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.85);
+            scene.add(ambientLight);
+
+            // Controls
+            const controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.screenSpacePanning = true;
+            controls.target.set(0.0, 1.35, 0.0);
+            controls.enablePan = false;
+            controls.enableZoom = true;
+            controls.minDistance = 0.6;
+            controls.maxDistance = 2.5;
+            controls.update();
+
+            loadVRM('../marin/marin.vrm');
+
+            window.addEventListener('resize', onResize);
+            animate();
+        }
+
+        function loadVRM(url) {
+            const loader = new THREE.GLTFLoader();
+            loader.crossOrigin = 'anonymous';
+            loader.register((parser) => new THREE.VRMLoaderPlugin(parser));
+
+            loader.load(
+                url,
+                (gltf) => {
+                    const vrm = gltf.userData.vrm;
+                    if (!vrm) return;
+
+                    currentVrm = vrm;
+                    scene.add(vrm.scene);
+                    vrm.scene.rotation.y = Math.PI; // Face camera
+
+                    // Relax arms naturally
+                    const lArm = vrm.humanoid.getNormalizedBoneNode('leftUpperArm');
+                    const rArm = vrm.humanoid.getNormalizedBoneNode('rightUpperArm');
+                    if (lArm) lArm.rotation.z = 1.35;
+                    if (rArm) rArm.rotation.z = -1.35;
+
+                    const lLower = vrm.humanoid.getNormalizedBoneNode('leftLowerArm');
+                    const rLower = vrm.humanoid.getNormalizedBoneNode('rightLowerArm');
+                    if (lLower) lLower.rotation.z = 0.15;
+                    if (rLower) rLower.rotation.z = -0.15;
+
+                    document.getElementById('loading').style.opacity = '0';
+                    console.log('Marin VRM loaded successfully!');
+                },
+                (progress) => {},
+                (error) => {
+                    console.error('Failed to load VRM:', error);
+                    document.getElementById('loading').innerText = 'VRM Load Error';
+                }
+            );
+        }
+
+        function onResize() {
+            const container = document.getElementById('vrm-canvas-container');
+            const width = container.clientWidth || window.innerWidth;
+            const height = container.clientHeight || window.innerHeight;
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
+        }
+
+        // Emotion Controller
+        window.setExpression = function(name, val = 1.0) {
+            if (!currentVrm || !currentVrm.expressionManager) return;
+            const em = currentVrm.expressionManager;
+            ['happy', 'angry', 'sad', 'relaxed', 'surprised'].forEach(exp => {
+                try { em.setValue(exp, 0); } catch(_) {}
+            });
+            try {
+                em.setValue(name, val);
+            } catch(e) {
+                console.warn('Unknown expression:', name);
+            }
+        };
+
+        window.setTalking = function(talking) {
+            isTalking = talking;
+            if (!talking && currentVrm && currentVrm.expressionManager) {
+                try { currentVrm.expressionManager.setValue('aa', 0); } catch(_) {}
+            }
+        };
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+
+            if (currentVrm) {
+                currentVrm.update(delta);
+
+                // Idle breathing motion
+                const t = clock.elapsedTime;
+                const spine = currentVrm.humanoid.getNormalizedBoneNode('spine');
+                if (spine) {
+                    spine.rotation.x = Math.sin(t * 1.5) * 0.02;
+                }
+
+                // Automatic natural blinking
+                blinkTimer += delta;
+                if (blinkTimer > 3.5) {
+                    const blinkVal = Math.sin((blinkTimer - 3.5) * Math.PI * 4);
+                    if (blinkVal > 0) {
+                        currentVrm.expressionManager.setValue('blink', blinkVal);
+                    } else {
+                        currentVrm.expressionManager.setValue('blink', 0);
+                        blinkTimer = 0;
+                    }
+                }
+
+                // Mouth movement when talking
+                if (isTalking) {
+                    mouthTimer += delta * 12;
+                    const mouthVal = (Math.sin(mouthTimer) + 1.0) * 0.35;
+                    currentVrm.expressionManager.setValue('aa', mouthVal);
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>

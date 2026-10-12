@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -63,6 +64,7 @@ fun ChatScreen(
     var scrollToBottom by remember { mutableStateOf(false) }
     var showCharacterPicker by remember { mutableStateOf(false) }
     var showClearChatConfirm by remember { mutableStateOf(false) }
+    var showVrm3dView by remember { mutableStateOf(false) }
 
     CupCakeTheme {
         Column(
@@ -73,10 +75,29 @@ fun ChatScreen(
             CharacterHeader(
                 characterName = currentCharacter?.name ?: "Companion",
                 characterAvatar = currentCharacter?.avatar ?: "🤖",
+                isVrmActive = showVrm3dView,
+                onToggleVrm = { showVrm3dView = !showVrm3dView },
                 onSwitchClick = { showCharacterPicker = true },
                 onBackClick = onBack,
                 onClearChatClick = { showClearChatConfirm = true }
             )
+
+            // 3D VRM Model Viewport (Toggled directly from header)
+            if (showVrm3dView) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(280.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLowest,
+                    tonalElevation = 2.dp
+                ) {
+                    com.cupcake.ui.component.VrmViewer(
+                        modifier = Modifier.fillMaxSize(),
+                        isGenerating = isGenerating,
+                        emotion = if (isGenerating) "happy" else "neutral"
+                    )
+                }
+            }
 
             if (showClearChatConfirm) {
                 androidx.compose.material3.AlertDialog(
@@ -205,6 +226,8 @@ fun ChatScreen(
 fun CharacterHeader(
     characterName: String,
     characterAvatar: String,
+    isVrmActive: Boolean = false,
+    onToggleVrm: () -> Unit = {},
     onSwitchClick: () -> Unit,
     onBackClick: () -> Unit,
     onClearChatClick: () -> Unit
@@ -281,6 +304,14 @@ fun CharacterHeader(
             }
             
             Row(verticalAlignment = Alignment.CenterVertically) {
+                // 3D VRM Model Viewport Toggle Button
+                androidx.compose.material3.IconButton(
+                    onClick = onToggleVrm,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Text(if (isVrmActive) "👗" else "🧊", fontSize = 18.sp)
+                }
+
                 val context = androidx.compose.ui.platform.LocalContext.current
                 androidx.compose.material3.IconButton(
                     onClick = {
