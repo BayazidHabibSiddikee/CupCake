@@ -35,6 +35,7 @@ fun VrmViewer(
                 ViewGroup.LayoutParams.MATCH_PARENT
             )
             setBackgroundColor(Color.TRANSPARENT)
+            setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
             settings.apply {
                 javaScriptEnabled = true
                 domStorageEnabled = true
@@ -44,45 +45,25 @@ fun VrmViewer(
                 allowUniversalAccessFromFileURLs = true
                 cacheMode = WebSettings.LOAD_NO_CACHE
             }
-            webChromeClient = WebChromeClient()
+            webChromeClient = object : WebChromeClient() {
+                override fun onConsoleMessage(consoleMessage: android.webkit.ConsoleMessage?): Boolean {
+                    android.util.Log.i(
+                        "VrmViewerConsole",
+                        "[${consoleMessage?.messageLevel()}] ${consoleMessage?.message()} (${consoleMessage?.sourceId()}:${consoleMessage?.lineNumber()})"
+                    )
+                    return true
+                }
+            }
             webViewClient = object : WebViewClient() {
                 override fun shouldInterceptRequest(
                     view: WebView?,
                     request: android.webkit.WebResourceRequest?
                 ): android.webkit.WebResourceResponse? {
                     val url = request?.url?.toString() ?: return null
-                    if (url.contains("marin.vrm")) {
-                        try {
-                            val stream = context.assets.open("marin/marin.vrm")
-                            return android.webkit.WebResourceResponse(
-                                "application/octet-stream",
-                                "UTF-8",
-                                stream
-                            )
-                        } catch (e: Exception) {
-                            android.util.Log.e("VrmViewer", "Failed to stream marin.vrm from assets", e)
-                        }
-                    } else if (url.contains("android_asset/")) {
-                        val path = url.substringAfter("android_asset/")
-                        try {
-                            val stream = context.assets.open(path)
-                            val mime = when {
-                                path.endsWith(".js") -> "application/javascript"
-                                path.endsWith(".html") -> "text/html"
-                                path.endsWith(".png") -> "image/png"
-                                path.endsWith(".gif") -> "image/gif"
-                                path.endsWith(".vrm") -> "application/octet-stream"
-                                else -> "application/octet-stream"
-                            }
-                            return android.webkit.WebResourceResponse(mime, "UTF-8", stream)
-                        } catch (e: Exception) {
-                            android.util.Log.e("VrmViewer", "Failed to stream asset: $path", e)
-                        }
-                    }
-                    return super.shouldInterceptRequest(view, request)
+                    return handleVrmAsset(context, url) ?: super.shouldInterceptRequest(view, request)
                 }
             }
-            loadUrl("file:///android_asset/vrm/vrm_viewer.html")
+            loadUrl("https://cupcake.local/assets/vrm/vrm_viewer.html")
         }
     }
 
@@ -134,5 +115,40 @@ fun VrmViewer(
             factory = { webView },
             modifier = Modifier.fillMaxSize()
         )
+    }
+}
+
+fun handleVrmAsset(context: android.content.Context, url: String): android.webkit.WebResourceResponse? {
+    val cleanPath = when {
+        url.contains("cupcake.local/assets/") -> url.substringAfter("cupcake.local/assets/")
+        url.contains("cupcake.local/") -> url.substringAfter("cupcake.local/")
+        url.contains("android_asset/") -> url.substringAfter("android_asset/")
+        url.contains("marin.vrm") -> "marin/marin.vrm"
+        else -> return null
+    }.substringBefore("?").removePrefix("/")
+
+    return try {
+        val stream = context.assets.open(cleanPath)
+        val mimeType = when {
+            cleanPath.endsWith(".html") -> "text/html"
+            cleanPath.endsWith(".js") -> "application/javascript"
+            cleanPath.endsWith(".css") -> "text/css"
+            cleanPath.endsWith(".json") -> "application/json"
+            cleanPath.endsWith(".png") -> "image/png"
+            cleanPath.endsWith(".gif") -> "image/gif"
+            cleanPath.endsWith(".vrm") || cleanPath.endsWith(".glb") -> "model/gltf-binary"
+            else -> "application/octet-stream"
+        }
+        val encoding = if (mimeType.startsWith("text/") || mimeType == "application/javascript" || mimeType == "application/json") "UTF-8" else null
+        val response = android.webkit.WebResourceResponse(mimeType, encoding, stream)
+        response.responseHeaders = mapOf(
+            "Access-Control-Allow-Origin" to "*",
+            "Access-Control-Allow-Methods" to "GET, OPTIONS, HEAD",
+            "Access-Control-Allow-Headers" to "*"
+        )
+        response
+    } catch (e: Exception) {
+        android.util.Log.e("VrmViewer", "Failed to stream asset: $cleanPath (url: $url)", e)
+        null
     }
 }

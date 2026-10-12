@@ -109,7 +109,8 @@ class ShimejiPetService : Service() {
             WindowManager.LayoutParams.WRAP_CONTENT,
             layoutFlag,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                    WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
@@ -136,6 +137,7 @@ class ShimejiPetService : Service() {
         // Initialize 3D VRM Mascot WebView
         petVrmView = view.findViewById<WebView>(R.id.pet_vrm_view)?.apply {
             setBackgroundColor(Color.TRANSPARENT)
+            setLayerType(View.LAYER_TYPE_HARDWARE, null)
             settings.apply {
                 javaScriptEnabled = true
                 domStorageEnabled = true
@@ -145,45 +147,25 @@ class ShimejiPetService : Service() {
                 allowUniversalAccessFromFileURLs = true
                 cacheMode = WebSettings.LOAD_NO_CACHE
             }
-            webChromeClient = WebChromeClient()
+            webChromeClient = object : WebChromeClient() {
+                override fun onConsoleMessage(consoleMessage: android.webkit.ConsoleMessage?): Boolean {
+                    Log.i(
+                        "PetVrmConsole",
+                        "[${consoleMessage?.messageLevel()}] ${consoleMessage?.message()} (${consoleMessage?.sourceId()}:${consoleMessage?.lineNumber()})"
+                    )
+                    return true
+                }
+            }
             webViewClient = object : WebViewClient() {
                 override fun shouldInterceptRequest(
                     view: WebView?,
                     request: android.webkit.WebResourceRequest?
                 ): android.webkit.WebResourceResponse? {
                     val url = request?.url?.toString() ?: return null
-                    if (url.contains("marin.vrm")) {
-                        try {
-                            val stream = assets.open("marin/marin.vrm")
-                            return android.webkit.WebResourceResponse(
-                                "application/octet-stream",
-                                "UTF-8",
-                                stream
-                            )
-                        } catch (e: Exception) {
-                            Log.e("ShimejiPetService", "Failed to stream marin.vrm from assets", e)
-                        }
-                    } else if (url.contains("android_asset/")) {
-                        val path = url.substringAfter("android_asset/")
-                        try {
-                            val stream = assets.open(path)
-                            val mime = when {
-                                path.endsWith(".js") -> "application/javascript"
-                                path.endsWith(".html") -> "text/html"
-                                path.endsWith(".png") -> "image/png"
-                                path.endsWith(".gif") -> "image/gif"
-                                path.endsWith(".vrm") -> "application/octet-stream"
-                                else -> "application/octet-stream"
-                            }
-                            return android.webkit.WebResourceResponse(mime, "UTF-8", stream)
-                        } catch (e: Exception) {
-                            Log.e("ShimejiPetService", "Failed to stream asset: $path", e)
-                        }
-                    }
-                    return super.shouldInterceptRequest(view, request)
+                    return com.cupcake.ui.component.handleVrmAsset(this@ShimejiPetService, url) ?: super.shouldInterceptRequest(view, request)
                 }
             }
-            loadUrl("file:///android_asset/vrm/vrm_viewer.html")
+            loadUrl("https://cupcake.local/assets/vrm/vrm_viewer.html")
         }
 
         updatePetVisual(avatar, customGif)

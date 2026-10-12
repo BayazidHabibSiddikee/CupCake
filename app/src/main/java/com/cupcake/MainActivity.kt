@@ -105,7 +105,7 @@ class MainActivity : ComponentActivity() {
                         route = "chat/{characterId}",
                         arguments = listOf(androidx.navigation.navArgument("characterId") { type = androidx.navigation.NavType.StringType })
                     ) { backStackEntry ->
-                        val characterId = backStackEntry.arguments?.getString("characterId")!!
+                        val characterId = backStackEntry.arguments?.getString("characterId") ?: "marin_kitagawa"
                         ChatScreen(
                             characterId = characterId,
                             onSwitchCharacter = { id ->

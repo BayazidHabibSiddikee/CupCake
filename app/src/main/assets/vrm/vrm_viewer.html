@@ -60,7 +60,13 @@
             camera = new THREE.PerspectiveCamera(30, width / height, 0.1, 20.0);
             camera.position.set(0.0, 1.35, 1.15); // Focused on Marin's upper body / head
 
-            renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+            try {
+                renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, powerPreference: "high-performance" });
+            } catch(e) {
+                console.error("WebGLRenderer creation failed:", e);
+                document.getElementById('loading').innerText = 'WebGL Error: ' + e.message;
+                return;
+            }
             renderer.setSize(width, height);
             renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
             renderer.outputEncoding = THREE.sRGBEncoding;
@@ -84,13 +90,14 @@
             controls.maxDistance = 2.5;
             controls.update();
 
-            loadVRM('../marin/marin.vrm');
+            loadVRM('https://cupcake.local/assets/marin/marin.vrm');
 
             window.addEventListener('resize', onResize);
             animate();
         }
 
         function loadVRM(url) {
+            console.log('loadVRM initiated with URL:', url);
             const loader = new THREE.GLTFLoader();
             loader.crossOrigin = 'anonymous';
             
@@ -139,11 +146,20 @@
                     if (progress.total > 0) {
                         const pct = Math.round((progress.loaded / progress.total) * 100);
                         document.getElementById('loading').innerText = 'Loading Marin ' + pct + '%...';
+                    } else if (progress.loaded > 0) {
+                        const mb = (progress.loaded / (1024 * 1024)).toFixed(1);
+                        document.getElementById('loading').innerText = 'Loading Marin (' + mb + 'MB)...';
                     }
                 },
                 (error) => {
                     console.error('Failed to load VRM:', error);
-                    document.getElementById('loading').innerText = 'VRM Load Error: ' + (error.message || error.statusText || error);
+                    let errDetail = error.message || (error.target && error.target.statusText) || error.type || String(error);
+                    if (url.startsWith('https://')) {
+                        console.log('Retrying with relative URL ../marin/marin.vrm...');
+                        loadVRM('../marin/marin.vrm');
+                    } else {
+                        document.getElementById('loading').innerText = 'VRM Load Error: ' + errDetail;
+                    }
                 }
             );
         }
@@ -211,17 +227,21 @@
             const delta = clock.getDelta();
 
             if (currentVrm) {
-                currentVrm.update(delta);
+                try {
+                    currentVrm.update(delta);
+                } catch(e) {
+                    console.warn('vrm update error:', e);
+                }
                 const t = clock.elapsedTime;
 
                 // Humanoid nodes
                 const humanoid = currentVrm.humanoid;
-                const spine = humanoid.getNormalizedBoneNode('spine');
-                const hips = humanoid.getNormalizedBoneNode('hips');
-                const lLeg = humanoid.getNormalizedBoneNode('leftUpperLeg');
-                const rLeg = humanoid.getNormalizedBoneNode('rightUpperLeg');
-                const lArm = humanoid.getNormalizedBoneNode('leftUpperArm');
-                const rArm = humanoid.getNormalizedBoneNode('rightUpperArm');
+                const spine = humanoid?.getNormalizedBoneNode('spine');
+                const hips = humanoid?.getNormalizedBoneNode('hips');
+                const lLeg = humanoid?.getNormalizedBoneNode('leftUpperLeg');
+                const rLeg = humanoid?.getNormalizedBoneNode('rightUpperLeg');
+                const lArm = humanoid?.getNormalizedBoneNode('leftUpperArm');
+                const rArm = humanoid?.getNormalizedBoneNode('rightUpperArm');
 
                 // 1. Walking / Screen roam motion animation
                 if (isWalking) {
@@ -247,7 +267,7 @@
                         spine.rotation.z = Math.sin(t * 3.5) * 0.12;
                         spine.rotation.x = Math.abs(Math.sin(t * 7.0)) * 0.05;
                     }
-                    const neck = humanoid.getNormalizedBoneNode('neck');
+                    const neck = humanoid?.getNormalizedBoneNode('neck');
                     if (neck) {
                         neck.rotation.z = -Math.sin(t * 3.5) * 0.08;
                     }
@@ -270,9 +290,9 @@
                 if (blinkTimer > 3.5) {
                     const blinkVal = Math.sin((blinkTimer - 3.5) * Math.PI * 4);
                     if (blinkVal > 0) {
-                        currentVrm.expressionManager.setValue('blink', blinkVal);
+                        currentVrm.expressionManager?.setValue('blink', blinkVal);
                     } else {
-                        currentVrm.expressionManager.setValue('blink', 0);
+                        currentVrm.expressionManager?.setValue('blink', 0);
                         blinkTimer = 0;
                     }
                 }
@@ -281,7 +301,7 @@
                 if (isTalking) {
                     mouthTimer += delta * 12;
                     const mouthVal = (Math.sin(mouthTimer) + 1.0) * 0.35;
-                    currentVrm.expressionManager.setValue('aa', mouthVal);
+                    currentVrm.expressionManager?.setValue('aa', mouthVal);
                 }
             }
 

@@ -18,6 +18,9 @@ class CupCakeApplication : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
 
+        // Enable WebView inspection
+        android.webkit.WebView.setWebContentsDebuggingEnabled(true)
+
         // Initialize character manager
         CharacterManager.initialize(filesDir)
 
