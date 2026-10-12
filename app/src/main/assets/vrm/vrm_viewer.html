@@ -157,18 +157,72 @@
             }
         };
 
+        let isWalking = false;
+        let walkTimer = 0;
+        let isDancing = false;
+        let audioAmplitude = 0;
+
+        window.setWalking = function(walking) {
+            isWalking = walking;
+        };
+
+        window.setAudioReactive = function(amplitude) {
+            audioAmplitude = amplitude;
+        };
+
+        window.setDancing = function(dancing) {
+            isDancing = dancing;
+        };
+
         function animate() {
             requestAnimationFrame(animate);
             const delta = clock.getDelta();
 
             if (currentVrm) {
                 currentVrm.update(delta);
-
-                // Idle breathing motion
                 const t = clock.elapsedTime;
-                const spine = currentVrm.humanoid.getNormalizedBoneNode('spine');
-                if (spine) {
-                    spine.rotation.x = Math.sin(t * 1.5) * 0.02;
+
+                // Humanoid nodes
+                const humanoid = currentVrm.humanoid;
+                const spine = humanoid.getNormalizedBoneNode('spine');
+                const hips = humanoid.getNormalizedBoneNode('hips');
+                const lLeg = humanoid.getNormalizedBoneNode('leftUpperLeg');
+                const rLeg = humanoid.getNormalizedBoneNode('rightUpperLeg');
+                const lArm = humanoid.getNormalizedBoneNode('leftUpperArm');
+                const rArm = humanoid.getNormalizedBoneNode('rightUpperArm');
+
+                // 1. Walking / Screen roam motion animation
+                if (isWalking) {
+                    walkTimer += delta * 4.0;
+                    const sway = Math.sin(walkTimer);
+                    if (hips) {
+                        hips.position.x = Math.sin(walkTimer * 0.5) * 0.25;
+                        hips.position.y = Math.abs(Math.sin(walkTimer)) * 0.04;
+                    }
+                    if (lLeg) lLeg.rotation.x = sway * 0.45;
+                    if (rLeg) rLeg.rotation.x = -sway * 0.45;
+                    if (lArm) lArm.rotation.x = -sway * 0.35;
+                    if (rArm) rArm.rotation.x = sway * 0.35;
+                } else if (isDancing || audioAmplitude > 0.05) {
+                    // 2. Audio beat reactivity / Dance groove to music
+                    const beat = Math.sin(t * 8.0) * (audioAmplitude > 0 ? audioAmplitude : 0.4);
+                    if (hips) {
+                        hips.position.y = Math.abs(Math.sin(t * 8.0)) * 0.08;
+                        hips.rotation.y = Math.sin(t * 4.0) * 0.2;
+                    }
+                    if (spine) {
+                        spine.rotation.z = Math.sin(t * 4.0) * 0.1;
+                    }
+                    if (lArm) lArm.rotation.z = 1.35 + Math.sin(t * 8.0) * 0.3;
+                    if (rArm) rArm.rotation.z = -1.35 - Math.sin(t * 8.0) * 0.3;
+                } else {
+                    // 3. Relaxed natural breathing
+                    if (spine) {
+                        spine.rotation.x = Math.sin(t * 1.5) * 0.02;
+                    }
+                    if (hips) {
+                        hips.position.y = 0;
+                    }
                 }
 
                 // Automatic natural blinking

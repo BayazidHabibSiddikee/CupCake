@@ -172,7 +172,16 @@ class ShimejiPetService : Service() {
                         return true
                     }
                     MotionEvent.ACTION_UP -> {
-                        if (!isDragging) {
+                        if (isDragging) {
+                            val displayMetrics = resources.displayMetrics
+                            val screenHeight = displayMetrics.heightPixels
+                            // Cut off / dismiss when dragged below screen
+                            if (layoutParams!!.y > screenHeight - 160) {
+                                Log.i(TAG, "Pet dragged below screen, cutting off / dismissing")
+                                stopSelf()
+                                return true
+                            }
+                        } else {
                             val now = System.currentTimeMillis()
                             if (now - lastClickTime < 350) {
                                 // Double Click -> Open App

@@ -22,7 +22,9 @@ import androidx.compose.ui.viewinterop.AndroidView
 fun VrmViewer(
     modifier: Modifier = Modifier,
     isGenerating: Boolean = false,
-    emotion: String = "neutral"
+    emotion: String = "neutral",
+    isWalking: Boolean = false,
+    audioBeat: Float = 0f
 ) {
     val context = LocalContext.current
     val webView = remember {
@@ -63,6 +65,16 @@ fun VrmViewer(
             else -> "neutral"
         }
         webView.evaluateJavascript("window.setExpression && window.setExpression('$exp', 1.0);", null)
+    }
+
+    // React to walking animation
+    LaunchedEffect(isWalking) {
+        webView.evaluateJavascript("window.setWalking && window.setWalking($isWalking);", null)
+    }
+
+    // React to audio beats / music motions
+    LaunchedEffect(audioBeat) {
+        webView.evaluateJavascript("window.setAudioReactive && window.setAudioReactive($audioBeat);", null)
     }
 
     DisposableEffect(Unit) {

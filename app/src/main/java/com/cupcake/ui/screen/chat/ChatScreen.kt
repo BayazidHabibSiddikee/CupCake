@@ -84,18 +84,56 @@ fun ChatScreen(
 
             // 3D VRM Model Viewport (Toggled directly from header)
             if (showVrm3dView) {
+                var isWalkingMode by remember { mutableStateOf(false) }
+                val detectedEmotion = remember(currentResponse, messages.size) {
+                    val lastText = if (currentResponse.isNotBlank()) currentResponse else messages.lastOrNull()?.content ?: ""
+                    com.cupcake.ai.EmotionClassifier.detectEmotion(lastText)
+                }
+
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(280.dp),
+                        .height(300.dp),
                     color = MaterialTheme.colorScheme.surfaceContainerLowest,
                     tonalElevation = 2.dp
                 ) {
-                    com.cupcake.ui.component.VrmViewer(
-                        modifier = Modifier.fillMaxSize(),
-                        isGenerating = isGenerating,
-                        emotion = if (isGenerating) "happy" else "neutral"
-                    )
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        com.cupcake.ui.component.VrmViewer(
+                            modifier = Modifier.fillMaxSize(),
+                            isGenerating = isGenerating,
+                            emotion = detectedEmotion.vrmExpression,
+                            isWalking = isWalkingMode,
+                            audioBeat = if (isGenerating) 0.5f else 0.0f
+                        )
+
+                        // 3D Motion Toolbar Overlay (Walk / Roam / Emotion badge)
+                        Row(
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Surface(
+                                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
+                            ) {
+                                Text(
+                                    text = "Emotion: ${detectedEmotion.name.lowercase().capitalize()}",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+
+                            androidx.compose.material3.FilledTonalButton(
+                                onClick = { isWalkingMode = !isWalkingMode },
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                modifier = Modifier.height(28.dp)
+                            ) {
+                                Text(if (isWalkingMode) "Walk: ON 🐾" else "Walk: OFF 🛑", fontSize = 11.sp)
+                            }
+                        }
+                    }
                 }
             }
 
