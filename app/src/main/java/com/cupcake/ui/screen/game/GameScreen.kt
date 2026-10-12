@@ -8,17 +8,20 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TextField
@@ -326,23 +329,61 @@ fun GameOptionCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(16.dp),
+            .height(175.dp),
+        shape = RoundedCornerShape(20.dp),
+        colors = androidx.compose.material3.CardDefaults.cardColors(
+            containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerLow
+        ),
+        elevation = androidx.compose.material3.CardDefaults.cardElevation(defaultElevation = 2.dp),
         onClick = onClick
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Box(
-                modifier = Modifier.size(64.dp),
-                contentAlignment = Alignment.Center
+            Surface(
+                modifier = Modifier.size(52.dp),
+                shape = CircleShape,
+                color = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerHigh
             ) {
-                Text(text = game.icon, fontSize = 36.sp)
+                Box(contentAlignment = Alignment.Center) {
+                    Text(text = game.icon, fontSize = 28.sp)
+                }
             }
-            Text(game.name, fontWeight = FontWeight.Medium, fontSize = 18.sp)
-            Text(game.description, fontSize = 14.sp, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-            Text("Personality: ${game.personality}", fontSize = 12.sp, color = androidx.compose.material3.MaterialTheme.colorScheme.primary)
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Text(
+                    text = game.name,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    maxLines = 1,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    text = game.description,
+                    fontSize = 11.sp,
+                    maxLines = 2,
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+            }
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = androidx.compose.material3.MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+            ) {
+                Text(
+                    text = game.personality,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.primary
+                )
+            }
         }
     }
 }
@@ -358,7 +399,7 @@ fun TicTacToeBoard(
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         // Status
         Text(
@@ -369,7 +410,7 @@ fun TicTacToeBoard(
                 com.cupcake.game.Game.GameStatus.DRAW -> "Draw! 🤝"
                 com.cupcake.game.Game.GameStatus.CHEATING_DETECTED -> "Cheating detected! 😤"
             },
-            fontSize = 20.sp,
+            fontSize = 22.sp,
             fontWeight = FontWeight.Bold,
             color = when (state.status) {
                 com.cupcake.game.Game.GameStatus.HUMAN_WON -> androidx.compose.material3.MaterialTheme.colorScheme.tertiary
@@ -379,25 +420,35 @@ fun TicTacToeBoard(
         )
 
         // Board
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            for (row in 0..2) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    for (col in 0..2) {
-                        val pos = row * 3 + col
-                        val cell = board.get(pos)
-                        TicTacToeCell(
-                            modifier = Modifier.weight(1f).aspectRatio(1f),
-                            value = cell?.symbol ?: "",
-                            isWinningCell = isWinningCell(board, pos, state.winner),
-                            onClick = { 
-                                if (state.status == com.cupcake.game.Game.GameStatus.PLAYING) {
-                                    onCellClick(pos)
+        Box(
+            modifier = Modifier.fillMaxWidth(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                modifier = Modifier
+                    .widthIn(max = 330.dp)
+                    .fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                for (row in 0..2) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        for (col in 0..2) {
+                            val pos = row * 3 + col
+                            val cell = board.get(pos)
+                            TicTacToeCell(
+                                modifier = Modifier.weight(1f).aspectRatio(1f),
+                                value = cell?.symbol ?: "",
+                                isWinningCell = isWinningCell(board, pos, state.winner),
+                                onClick = { 
+                                    if (state.status == com.cupcake.game.Game.GameStatus.PLAYING) {
+                                        onCellClick(pos)
+                                    }
                                 }
-                            }
-                        )
+                            )
+                        }
                     }
                 }
             }
@@ -405,8 +456,11 @@ fun TicTacToeBoard(
 
         // Restart button
         if (state.status != com.cupcake.game.Game.GameStatus.PLAYING) {
-            Button(onClick = onRestart) {
-                Text("Play Again")
+            Button(
+                onClick = onRestart,
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("Play Again 🔄", fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -419,17 +473,25 @@ fun TicTacToeCell(
     isWinningCell: Boolean = false,
     onClick: () -> Unit
 ) {
-    androidx.compose.material3.Button(
+    val containerColor = when {
+        isWinningCell -> androidx.compose.material3.MaterialTheme.colorScheme.tertiaryContainer
+        value.isNotEmpty() -> androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerHigh
+        else -> androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerLowest
+    }
+    val contentColor = when (value) {
+        "X" -> androidx.compose.material3.MaterialTheme.colorScheme.primary
+        "O" -> androidx.compose.material3.MaterialTheme.colorScheme.error
+        else -> androidx.compose.material3.MaterialTheme.colorScheme.onSurface
+    }
+
+    Surface(
         onClick = onClick,
-        modifier = modifier,
         enabled = value.isEmpty(),
-        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-            containerColor = if (isWinningCell)
-                androidx.compose.material3.MaterialTheme.colorScheme.tertiaryContainer
-            else
-                androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerHigh
-        ),
-        shape = RoundedCornerShape(8.dp)
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        color = containerColor,
+        shadowElevation = if (isWinningCell) 8.dp else 2.dp,
+        border = if (isWinningCell) androidx.compose.foundation.BorderStroke(2.dp, androidx.compose.material3.MaterialTheme.colorScheme.tertiary) else null
     ) {
         Box(
             modifier = Modifier.fillMaxSize(),
@@ -437,13 +499,9 @@ fun TicTacToeCell(
         ) {
             Text(
                 text = value,
-                fontSize = 32.sp,
-                fontWeight = FontWeight.Bold,
-                color = when (value) {
-                    "X" -> androidx.compose.material3.MaterialTheme.colorScheme.primary
-                    "O" -> androidx.compose.material3.MaterialTheme.colorScheme.error
-                    else -> androidx.compose.material3.MaterialTheme.colorScheme.onSurface
-                }
+                fontSize = 36.sp,
+                fontWeight = FontWeight.Black,
+                color = contentColor
             )
         }
     }

@@ -16,7 +16,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PeopleAlt
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -63,7 +62,6 @@ fun ChatScreen(
 
     var scrollToBottom by remember { mutableStateOf(false) }
     var showCharacterPicker by remember { mutableStateOf(false) }
-    var showClearChatConfirm by remember { mutableStateOf(false) }
     var showVrm3dView by remember { mutableStateOf(false) }
 
     CupCakeTheme {
@@ -78,8 +76,7 @@ fun ChatScreen(
                 isVrmActive = showVrm3dView,
                 onToggleVrm = { showVrm3dView = !showVrm3dView },
                 onSwitchClick = { showCharacterPicker = true },
-                onBackClick = onBack,
-                onClearChatClick = { showClearChatConfirm = true }
+                onBackClick = onBack
             )
 
             // 3D VRM Model Viewport (Toggled directly from header)
@@ -135,27 +132,6 @@ fun ChatScreen(
                         }
                     }
                 }
-            }
-
-            if (showClearChatConfirm) {
-                androidx.compose.material3.AlertDialog(
-                    onDismissRequest = { showClearChatConfirm = false },
-                    title = { Text("Clear Chat?") },
-                    text = { Text("Are you sure you want to clear the entire conversation?") },
-                    confirmButton = {
-                        androidx.compose.material3.TextButton(onClick = {
-                            viewModel.clearChat()
-                            showClearChatConfirm = false
-                        }) {
-                            Text("Clear")
-                        }
-                    },
-                    dismissButton = {
-                        androidx.compose.material3.TextButton(onClick = { showClearChatConfirm = false }) {
-                            Text("Cancel")
-                        }
-                    }
-                )
             }
 
             // Load status without technical details
@@ -267,8 +243,7 @@ fun CharacterHeader(
     isVrmActive: Boolean = false,
     onToggleVrm: () -> Unit = {},
     onSwitchClick: () -> Unit,
-    onBackClick: () -> Unit,
-    onClearChatClick: () -> Unit
+    onBackClick: () -> Unit
 ) {
     androidx.compose.material3.Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -382,16 +357,6 @@ fun CharacterHeader(
                         imageVector = androidx.compose.material.icons.Icons.Filled.PeopleAlt,
                         contentDescription = "Switch Character",
                         tint = com.cupcake.ui.component.MessengerBlue
-                    )
-                }
-                androidx.compose.material3.IconButton(
-                    onClick = onClearChatClick,
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    androidx.compose.material3.Icon(
-                        imageVector = androidx.compose.material.icons.Icons.Filled.Delete,
-                        contentDescription = "Clear Chat",
-                        tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }

@@ -24,12 +24,15 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val notificationCharId = intent?.getStringExtra("characterId")
+        val startDestination = if (!notificationCharId.isNullOrBlank()) "chat/$notificationCharId" else "home"
+
         setContent {
             CupCakeTheme {
                 val navController = rememberNavController()
                 val homeViewModel: HomeViewModel = androidx.hilt.navigation.compose.hiltViewModel()
                 
-                NavHost(navController, startDestination = "home") {
+                NavHost(navController, startDestination = startDestination) {
                     composable("home") {
                         HomeScreen(
                             viewModel = homeViewModel,

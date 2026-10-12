@@ -30,6 +30,17 @@ class ChatSessionStore @Inject constructor(
     private val idCounter = java.util.concurrent.atomic.AtomicLong(1L)
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
+    init {
+        instance = this
+    }
+
+    companion object {
+        @Volatile
+        private var instance: ChatSessionStore? = null
+
+        fun get(): ChatSessionStore? = instance
+    }
+
     fun conversationIdFor(characterId: String): String = "chat_$characterId"
 
     fun messages(characterId: String): StateFlow<List<ChatMessage>> =

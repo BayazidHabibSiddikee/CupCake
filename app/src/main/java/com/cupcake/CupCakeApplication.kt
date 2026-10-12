@@ -45,6 +45,9 @@ class CupCakeApplication : Application(), ImageLoaderFactory {
                 android.util.Log.i("EspServer", "ESP32 $sessionId ${if (connected) "connected" else "disconnected"}")
             }
         )
+
+        // Initialize proactive companion outreach
+        com.cupcake.ai.ProactiveEngagementManager.initialize(this)
     }
 
     override fun newImageLoader(): ImageLoader {

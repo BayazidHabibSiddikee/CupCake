@@ -85,7 +85,8 @@ fun HomeScreen(
     val companionQuote by viewModel.companionQuote.collectAsStateWithLifecycle()
     val companionEmotion by viewModel.companionEmotion.collectAsStateWithLifecycle()
 
-    val marin = characters.firstOrNull { it.id == "marin_kitagawa" }
+    val activeCompanion = characters.firstOrNull { it.isSelected }
+        ?: characters.firstOrNull { it.id == "marin_kitagawa" }
         ?: characters.firstOrNull()
         ?: Character(
             id = "marin_kitagawa",
@@ -104,7 +105,7 @@ fun HomeScreen(
             topBar = {
                 Surface(
                     color = MaterialTheme.colorScheme.surface,
-                    tonalElevation = 1.dp
+                    tonalElevation = 2.dp
                 ) {
                     Row(
                         modifier = Modifier
@@ -113,11 +114,14 @@ fun HomeScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.clickable { onNavigateToCharacters() }
+                        ) {
                             Text(
-                                text = "Marin",
-                                fontSize = 24.sp,
-                                fontWeight = FontWeight.Bold,
+                                text = activeCompanion.name.split(" ").firstOrNull() ?: activeCompanion.name,
+                                fontSize = 22.sp,
+                                fontWeight = FontWeight.ExtraBold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Spacer(Modifier.width(6.dp))
@@ -131,11 +135,11 @@ fun HomeScreen(
                             // Energy Pill
                             Surface(
                                 shape = RoundedCornerShape(12.dp),
-                                color = Color(0xFFFFF9E6),
+                                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f),
                                 modifier = Modifier.padding(end = 6.dp)
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Icon(
@@ -147,11 +151,16 @@ fun HomeScreen(
                                     Spacer(Modifier.width(4.dp))
                                     Text(
                                         text = "$energy",
-                                        fontSize = 12.sp,
+                                        fontSize = 12.5.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF8D6E63)
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer
                                     )
                                 }
+                            }
+
+                            // Switch Companion / Mascot
+                            IconButton(onClick = onNavigateToCharacters) {
+                                Text("🎭", fontSize = 20.sp)
                             }
 
                             // Shimeji Desktop Floating Pet Launcher
@@ -159,11 +168,11 @@ fun HomeScreen(
                                 if (Settings.canDrawOverlays(context)) {
                                     ShimejiPetService.start(
                                         context = context,
-                                        avatar = marin.avatar,
-                                        gif = marin.customGif,
-                                        name = marin.name
+                                        avatar = activeCompanion.avatar,
+                                        gif = activeCompanion.customGif,
+                                        name = activeCompanion.name
                                     )
-                                    ShimejiPetService.showSpeech(context, "Kyaa! Marin is on your screen! ✨")
+                                    ShimejiPetService.showSpeech(context, "Kyaa! ${activeCompanion.name} is on your screen! ✨")
                                 } else {
                                     val intent = Intent(
                                         Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
@@ -228,7 +237,7 @@ fun HomeScreen(
                                 }
                             ) {
                                 CharacterAvatar(
-                                    avatar = marin.avatar,
+                                    avatar = activeCompanion.avatar,
                                     modifier = Modifier
                                         .size(100.dp)
                                         .clip(CircleShape)
@@ -258,7 +267,7 @@ fun HomeScreen(
                             Spacer(Modifier.height(10.dp))
 
                             Text(
-                                text = "Marin Kitagawa",
+                                text = activeCompanion.name,
                                 fontSize = 20.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
@@ -343,9 +352,9 @@ fun HomeScreen(
 
                             Spacer(Modifier.height(14.dp))
 
-                            // Direct Action Button: Chat with Marin
+                            // Direct Action Button: Chat with companion
                             Button(
-                                onClick = { onNavigateToChat(marin.id) },
+                                onClick = { onNavigateToChat(activeCompanion.id) },
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(14.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = MessengerBlue)
@@ -356,7 +365,7 @@ fun HomeScreen(
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Spacer(Modifier.width(8.dp))
-                                Text("Chat with Marin", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                Text("Chat with ${activeCompanion.name.split(" ").firstOrNull() ?: activeCompanion.name}", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                             }
                         }
                     }

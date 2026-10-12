@@ -303,6 +303,7 @@ class ChatViewModel @Inject constructor(
 
         val userMessage = ChatMessage.user(text, conversationId)
         addMessage(userMessage)
+        com.cupcake.ai.ProactiveEngagementManager.onUserActivity(appContext)
 
         _isGenerating.value = true
         _currentResponse.value = ""

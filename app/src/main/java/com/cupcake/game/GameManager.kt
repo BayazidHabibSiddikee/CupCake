@@ -688,8 +688,12 @@ class GameManager(
 
         // Bot moves after short delay
         CoroutineScope(Dispatchers.IO).launch {
-            kotlinx.coroutines.delay(500) // Thinking delay
-            makeBotMove()
+            try {
+                kotlinx.coroutines.delay(500) // Thinking delay
+                makeBotMove()
+            } catch (e: Exception) {
+                android.util.Log.e("GameManager", "Bot move failed", e)
+            }
         }
 
         return Result(true, "Move made", currentGame)
@@ -852,21 +856,19 @@ class GameManager(
         val availableMoves = (0..8).filter { board.get(it) == null }
         
         // Check if cheating mind wants to cheat
-        val cheatMove = ticTacToeML.executeCheat(board, availableMoves)
+        val mlCheat = if (ticTacToeML.isCheatingEnabled()) ticTacToeML.executeCheat(board, availableMoves) else null
         
         val move = if (cheatMode) {
             TicTacToeEngine.getCheatingMove(board)
-        } else if (ticTacToeML.isCheatingEnabled() && ticTacToeML.executeCheat(board, availableMoves) != null) {
-            // Cheating mind decided to cheat
-            ticTacToeML.executeCheat(board, availableMoves)!!
+        } else if (mlCheat != null) {
+            mlCheat
         } else if (availableMoves.isNotEmpty()) {
             // Use ML model with jealousy-based exploration
-            val move = ticTacToeML.chooseAction(board, availableMoves)
-            // Learn from this move (will be updated after game ends)
-            if (move >= 0) {
-                ticTacToeML.learnFromGame(board, move, false) // Assume bot perspective
+            val chosen = ticTacToeML.chooseAction(board, availableMoves)
+            if (chosen >= 0) {
+                ticTacToeML.learnFromGame(board, chosen, false) // Assume bot perspective
             }
-            move
+            chosen
         } else {
             -1
         }
@@ -924,10 +926,10 @@ class GameManager(
         val availableMoves = (0..15).filter { board.get(it) == null }
         
         // Check if cheating mind wants to cheat
-        val cheatMove = ticTacToe4x4ML.executeCheat(board, availableMoves)
+        val mlCheat = if (ticTacToe4x4ML.isCheatingEnabled()) ticTacToe4x4ML.executeCheat(board, availableMoves) else null
         
-        val move = if (ticTacToe4x4ML.isCheatingEnabled() && ticTacToe4x4ML.executeCheat(board, availableMoves) != null) {
-            ticTacToe4x4ML.executeCheat(board, availableMoves)!!
+        val move = if (mlCheat != null) {
+            mlCheat
         } else if (availableMoves.isNotEmpty()) {
             ticTacToe4x4ML.chooseAction(board, availableMoves, jealousyTracker.getJealousyLevel())
         } else {

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -83,31 +84,46 @@ fun TicTacToe4x4BoardUI(
             }
         )
 
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            for (row in 0..3) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    for (col in 0..3) {
-                        val pos = row * 4 + col
-                        TicTacToeCell(
-                            modifier = Modifier.weight(1f).aspectRatio(1f),
-                            value = board.get(pos)?.symbol ?: "",
-                            isWinningCell = isWinningCell4x4(board, pos, state.winner),
-                            onClick = {
-                                if (state.status == com.cupcake.game.Game.GameStatus.PLAYING) {
-                                    onCellClick(pos)
+        Box(
+            modifier = Modifier.fillMaxWidth(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                modifier = Modifier
+                    .widthIn(max = 340.dp)
+                    .fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                for (row in 0..3) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        for (col in 0..3) {
+                            val pos = row * 4 + col
+                            TicTacToeCell(
+                                modifier = Modifier.weight(1f).aspectRatio(1f),
+                                value = board.get(pos)?.symbol ?: "",
+                                isWinningCell = isWinningCell4x4(board, pos, state.winner),
+                                onClick = {
+                                    if (state.status == com.cupcake.game.Game.GameStatus.PLAYING) {
+                                        onCellClick(pos)
+                                    }
                                 }
-                            }
-                        )
+                            )
+                        }
                     }
                 }
             }
         }
 
         if (state.status != com.cupcake.game.Game.GameStatus.PLAYING) {
-            Button(onClick = onRestart) { Text("Play Again") }
+            Button(
+                onClick = onRestart,
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("Play Again 🔄", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            }
         }
     }
 }
