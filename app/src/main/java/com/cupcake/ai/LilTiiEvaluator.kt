@@ -1,16 +1,12 @@
 package com.cupcake.ai
 
 import android.content.Context
-import com.cupcake.data.model.ChatMessage
-import com.cupcake.data.model.ModelConfig
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.channels.consumeEach
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.withContext
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 
 class LilTiiEvaluator(
     private val llamaEngine: LlamaEngine,
@@ -24,7 +20,7 @@ class LilTiiEvaluator(
     )
 
     suspend fun evaluate(
-        config: ModelConfig,
+        config: com.cupcake.data.model.ModelConfig,
         iterations: Int = 20,
         timeoutMs: Long = 60_000
     ): LilTiiEvalReport {
@@ -50,8 +46,8 @@ class LilTiiEvaluator(
             expectedEmotion = null
         )
         return runIteration(
-            config = ModelConfig(
-                provider = ModelConfig.ModelProvider.LOCAL_LLAMA,
+            config = com.cupcake.data.model.ModelConfig(
+                provider = com.cupcake.data.model.ModelConfig.ModelProvider.LOCAL_LLAMA,
                 modelName = LlamaEngine.Config().modelFileName
             ),
             input = input,
@@ -60,7 +56,7 @@ class LilTiiEvaluator(
     }
 
     private suspend fun runIteration(
-        config: ModelConfig,
+        config: com.cupcake.data.model.ModelConfig,
         input: IterationInput,
         timeoutMs: Long
     ): LilTiiEvalResult {
@@ -96,20 +92,20 @@ class LilTiiEvaluator(
     private suspend fun collectLocalOutput(prompt: String): String {
         val channel = llamaEngine.generateStream(prompt)
         val sb = StringBuilder()
-        channel.consumeEach { chunk: String ->
+        for (chunk in channel) {
             sb.append(chunk)
         }
         return sb.toString()
     }
 
     private suspend fun collectOllamaOutput(
-        config: ModelConfig,
+        config: com.cupcake.data.model.ModelConfig,
         prompt: String
     ): String {
         val messages = listOf(
             OllamaEngine.OllamaMessage(role = "user", content = prompt)
         )
-        val resultChannel = Channel<String>(1)
+        val resultChannel = kotlinx.coroutines.channels.Channel<String>(1)
         ollamaEngine.generateStream(
             baseUrl = config.effectiveEndpoint(),
             config = config,

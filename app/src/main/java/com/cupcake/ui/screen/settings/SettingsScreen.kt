@@ -59,6 +59,7 @@ import androidx.compose.foundation.BorderStroke
 @Composable
 fun SettingsScreen(
     onClose: () -> Unit,
+    onNavigateToLilTiiEval: (() -> Unit)? = null,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val providers by viewModel.providers.collectAsStateWithLifecycle()
@@ -221,6 +222,23 @@ fun SettingsScreen(
                         Icon(imageVector = androidx.compose.material.icons.Icons.Filled.Add, contentDescription = null)
                         androidx.compose.foundation.layout.Spacer(Modifier.size(8.dp))
                         Text("Add Custom Provider")
+                    }
+                }
+
+                // Debug-only: LilTii eval entry point
+                if (com.cupcake.BuildConfig.DEBUG) {
+                    item {
+                        androidx.compose.foundation.layout.Spacer(Modifier.size(4.dp))
+                        androidx.compose.material3.TextButton(
+                            onClick = { onNavigateToLilTiiEval?.invoke() },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "LilTii Eval (debug)",
+                                fontSize = 12.sp,
+                                color = androidx.compose.material3.MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
                 }
             }

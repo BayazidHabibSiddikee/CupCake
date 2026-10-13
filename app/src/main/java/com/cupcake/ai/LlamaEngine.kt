@@ -46,8 +46,6 @@ class LlamaEngine private constructor() {
         ): File {
             val modelDir = File(context.filesDir, "models")
             modelDir.mkdirs()
-            // fileName may include an assets-relative subdir (e.g. "models/x.gguf");
-            // the destination always uses just the base name to avoid doubled paths.
             val modelFile = File(modelDir, File(fileName).name)
 
             if (modelFile.exists() && modelFile.length() > 0) {
@@ -56,7 +54,6 @@ class LlamaEngine private constructor() {
                 return modelFile
             }
 
-            // Declared asset length for progress (-1 when unknown/compressed).
             val totalBytes = try {
                 context.assets.openFd(fileName).use { it.length }
             } catch (e: Exception) {
@@ -67,13 +64,12 @@ class LlamaEngine private constructor() {
             var lastReport = 0L
             context.assets.open(fileName).use { input ->
                 FileOutputStream(modelFile).use { output ->
-                    val buffer = ByteArray(1024 * 1024) // 1MB chunks
+                    val buffer = ByteArray(1024 * 1024)
                     while (true) {
                         val read = input.read(buffer)
                         if (read <= 0) break
                         output.write(buffer, 0, read)
                         copiedBytes += read
-                        // Report at most every 8MB to avoid spamming the UI thread.
                         if (copiedBytes - lastReport >= 8L * 1024 * 1024) {
                             lastReport = copiedBytes
                             onProgressBytes?.invoke(copiedBytes, totalBytes)
@@ -108,9 +104,8 @@ class LlamaEngine private constructor() {
 
     data class Config(
         val modelFileName: String = "models/qwen2.5-0.5b-instruct-q2_k.gguf",
-        // 1024 context for full multi-turn conversation memory on phones.
         val nCtx: Int = 1024,
-        val nThreads: Int = 4, // 4 threads: optimal for mobile 2 big + 2 little cores
+        val nThreads: Int = 4,
         val nBatch: Int = 512,
         val maxTokens: Int = 256,
         val temperature: Float = 0.7f,
@@ -135,12 +130,10 @@ class LlamaEngine private constructor() {
         val modelFile = copyModelFromAssets(context, config.modelFileName, onProgressBytes)
         val targetName = modelFile.name
 
-        // Already loaded this model - don't pay init cost again.
         if (isReady() && _loadedModelName == targetName) {
             return Result.success(Unit)
         }
 
-        // Switching models: unload previous model from memory
         if (isReady()) {
             unload()
         }
@@ -175,9 +168,6 @@ class LlamaEngine private constructor() {
         }
     }
 
-    // NOTE: UNLIMITED buffer is required. The native thread emits tokens via
-    // trySend, which silently drops on a rendezvous channel when the consumer
-    // isn't parked yet - on fast devices this drops the whole response.
     private val generateMutex = Mutex()
 
     fun generateStream(prompt: String): ReceiveChannel<String> = Channel<String>(Channel.UNLIMITED).apply {

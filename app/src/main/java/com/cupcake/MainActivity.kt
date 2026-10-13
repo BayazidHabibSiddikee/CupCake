@@ -28,6 +28,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.LaunchedEffect
 import androidx.core.content.ContextCompat
+import com.cupcake.ui.screen.debug.LilTiiEvalScreen
+import com.cupcake.BuildConfig
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -127,7 +129,14 @@ class MainActivity : ComponentActivity() {
                     }
                     
                     composable("settings") {
-                        SettingsScreen(onClose = { navController.popBackStack() })
+                        SettingsScreen(
+                            onClose = { navController.popBackStack() },
+                            onNavigateToLilTiiEval = {
+                                if (BuildConfig.DEBUG) {
+                                    navController.navigate("liltii-eval")
+                                }
+                            }
+                        )
                     }
                     
                     composable("characters") {
@@ -164,6 +173,12 @@ class MainActivity : ComponentActivity() {
                             promptId = promptId,
                             onClose = { navController.popBackStack() }
                         )
+                    }
+
+                    if (BuildConfig.DEBUG) {
+                        composable("liltii-eval") {
+                            LilTiiEvalScreen(onClose = { navController.popBackStack() })
+                        }
                     }
                 }
             }

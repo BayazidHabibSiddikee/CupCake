@@ -107,6 +107,7 @@ android {
         compose = true
         viewBinding = true
         dataBinding = false
+        buildConfig = true
     }
 
     composeOptions {

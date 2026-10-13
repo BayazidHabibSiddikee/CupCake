@@ -1,11 +1,5 @@
 package com.cupcake.ai
 
-/**
- * Exact LilTii-v0.2 few-shot prompt template.
- *
- * Uses 3 scripted exchanges to teach a base Bengali model to emit:
- *   [emotion] *action* response text
- */
 object LilTiiPromptTemplate {
 
     val SYSTEM_INSTRUCTIONS: String = """
