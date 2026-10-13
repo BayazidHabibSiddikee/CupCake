@@ -54,10 +54,34 @@ pip install bitsandbytes --no-build-isolation
 
 ### 2. Prepare Dataset
 
-The dataset is already prepared in `training/dataset/`:
-- `liltii_fewshot.jsonl` — 800 augmented Bangla-English examples with emotion tags
-- `train.jsonl` — 640 examples for training
-- `val.jsonl` — 160 examples for validation
+## Dataset Preparation
+
+The dataset can be generated or expanded with the provided scripts:
+
+```bash
+# Base dataset: 152 examples
+python training/build_dataset.py
+
+# Style-preserving augmentation: ~800 examples
+python training/augment_dataset.py
+
+# Banglish-heavy augmentation: ~1200 examples
+python training/augment_banglish.py
+```
+
+Final dataset files in `training/dataset/`:
+- `liltii_fewshot.jsonl` — 1200 Bangla-English examples with emotion tags
+- `train.jsonl` — 960 examples for training
+- `val.jsonl` — 240 examples for validation
+
+Each example follows the format:
+
+```json
+{"messages": [
+  {"role": "user", "content": "bhai, i'm so sleepy but i need to study fr"},
+  {"role": "assistant", "content": "[sleepy] *yawns* ghum... but ami study kora lagbe..."}
+]}
+```
 
 Each example follows the format:
 
