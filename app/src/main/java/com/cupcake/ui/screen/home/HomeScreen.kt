@@ -71,7 +71,7 @@ fun HomeScreen(
     onNavigateToDevice: (String) -> Unit,
     onNavigateToSettings: () -> Unit,
     onNavigateToCharacters: () -> Unit,
-    onNavigateToGames: () -> Unit,
+    onNavigateToGame: (String) -> Unit,
     onNavigateToPoints: () -> Unit
 ) {
     val context = LocalContext.current
@@ -476,41 +476,111 @@ fun HomeScreen(
                             color = MessengerBlue,
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 14.sp,
-                            modifier = Modifier.clickable { onNavigateToGames() }
+                            modifier = Modifier.clickable { onNavigateToGame("") }
                         )
                     }
                 }
 
-                // Quick Play Game Grid / Cards
+                // Quick Play Game Grid — all 14 games
                 item {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         GameLaunchCard(
                             emoji = "❌⭕",
                             title = "Tic-Tac-Toe",
-                            description = "Play 3x3 against Marin. Watch out for her pouting when she loses!",
+                            description = "Play 3×3 against Marin. Watch out for her pouting when she loses!",
                             xpReward = "+100 XP",
-                            onClick = onNavigateToGames
+                            onClick = { onNavigateToGame("TIC_TAC_TOE") }
                         )
                         GameLaunchCard(
-                            emoji = "✊✋✌️",
-                            title = "Rock Paper Scissors",
-                            description = "Fast hands battle! Test your intuition against Marin's strategy.",
-                            xpReward = "+80 XP",
-                            onClick = onNavigateToGames
+                            emoji = "⭕❌",
+                            title = "Tic-Tac-Toe 4×4",
+                            description = "Bigger board, bigger brain battle. Can you keep up with Marin?",
+                            xpReward = "+150 XP",
+                            onClick = { onNavigateToGame("TIC_TAC_TOE_4X4") }
+                        )
+                        GameLaunchCard(
+                            emoji = "🔴🟡",
+                            title = "Connect Four",
+                            description = "Drop discs and outsmart Marin's sneaky combos!",
+                            xpReward = "+150 XP",
+                            onClick = { onNavigateToGame("CONNECT_FOUR") }
                         )
                         GameLaunchCard(
                             emoji = "♟️",
                             title = "Chess Challenge",
                             description = "Tactical chess duel. Can you outsmart Marin's brain?",
                             xpReward = "+200 XP",
-                            onClick = onNavigateToGames
+                            onClick = { onNavigateToGame("CHESS") }
                         )
                         GameLaunchCard(
-                            emoji = "🧠",
+                            emoji = "✊✋✌️",
+                            title = "Rock Paper Scissors",
+                            description = "Fast hands battle! Test your intuition against Marin's strategy.",
+                            xpReward = "+80 XP",
+                            onClick = { onNavigateToGame("ROCK_PAPER_SCISSORS") }
+                        )
+                        GameLaunchCard(
+                            emoji = "🔢",
+                            title = "Guess the Number",
+                            description = "Marin picked a number. How quickly can you find it?",
+                            xpReward = "+60 XP",
+                            onClick = { onNavigateToGame("GUESS_NUMBER") }
+                        )
+                        GameLaunchCard(
+                            emoji = "➕➖✖️➗",
+                            title = "Math Quiz",
+                            description = "Race Marin through rapid-fire math. Smarter than you think?",
+                            xpReward = "+100 XP",
+                            onClick = { onNavigateToGame("MATH_QUIZ") }
+                        )
+                        GameLaunchCard(
+                            emoji = "💾",
+                            title = "Number Base",
+                            description = "Binary, octal, hex — flex your geek muscles with Marin!",
+                            xpReward = "+120 XP",
+                            onClick = { onNavigateToGame("NUMBER_BASE") }
+                        )
+                        GameLaunchCard(
+                            emoji = "🃏",
                             title = "Memory Match",
                             description = "Match the hidden cards! Win high affection bonuses.",
                             xpReward = "+120 XP",
-                            onClick = onNavigateToGames
+                            onClick = { onNavigateToGame("MEMORY_MATCH") }
+                        )
+                        GameLaunchCard(
+                            emoji = "🎯",
+                            title = "Hangman",
+                            description = "Guess letters before the stick figure is complete!",
+                            xpReward = "+90 XP",
+                            onClick = { onNavigateToGame("HANGMAN") }
+                        )
+                        GameLaunchCard(
+                            emoji = "🔤",
+                            title = "Word Scramble",
+                            description = "Unscramble Marin's jumbled words as fast as you can!",
+                            xpReward = "+90 XP",
+                            onClick = { onNavigateToGame("WORD_SCRAMBLE") }
+                        )
+                        GameLaunchCard(
+                            emoji = "🔐",
+                            title = "Mastermind",
+                            description = "Crack the secret code before your chances run out.",
+                            xpReward = "+130 XP",
+                            onClick = { onNavigateToGame("MASTERMIND") }
+                        )
+                        GameLaunchCard(
+                            emoji = "⚡",
+                            title = "Reaction Time",
+                            description = "Tap as fast as you can! Marin loves teasing slowpokes.",
+                            xpReward = "+70 XP",
+                            onClick = { onNavigateToGame("REACTION_TIME") }
+                        )
+                        GameLaunchCard(
+                            emoji = "🧁",
+                            title = "Clicker",
+                            description = "Just tap! Simple, addictive, and Marin cheers every click.",
+                            xpReward = "+50 XP",
+                            onClick = { onNavigateToGame("CLICKER") }
                         )
                     }
                 }

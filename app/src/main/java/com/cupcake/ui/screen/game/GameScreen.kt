@@ -26,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -57,6 +58,7 @@ import androidx.compose.material.icons.filled.SportsEsports
 @Composable
 fun GameScreen(
     onClose: () -> Unit,
+    startGameType: String? = null,
     viewModel: GameViewModel = hiltViewModel()
 ) {
     val gameState by viewModel.gameState.collectAsStateWithLifecycle()
@@ -64,6 +66,16 @@ fun GameScreen(
     val showGameSelector by viewModel.showGameSelector.collectAsStateWithLifecycle()
     val selectedDifficulty by viewModel.selectedDifficulty.collectAsStateWithLifecycle()
     val botComment by viewModel.botComment.collectAsStateWithLifecycle()
+
+    // Auto-launch a specific game when arriving from the home screen
+    LaunchedEffect(startGameType) {
+        if (!startGameType.isNullOrBlank()) {
+            val target = availableGames.firstOrNull { it.type.name == startGameType }
+            if (target != null) {
+                viewModel.startGame(target, selectedDifficulty)
+            }
+        }
+    }
 
     CupCakeTheme {
         Column(Modifier.fillMaxSize()) {
@@ -90,7 +102,7 @@ fun GameScreen(
                 )
             )
 
-            // Live bot commentary — the bot's reply to your move / game-ending reaction
+            // Live bot commentary — Marin's reaction to your move / game-ending
             botComment?.let { comment ->
                 androidx.compose.material3.Card(
                     modifier = Modifier
@@ -108,7 +120,7 @@ fun GameScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(text = "🤖", fontSize = 20.sp)
+                        Text(text = "🌸", fontSize = 20.sp)
                         Text(
                             text = comment,
                             modifier = Modifier.weight(1f),
@@ -118,6 +130,7 @@ fun GameScreen(
                     }
                 }
             }
+
 
             val activeGameState = gameState
             if (activeGameState == null) {

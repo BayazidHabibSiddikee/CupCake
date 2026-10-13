@@ -1017,7 +1017,7 @@ class GameManager(
             }
     }
 
-    private fun notifyLLMMove(
+     private fun notifyLLMMove(
         gameType: Game.GameType,
         player: String,
         position: Int,
@@ -1025,37 +1025,51 @@ class GameManager(
         detail: String? = null
     ) {
         val character = characterManager.getCurrentCharacter()
+        val characterName = character?.name ?: "Marin"
         val personality = character?.personality ?: "friendly"
         val mood = jealousyTracker.getBotMood()
         val jealousy = jealousyTracker.getJealousyLevel()
         val anger = jealousyTracker.getAngerLevel()
-        
+
         val moveDesc = describeMove(gameType, player, position, gameState, detail)
 
-        val prompt = """
-            Game: ${gameType.name}
-            Player: $player $moveDesc
-            Board state: ${gameState.board}
-            Bot mood: ${mood.name} (Jealousy: ${(jealousy * 100).toInt()}%, Anger: ${(anger * 100).toInt()}%)
-            Bot wins: ${jealousyTracker.getBotWins()}, Player wins: ${jealousyTracker.getPlayerWins()}
-            
-            As the bot, react to this move in character. 
-            Be ${when {
-                anger > 0.7 -> "furious and threatening"
-                anger > 0.4 -> "angry and competitive"
-                jealousy > 0.6 -> "jealous and spiteful"
-                jealousy > 0.3 -> "competitive and annoyed"
-                else -> "playful but watchful"
-            }}. 
-            Keep it under 20 words in $personality style.
-            Mention the move if relevant.
-        """.trimIndent()
+        val prompt = if (player == "bot") {
+            // Marin is announcing HER OWN move — first-person, playful
+            """
+                Game: ${gameType.name}
+                You ($characterName) just played: $moveDesc
+                Bot wins: ${jealousyTracker.getBotWins()}, Player wins: ${jealousyTracker.getPlayerWins()}
+                Mood: ${mood.name}
+                
+                Announce YOUR move in first person, in a ${when {
+                    anger > 0.6 -> "fierce, competitive"
+                    jealousy > 0.5 -> "smug, teasing"
+                    else -> "playful, cat-like"
+                }} way. Under 18 words. Sound natural, NOT robotic.
+                Example: "Hehe, I placed right there~ bet you didn't see that coming! 😏"
+            """.trimIndent()
+        } else {
+            // Reacting to the player's move
+            """
+                Game: ${gameType.name}
+                Player just moved: $moveDesc
+                Mood: ${mood.name} (Jealousy: ${(jealousy * 100).toInt()}%, Anger: ${(anger * 100).toInt()}%)
+                
+                React to this move as $characterName. Be ${when {
+                    anger > 0.7 -> "furious and competitive"
+                    anger > 0.4 -> "annoyed and challenging"
+                    jealousy > 0.6 -> "jealous and spiteful"
+                    jealousy > 0.3 -> "competitive and teasing"
+                    else -> "playfully surprised"
+                }}. Under 18 words. Don't say 'the player', react naturally.
+            """.trimIndent()
+        }
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val fullPrompt = characterManager.getSystemPromptForCharacter(
                     character?.id ?: "marin_kitagawa",
-                    "Game: $gameType, Jealousy: ${(jealousy * 100).toInt()}%, Anger: ${(anger * 100).toInt()}%"
+                    "Game: $gameType, Mood: ${mood.name}"
                 ) + "\n\nUser: $prompt\nAssistant:"
 
                 var fullResponse = ""
@@ -1065,10 +1079,10 @@ class GameManager(
                         provider = com.cupcake.data.model.ModelConfig.ModelProvider.CUSTOM_OLLAMA,
                         modelName = "qwen2.5-0.5b-instruct",
                         customEndpoint = "http://localhost:11434/v1",
-                        temperature = 0.8f, // Higher temperature for more personality
+                        temperature = 0.85f,
                         topP = 0.9f,
                         topK = 40,
-                        maxTokens = 128,
+                        maxTokens = 64,
                         useStreaming = true
                     ),
                     messages = listOf(OllamaEngine.OllamaMessage("user", fullPrompt)),
@@ -1078,7 +1092,6 @@ class GameManager(
                         }
 
                         override fun onComplete() {
-                            // Deliver the bot's reply about the move to the UI/chat
                             val translated = com.cupcake.ai.BanglishTranslator.translate(fullResponse.trim(), personality)
                             val comment = translated.ifBlank { fallbackMoveComment(player) }
                             gameComments.tryEmit(comment)
@@ -1099,9 +1112,21 @@ class GameManager(
 
     private fun fallbackMoveComment(player: String): String =
         if (player == "bot") {
-            listOf("Hehe, my turn! ✨", "Watch this! 😏", "Too easy! 🙄").random()
+            listOf(
+                "Hehe, my turn~ ✨",
+                "Watch this move! 😏",
+                "Nyahaha, too easy! 🙄",
+                "I placed mine~ try to stop me! 😼",
+                "Your turn now... if you dare~ 😈"
+            ).random()
         } else {
-            listOf("Hmm... interesting 🤔", "Hmph, we'll see 😤", "Kyaa, you're actually trying! 😏").random()
+            listOf(
+                "Hmm... interesting move 🤔",
+                "Hmph, we'll see about that 😤",
+                "Oh? You're actually trying! 😏",
+                "Bold choice~ let's see if it works 👀",
+                "I'm not impressed yet~ 😒"
+            ).random()
         }
 
     private fun triggerReaction(humanWon: Boolean, isDraw: Boolean = false) {
@@ -1131,7 +1156,7 @@ class GameManager(
                     baseUrl = "http://localhost:11434/v1",
                     config = com.cupcake.data.model.ModelConfig(
                         provider = com.cupcake.data.model.ModelConfig.ModelProvider.CUSTOM_OLLAMA,
-                        modelName = "qwen2:0.5b",
+                        modelName = "qwen2.5-0.5b-instruct",
                         customEndpoint = "http://localhost:11434/v1",
                         temperature = 0.8f, // Higher for more emotional responses
                         topP = 0.9f,

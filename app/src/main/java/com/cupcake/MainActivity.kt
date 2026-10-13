@@ -92,8 +92,9 @@ class MainActivity : ComponentActivity() {
                             onNavigateToCharacters = {
                                 navController.navigate("characters")
                             },
-                            onNavigateToGames = {
-                                navController.navigate("games")
+                            onNavigateToGame = { gameType ->
+                                val route = if (gameType != null) "games?gameType=$gameType" else "games"
+                                navController.navigate(route)
                             },
                             onNavigateToPoints = {
                                 navController.navigate("points")
@@ -133,8 +134,21 @@ class MainActivity : ComponentActivity() {
                         CharacterScreen(onClose = { navController.popBackStack() })
                     }
                     
-                    composable("games") {
-                        GameScreen(onClose = { navController.popBackStack() })
+                    composable(
+                        route = "games?gameType={gameType}",
+                        arguments = listOf(
+                            androidx.navigation.navArgument("gameType") {
+                                type = androidx.navigation.NavType.StringType
+                                defaultValue = ""
+                                nullable = true
+                            }
+                        )
+                    ) { backStackEntry ->
+                        val gameType = backStackEntry.arguments?.getString("gameType")?.takeIf { it.isNotBlank() }
+                        GameScreen(
+                            startGameType = gameType,
+                            onClose = { navController.popBackStack() }
+                        )
                     }
                     
                     composable("points") {
