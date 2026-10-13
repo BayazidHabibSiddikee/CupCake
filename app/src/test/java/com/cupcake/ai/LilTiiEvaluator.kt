@@ -40,6 +40,25 @@ class LilTiiEvaluator(
         return buildReport(results)
     }
 
+    suspend fun evaluateWithLlama(
+        prompt: String,
+        timeoutMs: Long = 60_000
+    ): LilTiiEvalResult {
+        val input = IterationInput(
+            index = 1,
+            userMessage = prompt,
+            expectedEmotion = null
+        )
+        return runIteration(
+            config = ModelConfig(
+                provider = ModelConfig.ModelProvider.LOCAL_LLAMA,
+                modelName = LlamaEngine.Config().modelFileName
+            ),
+            input = input,
+            timeoutMs = timeoutMs
+        )
+    }
+
     private suspend fun runIteration(
         config: ModelConfig,
         input: IterationInput,

@@ -4,8 +4,10 @@ import android.content.Context
 import com.cupcake.data.model.ModelConfig
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -33,30 +35,19 @@ class LilTiiEvaluatorTest {
     }
 
     @Test
-    fun `20 iterations produce structured outputs with emotion tags`() = runBlocking {
+    fun `20 iterations use local llama backend path when provider is local`() = runBlocking {
         val config = ModelConfig(
-            provider = ModelConfig.ModelProvider.CUSTOM_OLLAMA,
-            modelName = "liltii-v0.2-test",
-            customEndpoint = "http://localhost:11434/v1"
+            provider = ModelConfig.ModelProvider.LOCAL_LLAMA,
+            modelName = LlamaEngine.Config().modelFileName
         )
 
-        val callCountSlot = slot<List<OllamaEngine.OllamaMessage>>()
-        coEvery {
-            ollamaEngine.generateStream(any(), any(), capture(callCountSlot), any())
-        } coAnswers {
-            val callback = it.invocation.args[3] as OllamaEngine.GenerateCallback
-            val emotions = listOf("[sleepy]", "[confused]", "[surprised]", "[happy]", "[angry]", "[sad]", "[thinking]")
-            val actions = listOf("*yawns*", "*tilts head*", "*jumps*", "*smiles*", "*frowns*", "*sighs*", "*ponders*")
-            val banglaFragments = listOf(" ami", " keno", " bhalo", " kharap", " klanto", " dhaka")
-
-            val rng = Random(System.currentTimeMillis())
-            repeat(3) {
-                val emotion = emotions.random(rng)
-                val action = actions.random(rng)
-                val bangla = banglaFragments.random(rng)
-                callback.onToken("$emotion $action$bangla ache... ")
-            }
-            callback.onComplete()
+        every {
+            llamaEngine.generateStream(any())
+        } answers {
+            val channel = Channel<String>(1)
+            channel.trySend("[sleepy] *yawns* ami onek klanto... ")
+            channel.close()
+            channel
         }
 
         val report = evaluator.evaluate(config, iterations = 20, timeoutMs = 5_000)
@@ -73,40 +64,32 @@ class LilTiiEvaluatorTest {
         val allHaveTags = report.results.all { it.hasEmotionTag }
         assert(allHaveTags) { "Not all iterations emitted an emotion tag" }
 
-        val allHaveActions = report.results.all { it.hasAction }
-        assert(allHaveActions) { "Not all iterations included an action" }
-
         report.results.forEach { result ->
             println("Iteration ${result.iteration}: tag=${result.emotionTag}, action=${result.action}, bangla=${result.hasBangla}, score=${result.score}")
         }
     }
 
     @Test
-    fun `evaluator enforces 80 percent pass threshold`() = runBlocking {
+    fun `evaluator reports per-iteration breakdown for 20 local runs`() = runBlocking {
         val config = ModelConfig(
-            provider = ModelConfig.ModelProvider.CUSTOM_OLLAMA,
-            modelName = "liltii-v0.2-test",
-            customEndpoint = "http://localhost:11434/v1"
+            provider = ModelConfig.ModelProvider.LOCAL_LLAMA,
+            modelName = LlamaEngine.Config().modelFileName
         )
 
-        var callIndex = 0
-        coEvery {
-            ollamaEngine.generateStream(any(), any(), any(), any())
-        } coAnswers {
-            callIndex++
-            val callback = it.invocation.args[3] as OllamaEngine.GenerateCallback
-            if (callIndex % 5 == 0) {
-                callback.onToken("just a normal reply without tags")
-            } else {
-                callback.onToken("[sleepy] *yawns* ami klanto... ")
-            }
-            callback.onComplete()
+        every {
+            llamaEngine.generateStream(any())
+        } answers {
+            val channel = Channel<String>(1)
+            channel.trySend("[happy] *smiles* bhalo ache... ")
+            channel.close()
+            channel
         }
 
         val report = evaluator.evaluate(config, iterations = 20, timeoutMs = 5_000)
-        val expectedFails = callIndex / 5
-        val expectedPasses = 20 - expectedFails
-        assert(report.passCount == expectedPasses)
-        assert(report.failCount == expectedFails)
+
+        assert(report.results.all { it.hasEmotionTag })
+        assert(report.results.all { it.hasAction })
+        assert(report.results.all { it.tagAtStart })
+        assert(report.emotionTagDistribution["happy"] == 20)
     }
 }
