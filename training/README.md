@@ -67,19 +67,22 @@ python training/augment_dataset.py
 
 # Banglish-heavy augmentation: ~1200 examples
 python training/augment_banglish.py
+
+# GenZ / internet-culture Banglish: ~2000 examples
+python training/augment_genz.py
 ```
 
 Final dataset files in `training/dataset/`:
-- `liltii_fewshot.jsonl` — 1200 Bangla-English examples with emotion tags
-- `train.jsonl` — 960 examples for training
-- `val.jsonl` — 240 examples for validation
+- `liltii_fewshot.jsonl` — 2000 Bangla-English examples with emotion tags
+- `train.jsonl` — 1600 examples for training
+- `val.jsonl` — 400 examples for validation
 
 Each example follows the format:
 
 ```json
 {"messages": [
-  {"role": "user", "content": "bhai, i'm so sleepy but i need to study fr"},
-  {"role": "assistant", "content": "[sleepy] *yawns* ghum... but ami study kora lagbe..."}
+  {"role": "user", "content": "bhai, why so serious?"},
+  {"role": "assistant", "content": "[confused] *raises eyebrow* tumi ki serious? hashao!"}
 ]}
 ```
 
