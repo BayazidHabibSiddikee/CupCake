@@ -55,10 +55,9 @@ pip install bitsandbytes --no-build-isolation
 ### 2. Prepare Dataset
 
 The dataset is already prepared in `training/dataset/`:
-- `liltii_fewshot.jsonl` — 50 raw examples (Bangla-English conversations with
-  emotion tags)
-- `train.jsonl` — 40 examples for training
-- `val.jsonl` — 10 examples for validation
+- `liltii_fewshot.jsonl` — 800 augmented Bangla-English examples with emotion tags
+- `train.jsonl` — 640 examples for training
+- `val.jsonl` — 160 examples for validation
 
 Each example follows the format:
 
