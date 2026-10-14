@@ -183,6 +183,17 @@ LILTII_V0_2_Q2_K("liltii-v0.2-q2_k", "liltii-v0.2-q2_k.gguf", ModelType.LOCAL),
 BANGLA_SMOLLM_135M_Q2_K("bangla-smollm-135m-v0.2-q2_k", "bangla-smollm-135m-v2_q2_k.gguf", ModelType.LOCAL),
 ```
 
+## Architecture Note
+
+These two models have **different architectures** and **cannot be merged together**:
+
+- `LilTii-v0.2` uses `Qwen/Qwen2.5-0.6B-Instruct` → **Qwen2** architecture
+- `Bangla SmolLM 135m` uses `rnnandi/bangla-smollm-135m` → **LLaMA** architecture
+
+You must train, merge, and convert each model **independently**. The LoRA adapters,
+merged models, and GGUF outputs are all separate. You can deploy both GGUF files
+to the Android app and switch between them at runtime.
+
 ## Multi-Turn / History Support
 
 Yes — both models can learn short-term history if trained with multi-turn data.
