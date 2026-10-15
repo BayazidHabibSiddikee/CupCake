@@ -1,9 +1,13 @@
 package com.cupcake.network
 
+import android.content.Context
 import android.util.Log
+import io.ktor.http.ContentType
+import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
+import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
 import io.ktor.websocket.*
@@ -33,6 +37,14 @@ object EspWebSocketServer {
     private val messageChannel = Channel<IncomingMessage>(100)
     private var onMessageReceived: ((IncomingMessage) -> Unit)? = null
     private var onConnectionChange: ((String, Boolean) -> Unit)? = null
+
+    /** Set once at startup so the server can serve bundled emotion art to the ESP board. */
+    @Volatile
+    private var appContext: Context? = null
+
+    fun attach(context: Context) {
+        appContext = context.applicationContext
+    }
 
     fun setOnConnectionChangeListener(listener: ((String, Boolean) -> Unit)?) {
         onConnectionChange = listener
@@ -121,6 +133,38 @@ object EspWebSocketServer {
                         }
                         webSocket("/esp/ws") {
                             handleWebSocketSession()
+                        }
+                        // Serve the companion's emotion art so the ESP board can render
+                        // the exact same image the phone is showing.
+                        get("/assets/marin/emotions/{file}") {
+                            val file = call.parameters["file"].orEmpty()
+                            if (!file.matches(Regex("[a-zA-Z0-9_]{1,32}\\.png"))) {
+                                call.respond(HttpStatusCode.BadRequest)
+                                return@get
+                            }
+                            val bytes = try {
+                                appContext?.assets?.open("marin/emotions/$file")?.use { it.readBytes() }
+                            } catch (e: Exception) {
+                                null
+                            }
+                            if (bytes == null) {
+                                call.respond(HttpStatusCode.NotFound)
+                            } else {
+                                call.respondBytes(bytes, ContentType.Image.PNG)
+                            }
+                        }
+                        get("/assets/marin/emotions") {
+                            val list = com.cupcake.ai.EmotionAssets.ALL_STEMS.map { stem ->
+                                mapOf(
+                                    "emotion" to stem,
+                                    "face" to com.cupcake.ai.EmotionAssets.espFaceForStem(stem),
+                                    "image" to com.cupcake.ai.EmotionAssets.httpPathForStem(stem)
+                                )
+                            }
+                            call.respondText(
+                                org.json.JSONArray(list).toString(),
+                                ContentType.Application.Json
+                            )
                         }
                     }
                 }.start(wait = false)
@@ -212,11 +256,19 @@ object EspWebSocketServer {
         return sent
     }
 
-    fun sendFaceExpression(expression: String, duration: Int = 2000) {
-        broadcast(MessageType.FACE, mapOf(
+    fun sendFaceExpression(
+        expression: String,
+        duration: Int = 2000,
+        emotion: String? = null,
+        imagePath: String? = null
+    ) {
+        val payload = mutableMapOf<String, Any?>(
             "expression" to expression,
             "duration" to duration
-        ))
+        )
+        if (emotion != null) payload["emotion"] = emotion
+        if (imagePath != null) payload["image"] = imagePath
+        broadcast(MessageType.FACE, payload)
     }
 
     fun sendMotorAction(action: String, params: Map<String, Any> = emptyMap()) {

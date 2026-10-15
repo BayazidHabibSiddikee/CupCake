@@ -41,6 +41,7 @@ class CupCakeApplication : Application(), ImageLoaderFactory {
         ).build()
 
         // Start WebSocket server for ESP32
+        com.cupcake.network.EspWebSocketServer.attach(this)
         com.cupcake.network.EspWebSocketServer.start(
             port = 8080,
             onMessage = { msg ->

@@ -1,15 +1,27 @@
 package com.cupcake.ai
 
 /**
- * Maps detected emotions (or the local model's bracketed emotion tags such as
- * `[happy]`) to the 2D character art bundled in `assets/marin/emotions/`.
+ * Single source of truth for the companion's 2D emotion art.
+ *
+ * The asset stem (e.g. `laugh`) is the shared vocabulary used by:
+ *  - the in-app live face + chat bubbles (via [assetForStem]),
+ *  - the floating overlay pet,
+ *  - the ESP32 board, which can fetch the exact same PNG over HTTP at
+ *    [httpPathForStem] and drive its own face from [espFaceForStem].
  */
 object EmotionAssets {
 
-    private const val ASSET_DIR = "file:///android_asset/marin/emotions"
+    private const val DIR = "marin/emotions"
+    const val URL_PREFIX = "file:///android_asset/$DIR"
+    const val HTTP_PREFIX = "/assets/$DIR"
 
-    /** Canonical PNG stem present in the asset folder. */
-    private val emotionToFile = mapOf(
+    /** Canonical PNG stems present in `assets/marin/emotions/`. */
+    val ALL_STEMS: List<String> = listOf(
+        "normal", "laugh", "lovely", "flirty", "excited",
+        "confident", "thinking", "shock", "sad", "angry", "eating"
+    )
+
+    private val emotionToStem = mapOf(
         EmotionClassifier.Emotion.JOY to "laugh",
         EmotionClassifier.Emotion.SURPRISE to "shock",
         EmotionClassifier.Emotion.AFFECTION to "lovely",
@@ -21,11 +33,13 @@ object EmotionAssets {
     )
 
     /** Bracket tags emitted by the local model -> asset stem. */
-    private val tagToFile = mapOf(
+    private val tagToStem = mapOf(
         "sleepy" to "normal",
         "confused" to "confident",
         "surprised" to "shock",
+        "shock" to "shock",
         "happy" to "laugh",
+        "laugh" to "laugh",
         "sad" to "sad",
         "angry" to "angry",
         "thinking" to "thinking",
@@ -34,10 +48,24 @@ object EmotionAssets {
         "flirty" to "flirty",
         "lovely" to "lovely",
         "love" to "lovely",
-        "shock" to "shock",
         "hungry" to "eating",
         "eating" to "eating",
         "pout" to "flirty"
+    )
+
+    /** Asset stem -> ESP32 face expression (see EspWebSocketServer.FaceExpression). */
+    private val stemToEspFace = mapOf(
+        "normal" to "neutral",
+        "confident" to "neutral",
+        "eating" to "neutral",
+        "laugh" to "happy",
+        "excited" to "excited",
+        "lovely" to "heart_eyes",
+        "flirty" to "wink",
+        "angry" to "angry",
+        "sad" to "sad",
+        "shock" to "excited",
+        "thinking" to "thinking"
     )
 
     private val tagRegex = Regex("\\[([a-zA-Z]+)\\]")
@@ -46,12 +74,24 @@ object EmotionAssets {
     fun tagOf(text: String): String? =
         tagRegex.find(text)?.groupValues?.getOrNull(1)?.lowercase()
 
-    fun assetFor(emotion: EmotionClassifier.Emotion): String =
-        "$ASSET_DIR/${emotionToFile[emotion] ?: "normal"}.png"
+    fun stemForEmotion(emotion: EmotionClassifier.Emotion): String =
+        emotionToStem[emotion] ?: "normal"
 
-    /** Resolves the best emotion image for a message: explicit tag wins, else lexical detection. */
-    fun assetForText(text: String): String {
-        tagOf(text)?.let { tag -> tagToFile[tag]?.let { return "$ASSET_DIR/$it.png" } }
-        return assetFor(EmotionClassifier.detectEmotion(text))
+    /** Resolves the best face stem for a message: explicit tag wins, else lexical detection. */
+    fun stemForText(text: String): String {
+        tagToStem[tagOf(text)]?.let { return it }
+        return stemForEmotion(EmotionClassifier.detectEmotion(text))
     }
+
+    fun assetForStem(stem: String): String = "$URL_PREFIX/$stem.png"
+
+    fun assetForText(text: String): String = assetForStem(stemForText(text))
+
+    fun assetFor(emotion: EmotionClassifier.Emotion): String = assetForStem(stemForEmotion(emotion))
+
+    fun httpPathForStem(stem: String): String = "$HTTP_PREFIX/$stem.png"
+
+    fun espFaceForStem(stem: String): String = stemToEspFace[stem] ?: "neutral"
+
+    fun espFaceForText(text: String): String = espFaceForStem(stemForText(text))
 }

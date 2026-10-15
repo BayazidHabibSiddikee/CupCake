@@ -1,5 +1,6 @@
 package com.cupcake.ui.screen.chat
 
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.PeopleAlt
@@ -32,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -44,6 +47,7 @@ import com.cupcake.ui.component.MessageInput
 import com.cupcake.ui.component.MessengerBlue
 import com.cupcake.ui.component.MessengerTypingBubble
 import com.cupcake.ui.theme.CupCakeTheme
+import coil.compose.AsyncImage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,6 +62,7 @@ fun ChatScreen(
     val currentResponse by viewModel.currentResponse.collectAsStateWithLifecycle()
     val currentCharacter by viewModel.currentCharacter.collectAsStateWithLifecycle()
     val modelLoadState by viewModel.modelLoadState.collectAsStateWithLifecycle()
+    val liveEmotionStem by viewModel.liveEmotionStem.collectAsStateWithLifecycle()
     val isModelLoading = modelLoadState is ChatViewModel.ModelLoadState.Loading
 
     var scrollToBottom by remember { mutableStateOf(false) }
@@ -136,6 +141,38 @@ fun ChatScreen(
                                 Text(if (isWalkingMode) "Walk: ON 🐾" else "Walk: OFF 🛑", fontSize = 11.sp)
                             }
                         }
+                    }
+                }
+            }
+
+            // Live 2D emotion face — morphs as the companion talks, mirrored to the ESP board
+            val isMarinCompanion = currentCharacter?.let {
+                it.id.contains("marin", ignoreCase = true) ||
+                    it.name.contains("marin", ignoreCase = true) ||
+                    it.avatar.contains("marin", ignoreCase = true)
+            } ?: false
+            val displayStem = if (isMarinCompanion) {
+                liveEmotionStem
+                    ?: messages.lastOrNull { it.role == ChatMessage.MessageRole.ASSISTANT }
+                        ?.let { com.cupcake.ai.EmotionAssets.stemForText(it.content) }
+            } else null
+
+            if (!showVrm3dView && displayStem != null) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Crossfade(targetState = displayStem, label = "companion_face") { stem ->
+                        AsyncImage(
+                            model = com.cupcake.ai.EmotionAssets.assetForStem(stem),
+                            contentDescription = "Companion emotion: $stem",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(120.dp)
+                                .clip(RoundedCornerShape(24.dp))
+                        )
                     }
                 }
             }

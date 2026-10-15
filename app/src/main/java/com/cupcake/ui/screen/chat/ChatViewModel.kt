@@ -94,6 +94,32 @@ class ChatViewModel @Inject constructor(
     private val _gameState = MutableStateFlow<com.cupcake.game.GameManager.Result?>(null)
     val gameState = _gameState.asStateFlow()
 
+    /** Live face stem the companion is "wearing" while it talks (drives the in-app face + ESP). */
+    private val _liveEmotionStem = MutableStateFlow<String?>(null)
+    val liveEmotionStem = _liveEmotionStem.asStateFlow()
+
+    private var lastPushedFaceStem: String? = null
+
+    /** Updates the live emotion face and pushes the matching image to the ESP board. */
+    private fun pushEmotion(stem: String, duration: Int = 5000) {
+        _liveEmotionStem.value = stem
+        if (stem == lastPushedFaceStem) return
+        lastPushedFaceStem = stem
+        espServer.sendFaceExpression(
+            expression = com.cupcake.ai.EmotionAssets.espFaceForStem(stem),
+            duration = duration,
+            emotion = stem,
+            imagePath = com.cupcake.ai.EmotionAssets.httpPathForStem(stem)
+        )
+    }
+
+    /** Re-derives the current emotion from partially/fully generated text and pushes on change. */
+    private fun refreshLiveEmotion(text: String) {
+        if (text.length < 3) return
+        val stem = com.cupcake.ai.EmotionAssets.stemForText(text)
+        if (stem != _liveEmotionStem.value) pushEmotion(stem)
+    }
+
     private var systemPromptCache = ""
 
     init {
@@ -215,12 +241,8 @@ class ChatViewModel @Inject constructor(
         // session itself, so we only handle the live effects here (TTS + ESP32).
         viewModelScope.launch {
             gameManager.gameReactions.collect { reaction ->
-                // Send to ESP32 for face animation
-                val expression = if (reaction.humanWon) EspWebSocketServer.FaceExpression.RAGE
-                else if (reaction.isDraw) EspWebSocketServer.FaceExpression.THINKING
-                else EspWebSocketServer.FaceExpression.HAPPY
-
-                espServer.sendFaceExpression(expression, 3000)
+                // Face follows what the companion is actually saying (same art as the phone).
+                refreshLiveEmotion(reaction.text)
 
                 // Motor action
                 val motorAction = if (reaction.humanWon) EspWebSocketServer.MotorAction.TANTUM
@@ -324,6 +346,8 @@ class ChatViewModel @Inject constructor(
 
         _isGenerating.value = true
         _currentResponse.value = ""
+        // Show a "thinking" face the moment the companion starts composing.
+        pushEmotion("thinking")
 
         viewModelScope.launch {
             var fullResponse = ""
@@ -332,14 +356,18 @@ class ChatViewModel @Inject constructor(
                 if (config.isLocal()) {
                     val prompt = buildPrompt()
                     val tokenChannel = LlamaEngine.getInstance().generateStream(prompt)
+                    var tick = 0
                     for (token in tokenChannel) {
                         fullResponse += token
                         _currentResponse.value = fullResponse
+                        if (++tick % 3 == 0) refreshLiveEmotion(fullResponse)
                     }
+                    refreshLiveEmotion(fullResponse)
                 } else {
                     val personality = currentCharacter.value?.personality ?: ""
                     val messages = buildOllamaMessages()
                     val endpoint = config.effectiveEndpoint()
+                    var tick = 0
                     ollamaEngine.generateStream(
                         baseUrl = endpoint,
                         config = config,
@@ -348,6 +376,7 @@ class ChatViewModel @Inject constructor(
                             override fun onToken(token: String) {
                                 fullResponse += token
                                 _currentResponse.value = fullResponse
+                                if (++tick % 3 == 0) refreshLiveEmotion(fullResponse)
                             }
 
                             override fun onComplete() {
@@ -390,6 +419,9 @@ class ChatViewModel @Inject constructor(
                         modelUsed = _modelConfig.value.modelName
                     )
                     addMessage(assistantMessage)
+
+                    // Settle the live face on the final emotion.
+                    refreshLiveEmotion(translatedText)
 
                     // Send to ESP32 for TTS
                     sendToEspForTts(fullResponse.trim())

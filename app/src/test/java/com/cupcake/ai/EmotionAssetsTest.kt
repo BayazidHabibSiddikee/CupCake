@@ -44,4 +44,19 @@ class EmotionAssetsTest {
         val threads = recommendedThreadCount()
         assertTrue("threads=$threads", threads in 2..6)
     }
+
+    @Test
+    fun `stem is the shared vocabulary for app and esp`() {
+        assertEquals("laugh", EmotionAssets.stemForText("[happy] *bounces* hi"))
+        assertEquals("happy", EmotionAssets.espFaceForStem("laugh"))
+        assertEquals("/assets/marin/emotions/laugh.png", EmotionAssets.httpPathForStem("laugh"))
+    }
+
+    @Test
+    fun `every stem has an esp face and http path`() {
+        for (stem in EmotionAssets.ALL_STEMS) {
+            assertTrue(EmotionAssets.espFaceForStem(stem).isNotBlank())
+            assertTrue(EmotionAssets.httpPathForStem(stem).endsWith("/$stem.png"))
+        }
+    }
 }
