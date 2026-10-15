@@ -63,3 +63,7 @@ coverage/
 # CMake externalNativeBuild output
 .cxx/
 app/.cxx/
+training/outputs/*.gguf
+training/outputs/*-merged/
+training/outputs/*-original/
+training/outputs/*-v3/
