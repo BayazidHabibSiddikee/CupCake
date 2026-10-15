@@ -17,6 +17,8 @@
 static llama_context* g_ctx = nullptr;
 static llama_model* g_model = nullptr;
 static std::vector<llama_token> g_tokens;
+// Tokens whose KV cells are currently cached as the reusable prefix (the last prompt).
+static std::vector<llama_token> g_cache_tokens;
 static std::atomic<bool> g_is_generating{false};
 static std::atomic<bool> g_should_stop{false};
 static int g_n_batch = 512;
@@ -49,6 +51,8 @@ Java_com_cupcake_ai_LlamaEngine_initModel(
     const char* path = env->GetStringUTFChars(model_path, nullptr);
     
     llama_backend_init();
+    g_cache_tokens.clear();
+    g_n_batch = n_batch > 0 ? n_batch : 512;
     
     llama_model_params model_params = llama_model_default_params();
     model_params.n_gpu_layers = 0; // CPU only for now
@@ -164,6 +168,13 @@ static void emit_error(JNIEnv* env, const std::string& error) {
     env->DeleteLocalRef(jerror);
 }
 
+static int common_prefix_len(const std::vector<llama_token>& a, const std::vector<llama_token>& b) {
+    const int n = (int) std::min(a.size(), b.size());
+    int i = 0;
+    while (i < n && a[i] == b[i]) i++;
+    return i;
+}
+
 extern "C" JNIEXPORT jint JNICALL
 Java_com_cupcake_ai_LlamaEngine_generate(
     JNIEnv* env, jobject thiz, jstring prompt
@@ -239,15 +250,30 @@ Java_com_cupcake_ai_LlamaEngine_generate(
             : (uint32_t) g_sampling_params.seed;
         llama_sampler_chain_add(smpl, llama_sampler_init_dist(seed));
         
-        // Clear previous KV cache so positions don't conflict or overflow
-        llama_kv_cache_clear(g_ctx);
-
         const int max_tokens = g_sampling_params.max_tokens > 0 ? g_sampling_params.max_tokens : 128;
         int generated = 0;
-        
-        // Process prompt in chunks of g_n_batch
+
+        // ---- KV prefix cache: reuse the longest shared prefix with the previous prompt ----
+        // The chat prompt is stable at the front (system + older turns) and only grows at
+        // the tail, so we can skip re-decoding that whole shared prefix every turn.
+        int n_match = common_prefix_len(g_cache_tokens, g_tokens);
+        // Always decode at least the final token so fresh logits are produced.
+        if (n_match >= (int) g_tokens.size()) {
+            n_match = (int) g_tokens.size() - 1;
+        }
+        if (n_match > 0) {
+            if (!llama_kv_cache_seq_rm(g_ctx, 0, n_match, -1)) {
+                llama_kv_cache_clear(g_ctx);
+                n_match = 0;
+            }
+        } else {
+            llama_kv_cache_clear(g_ctx);
+            n_match = 0;
+        }
+
+        // Decode only the new suffix; positions continue automatically from the cache.
         bool decode_err = false;
-        for (size_t i = 0; i < g_tokens.size(); i += g_n_batch) {
+        for (size_t i = (size_t) n_match; i < g_tokens.size(); i += g_n_batch) {
             int32_t chunk = std::min((int32_t)(g_tokens.size() - i), (int32_t)g_n_batch);
             if (llama_decode(g_ctx, llama_batch_get_one(g_tokens.data() + i, chunk))) {
                 decode_err = true;
@@ -255,12 +281,15 @@ Java_com_cupcake_ai_LlamaEngine_generate(
             }
         }
         if (decode_err) {
+            g_cache_tokens.clear();
             emit_error(env, "Failed to process prompt");
             g_is_generating = false;
             llama_sampler_free(smpl);
             g_jvm->DetachCurrentThread();
             return;
         }
+        // Remember this prompt as the reusable prefix for the next turn.
+        g_cache_tokens = g_tokens;
         
         // Generate tokens with UTF-8 buffering and accumulated stop checks
         std::string utf8_buffer;
@@ -335,6 +364,7 @@ Java_com_cupcake_ai_LlamaEngine_cancel(JNIEnv* env, jobject thiz) {
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_cupcake_ai_LlamaEngine_release(JNIEnv* env, jobject thiz) {
+    g_cache_tokens.clear();
     if (g_ctx) {
         llama_free(g_ctx);
         g_ctx = nullptr;

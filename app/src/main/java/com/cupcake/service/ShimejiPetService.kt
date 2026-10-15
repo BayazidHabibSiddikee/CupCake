@@ -54,10 +54,14 @@ class ShimejiPetService : Service() {
     private val handler = Handler(Looper.getMainLooper())
     private var speechBubbleDismissRunnable: Runnable? = null
 
+    private var isVrmMode = false
+    private var baseImageSource: String? = null
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
+        isRunning = true
         ensureNotificationChannel()
         startForegroundServiceNotification()
     }
@@ -70,7 +74,8 @@ class ShimejiPetService : Service() {
             }
             ACTION_SHOW_SPEECH -> {
                 val text = intent.getStringExtra(EXTRA_TEXT) ?: "Hello!"
-                showSpeechBubble(text)
+                val emotionAsset = intent.getStringExtra(EXTRA_EMOTION)
+                showSpeechBubble(text, emotionAsset)
             }
             else -> {
                 val avatar = intent?.getStringExtra(EXTRA_AVATAR)
@@ -273,6 +278,7 @@ class ShimejiPetService : Service() {
         val petEmojiView = view.findViewById<TextView>(R.id.pet_emoji) ?: return
 
         val isVrm = avatar?.contains("marin") == true || avatar?.endsWith(".vrm") == true
+        isVrmMode = isVrm
         if (isVrm) {
             petVrmView?.visibility = View.VISIBLE
             petImageView.visibility = View.GONE
@@ -282,6 +288,7 @@ class ShimejiPetService : Service() {
 
         petVrmView?.visibility = View.GONE
         val imageSource = customGif?.takeIf { it.isNotBlank() } ?: avatar?.takeIf { it.isNotBlank() }
+        baseImageSource = imageSource
 
         if (imageSource != null && (imageSource.startsWith("http") || imageSource.startsWith("content://") || imageSource.startsWith("file://") || imageSource.endsWith(".gif") || imageSource.endsWith(".png") || imageSource.endsWith(".webp") || imageSource.endsWith(".jpg"))) {
             petEmojiView.visibility = View.GONE
@@ -299,7 +306,7 @@ class ShimejiPetService : Service() {
         }
     }
 
-    fun showSpeechBubble(text: String) {
+    fun showSpeechBubble(text: String, emotionAsset: String? = null) {
         val view = floatView ?: return
         val speechBubble = view.findViewById<View>(R.id.speech_bubble) ?: return
         val speechText = view.findViewById<TextView>(R.id.speech_text) ?: return
@@ -309,12 +316,29 @@ class ShimejiPetService : Service() {
         speechText.text = text
         speechBubble.visibility = View.VISIBLE
 
+        // Swap the 2D pet face to the spoken emotion, then restore the base look.
+        val petImageView = view.findViewById<ImageView>(R.id.pet_image)
+        if (!isVrmMode && emotionAsset != null && petImageView != null) {
+            petImageView.visibility = View.VISIBLE
+            petImageView.load(emotionAsset) {
+                crossfade(true)
+                placeholder(R.drawable.ic_pet_placeholder)
+                error(R.drawable.ic_pet_placeholder)
+            }
+        }
+
         // Trigger VRM talking animation
         petVrmView?.evaluateJavascript("window.setTalking && window.setTalking(true);", null)
 
         speechBubbleDismissRunnable = Runnable {
             speechBubble.visibility = View.GONE
             petVrmView?.evaluateJavascript("window.setTalking && window.setTalking(false);", null)
+            if (!isVrmMode && emotionAsset != null && petImageView != null) {
+                val restore = baseImageSource
+                if (restore != null) {
+                    petImageView.load(restore) { crossfade(true) }
+                }
+            }
         }
         handler.postDelayed(speechBubbleDismissRunnable!!, 4000)
     }
@@ -379,6 +403,7 @@ class ShimejiPetService : Service() {
         petVrmView?.destroy()
         petVrmView = null
         speechBubbleDismissRunnable?.let { handler.removeCallbacks(it) }
+        isRunning = false
         super.onDestroy()
     }
 
@@ -386,6 +411,10 @@ class ShimejiPetService : Service() {
         private const val TAG = "ShimejiPetService"
         private const val CHANNEL_ID = "cupcake_shimeji_channel"
         private const val NOTIFICATION_ID = 2002
+
+        /** True while the floating overlay service is actually alive (not just requested). */
+        @Volatile
+        var isRunning = false
 
         const val ACTION_START = "com.cupcake.shimeji.START"
         const val ACTION_STOP = "com.cupcake.shimeji.STOP"
@@ -395,6 +424,7 @@ class ShimejiPetService : Service() {
         const val EXTRA_GIF = "extra_gif"
         const val EXTRA_NAME = "extra_name"
         const val EXTRA_TEXT = "extra_text"
+        const val EXTRA_EMOTION = "extra_emotion"
 
         fun start(context: Context, avatar: String? = null, gif: String? = null, name: String? = null) {
             val intent = Intent(context, ShimejiPetService::class.java).apply {
@@ -416,10 +446,11 @@ class ShimejiPetService : Service() {
             context.startService(intent)
         }
 
-        fun showSpeech(context: Context, text: String) {
+        fun showSpeech(context: Context, text: String, emotionAsset: String? = null) {
             val intent = Intent(context, ShimejiPetService::class.java).apply {
                 action = ACTION_SHOW_SPEECH
                 putExtra(EXTRA_TEXT, text)
+                if (emotionAsset != null) putExtra(EXTRA_EMOTION, emotionAsset)
             }
             context.startService(intent)
         }

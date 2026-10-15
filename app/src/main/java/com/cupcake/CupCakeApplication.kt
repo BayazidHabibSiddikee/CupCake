@@ -30,6 +30,9 @@ class CupCakeApplication : Application(), ImageLoaderFactory {
         // Initialize Native Llama Engine
         com.cupcake.ai.LlamaEngine.initialize(this)
 
+        // Warm the active on-device model in the background for instant first replies
+        com.cupcake.ai.ModelPreloader.preload(this)
+
         // Pre-create database
         Room.databaseBuilder(
             this,

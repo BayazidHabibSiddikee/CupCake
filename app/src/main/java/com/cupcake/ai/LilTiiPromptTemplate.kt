@@ -11,6 +11,18 @@ object LilTiiPromptTemplate {
         Stay playful, a little weird, and never break character.
     """.trimIndent()
 
+    /**
+     * Compact, persona-agnostic style line injected into on-device chat prompts so the
+     * little local model answers in the cute `[emotion] *action* reply` format. The
+     * bracket is later read back by [EmotionAssets] to pick the matching 2D emotion art.
+     */
+    val CUTE_STYLE: String = """
+        Style: start EVERY reply with exactly one bracketed mood from
+          [happy] [sleepy] [surprised] [sad] [angry] [thinking],
+        then one short *action*, then a short, warm, playful reply (1-2 sentences).
+        Example: [happy] *bounces a little* yay, you're back! let's chat~
+    """.trimIndent()
+
     private val FEW_SHOT_SCRIPT: String = """
         User: hey what are you doing?
         Bot: [sleepy] *yawns loudly* just taking a nap... ami onek klanto... is it time for food yet?

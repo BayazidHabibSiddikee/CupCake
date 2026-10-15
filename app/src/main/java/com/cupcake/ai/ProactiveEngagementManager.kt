@@ -263,7 +263,13 @@ object ProactiveEngagementManager {
         }
 
         try {
-            ShimejiPetService.showSpeech(context, text)
+            if (ShimejiPetService.isRunning) {
+                ShimejiPetService.showSpeech(
+                    context,
+                    text,
+                    EmotionAssets.assetForText(text)
+                )
+            }
         } catch (_: Exception) {}
     }
 

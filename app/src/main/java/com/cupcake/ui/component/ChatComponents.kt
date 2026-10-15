@@ -24,14 +24,17 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.cupcake.data.model.ChatMessage
 
 // Signature Messenger Blue
@@ -42,6 +45,7 @@ val MessengerBlueDark = Color(0xFF0072E5)
 fun ChatMessageItem(
     message: ChatMessage,
     characterAvatar: String? = null,
+    emotionImage: String? = null,
     isStreaming: Boolean = false
 ) {
     val isUser = message.role == ChatMessage.MessageRole.USER
@@ -128,6 +132,22 @@ fun ChatMessageItem(
                 }
 
                 Column(modifier = Modifier.widthIn(max = 285.dp)) {
+                    val displayText = remember(message.content) {
+                        message.content.replaceFirst(Regex("^\\s*\\[[a-zA-Z]+\\]\\s*"), "")
+                    }
+
+                    if (emotionImage != null) {
+                        AsyncImage(
+                            model = emotionImage,
+                            contentDescription = "Companion emotion",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .padding(bottom = 4.dp)
+                                .size(96.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                        )
+                    }
+
                     Box(
                         modifier = Modifier
                             .clip(
@@ -144,7 +164,7 @@ fun ChatMessageItem(
                             .padding(horizontal = 14.dp, vertical = 10.dp)
                     ) {
                         Text(
-                            text = message.content,
+                            text = displayText,
                             fontSize = 15.sp,
                             lineHeight = 20.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant

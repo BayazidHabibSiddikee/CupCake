@@ -224,9 +224,16 @@ fun ChatScreen(
                     }
                 ) { i ->
                     val message = messages[messages.lastIndex - i]
+                    val isAssistant = message.role == ChatMessage.MessageRole.ASSISTANT
+                    val emotionImage = if (isAssistant) {
+                        remember(message.content) {
+                            com.cupcake.ai.EmotionAssets.assetForText(message.content)
+                        }
+                    } else null
                     ChatMessageItem(
                         message = message,
-                        characterAvatar = currentCharacter?.avatar
+                        characterAvatar = currentCharacter?.avatar,
+                        emotionImage = emotionImage
                     )
                 }
             }

@@ -123,7 +123,9 @@ class ChatViewModel @Inject constructor(
                         context = appContext,
                         config = LlamaEngine.Config(
                             modelFileName = "models/$targetModel",
-                            nCtx = 1024,
+                            nCtx = 2048,
+                            nThreads = com.cupcake.ai.recommendedThreadCount(),
+                            nBatch = 512,
                             maxTokens = config.maxTokens,
                             temperature = config.temperature,
                             topP = config.topP,
@@ -409,10 +411,12 @@ class ChatViewModel @Inject constructor(
         
         // Compact system prompt and sanitize macros
         val cleanSystemPrompt = SillyTavernCardParser.replaceTemplateMacros(rawSystemPrompt, charName, "User")
-        val systemPrompt = if (cleanSystemPrompt.length > 900) {
-            cleanSystemPrompt.take(900)
+        // Nudge the small on-device model into the cute [emotion] *action* reply format
+        val styledSystemPrompt = cleanSystemPrompt + "\n" + com.cupcake.ai.LilTiiPromptTemplate.CUTE_STYLE
+        val systemPrompt = if (styledSystemPrompt.length > 1100) {
+            styledSystemPrompt.take(1100)
         } else {
-            cleanSystemPrompt
+            styledSystemPrompt
         }
         
         val builder = StringBuilder()

@@ -104,8 +104,8 @@ class LlamaEngine private constructor() {
 
     data class Config(
         val modelFileName: String = "models/liltii-v0.2-small-q2_k.gguf",
-        val nCtx: Int = 1024,
-        val nThreads: Int = 4,
+        val nCtx: Int = 2048,
+        val nThreads: Int = recommendedThreadCount(),
         val nBatch: Int = 512,
         val maxTokens: Int = 256,
         val temperature: Float = 0.7f,
@@ -122,6 +122,7 @@ class LlamaEngine private constructor() {
 
     fun getLoadedModelName(): String? = _loadedModelName
 
+    @Synchronized
     fun loadModel(
         context: Context,
         config: Config = Config(),
@@ -219,4 +220,36 @@ class LlamaEngine private constructor() {
     fun isReady(): Boolean = isLoaded()
 
     fun getInfo(): String = getModelInfo()
+}
+
+/**
+ * Picks a sensible CPU thread count for on-device inference.
+ *
+ * big.LITTLE phones report all cores, but only the "big" cluster actually helps a
+ * tiny (135M-0.5B) model — scheduling onto slow LITTLE cores can *hurt* throughput.
+ * We count the cores that share the highest max-frequency and clamp to [2, 6].
+ */
+fun recommendedThreadCount(): Int {
+    val cores = Runtime.getRuntime().availableProcessors().coerceAtLeast(1)
+    val big = performanceCoreCount()
+    val threads = when {
+        big in 1..cores -> big
+        cores >= 8 -> cores / 2
+        else -> cores
+    }
+    return threads.coerceIn(2, 6).coerceAtMost(cores)
+}
+
+private fun performanceCoreCount(): Int {
+    val cores = Runtime.getRuntime().availableProcessors()
+    val freqs = ArrayList<Long>()
+    for (i in 0 until cores) {
+        val f = File("/sys/devices/system/cpu/cpu$i/cpufreq/cpuinfo_max_freq")
+        if (!f.exists()) continue
+        val v = runCatching { f.readText().trim().toLong() }.getOrNull()
+        if (v != null && v > 0) freqs.add(v)
+    }
+    if (freqs.isEmpty()) return -1
+    val max = freqs.maxOrNull() ?: return -1
+    return freqs.count { it >= max }
 }
