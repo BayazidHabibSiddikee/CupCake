@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cupcake.data.model.ApiProvider
 import com.cupcake.data.model.ModelConfig
+import com.cupcake.data.UserProfile
+import com.cupcake.data.UserProfileStore
 import com.cupcake.domain.usecase.AddApiProviderUseCase
 import com.cupcake.domain.usecase.DeleteApiProviderUseCase
 import com.cupcake.domain.usecase.GetApiProvidersUseCase
@@ -27,7 +29,8 @@ class SettingsViewModel @Inject constructor(
     private val deleteProviderUseCase: DeleteApiProviderUseCase,
     private val testConnectionUseCase: TestProviderConnectionUseCase,
     private val getProviderModelsUseCase: GetProviderModelsUseCase,
-    val modelDownloadManager: ModelDownloadManager
+    val modelDownloadManager: ModelDownloadManager,
+    private val userProfileStore: UserProfileStore
 ) : ViewModel() {
 
     val providers: StateFlow<List<ApiProvider>> = getProvidersUseCase()
@@ -42,6 +45,30 @@ class SettingsViewModel @Inject constructor(
     val newProviderModel = MutableStateFlow("")
 
     val statusMessage = MutableStateFlow<String?>(null)
+
+    // User profile form (initialized from storage so reopening Settings shows saved values).
+    val userName = MutableStateFlow(userProfileStore.current().name)
+    val userAge = MutableStateFlow(userProfileStore.current().age)
+    val userGender = MutableStateFlow(userProfileStore.current().gender)
+    val userRelationship = MutableStateFlow(userProfileStore.current().relationship)
+    val userLikes = MutableStateFlow(userProfileStore.current().likes)
+    val userDislikes = MutableStateFlow(userProfileStore.current().dislikes)
+    val userNotes = MutableStateFlow(userProfileStore.current().notes)
+
+    fun saveUserProfile() {
+        userProfileStore.save(
+            UserProfile(
+                name = userName.value,
+                age = userAge.value,
+                gender = userGender.value,
+                relationship = userRelationship.value,
+                likes = userLikes.value,
+                dislikes = userDislikes.value,
+                notes = userNotes.value
+            )
+        )
+        statusMessage.value = "Saved — your companion will remember you."
+    }
 
     var onProviderSelected: ((ApiProvider) -> Unit)? = null
     var onLocalModelSelected: (() -> Unit)? = null

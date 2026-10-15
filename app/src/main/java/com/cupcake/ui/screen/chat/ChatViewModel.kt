@@ -12,8 +12,10 @@ import com.cupcake.data.model.Character
 import com.cupcake.data.model.ChatMessage
 import com.cupcake.data.model.ModelConfig
 import com.cupcake.data.model.SystemPrompt
+import com.cupcake.data.UserProfileStore
 import com.cupcake.game.GameManager
 import com.cupcake.network.EspWebSocketServer
+import com.cupcake.service.ShimejiPetService
 import com.cupcake.tts.TtsManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -23,7 +25,9 @@ import com.cupcake.chat.ChatSessionStore
 import com.cupcake.domain.usecase.GetApiProvidersUseCase
 import com.cupcake.data.model.ApiProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.consumeEach
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
@@ -44,7 +48,8 @@ class ChatViewModel @Inject constructor(
     private val ttsManager: TtsManager,
     private val energyManager: EnergyManager,
     private val getApiProvidersUseCase: GetApiProvidersUseCase,
-    private val modelDownloadManager: com.cupcake.ai.ModelDownloadManager
+    private val modelDownloadManager: com.cupcake.ai.ModelDownloadManager,
+    private val userProfileStore: UserProfileStore
 ) : ViewModel() {
 
     val characterId: String =
@@ -100,11 +105,20 @@ class ChatViewModel @Inject constructor(
 
     private var lastPushedFaceStem: String? = null
 
-    /** Updates the live emotion face and pushes the matching image to the ESP board. */
+    /** Job that occasionally lets the companion speak first while the chat is open. */
+    private var idleChatterJob: Job? = null
+
+    /** Updates the live emotion face, the floating pet, and pushes the image to the ESP board. */
     private fun pushEmotion(stem: String, duration: Int = 5000) {
         _liveEmotionStem.value = stem
         if (stem == lastPushedFaceStem) return
         lastPushedFaceStem = stem
+
+        // Reflect the emotion on the floating companion overlay (static art, no VRM needed).
+        if (ShimejiPetService.isRunning) {
+            ShimejiPetService.setFace(appContext, com.cupcake.ai.EmotionAssets.assetForStem(stem))
+        }
+
         espServer.sendFaceExpression(
             expression = com.cupcake.ai.EmotionAssets.espFaceForStem(stem),
             duration = duration,
@@ -128,6 +142,38 @@ class ChatViewModel @Inject constructor(
         setupEspCallbacks()
         loadCurrentCharacter()
         ensureModelLoaded()
+        scheduleIdleChatter()
+    }
+
+    /**
+     * After a random idle interval the companion may drop a spontaneous one-liner
+     * into the chat and pop it up in the floating character's speech bubble.
+     */
+    private fun scheduleIdleChatter() {
+        idleChatterJob?.cancel()
+        idleChatterJob = viewModelScope.launch {
+            delay(45_000L + kotlin.random.Random.nextLong(90_000L))
+            maybeSendIdleChatter()
+            scheduleIdleChatter()
+        }
+    }
+
+    private fun maybeSendIdleChatter() {
+        if (_isGenerating.value) return
+        if (messages.value.isEmpty()) return
+        if (kotlin.random.Random.nextInt(100) >= 35) return
+
+        val text = IDLE_CHATTER_LINES.random()
+        addMessage(ChatMessage.assistant(text, conversationId, modelUsed = "idle"))
+        refreshLiveEmotion(text)
+
+        if (ShimejiPetService.isRunning) {
+            ShimejiPetService.showSpeech(
+                appContext,
+                text,
+                com.cupcake.ai.EmotionAssets.assetForText(text)
+            )
+        }
     }
 
     /**
@@ -173,7 +219,7 @@ class ChatViewModel @Inject constructor(
                 }
             }
         } else {
-            _modelLoadState.value = ModelLoadState.Loading("Connecting to Ollama...")
+            _modelLoadState.value = ModelLoadState.Loading("Connecting...")
             viewModelScope.launch(Dispatchers.IO) {
                 val baseUrl = config.effectiveEndpoint()
                 val result = ollamaEngine.checkConnection(baseUrl)
@@ -181,7 +227,7 @@ class ChatViewModel @Inject constructor(
                     _modelLoadState.value = connectionResult.fold(
                         onSuccess = { connected ->
                             if (connected) ModelLoadState.Ready
-                            else ModelLoadState.Error("Cannot connect to Ollama at $baseUrl")
+                            else ModelLoadState.Error("Init failed")
                         },
                         onFailure = { ModelLoadState.Error(it.message ?: "Connection failed") }
                     )
@@ -273,7 +319,7 @@ class ChatViewModel @Inject constructor(
             val rawFirst = character.firstMessage?.ifBlank { null }
                 ?: "*smiles cheerfully and waves* Hey! I was waiting for you! What's on your mind today?"
             if (sessionStore.messages(character.id).value.isEmpty()) {
-                val cleanFirst = SillyTavernCardParser.replaceTemplateMacros(rawFirst, character.name, "User")
+                val cleanFirst = SillyTavernCardParser.replaceTemplateMacros(rawFirst, character.name, userName())
                 sessionStore.addMessage(
                     character.id,
                     ChatMessage.assistant(
@@ -285,6 +331,12 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    /** Name to address the user by (from the Settings profile form). */
+    private fun userName(): String = userProfileStore.current().displayName()
+
+    /** Extra system-prompt lines describing the user, or "" when the profile is empty. */
+    private fun userProfileBlock(): String = userProfileStore.current().toPromptBlock()
+
     private fun buildOllamaMessages(): List<OllamaEngine.OllamaMessage> {
         val charName = _currentCharacter.value?.name ?: "Companion"
         val messageList = mutableListOf<OllamaEngine.OllamaMessage>()
@@ -292,8 +344,10 @@ class ChatViewModel @Inject constructor(
         // Add system prompt if available
         val rawSys = _systemPrompt.value?.fullPrompt() ?: systemPromptCache
         if (rawSys.isNotBlank()) {
-            val cleanSys = SillyTavernCardParser.replaceTemplateMacros(rawSys, charName, "User")
-            messageList.add(OllamaEngine.OllamaMessage(role = "system", content = cleanSys))
+            val cleanSys = SillyTavernCardParser.replaceTemplateMacros(rawSys, charName, userName())
+            val profile = userProfileBlock()
+            val withProfile = if (profile.isNotBlank()) "$cleanSys\n$profile" else cleanSys
+            messageList.add(OllamaEngine.OllamaMessage(role = "system", content = withProfile))
         }
         
         // Add conversation messages
@@ -302,7 +356,7 @@ class ChatViewModel @Inject constructor(
         if (!hasAssistant) {
             val defaultGreeting = _currentCharacter.value?.firstMessage?.ifBlank { null }
                 ?: "*smiles cheerfully and waves* Hey! I was waiting for you! What's on your mind today?"
-            val cleanGreeting = SillyTavernCardParser.replaceTemplateMacros(defaultGreeting, charName, "User")
+            val cleanGreeting = SillyTavernCardParser.replaceTemplateMacros(defaultGreeting, charName, userName())
             messageList.add(OllamaEngine.OllamaMessage(role = "assistant", content = cleanGreeting))
         }
 
@@ -313,7 +367,7 @@ class ChatViewModel @Inject constructor(
                 ChatMessage.MessageRole.SYSTEM -> "system"
                 ChatMessage.MessageRole.TOOL -> "tool"
             }
-            val cleanContent = SillyTavernCardParser.replaceTemplateMacros(msg.content, charName, "User")
+            val cleanContent = SillyTavernCardParser.replaceTemplateMacros(msg.content, charName, userName())
             messageList.add(OllamaEngine.OllamaMessage(role = role, content = cleanContent))
         }
         
@@ -343,6 +397,7 @@ class ChatViewModel @Inject constructor(
         val userMessage = ChatMessage.user(text, conversationId)
         addMessage(userMessage)
         com.cupcake.ai.ProactiveEngagementManager.onUserActivity(appContext)
+        scheduleIdleChatter()
 
         _isGenerating.value = true
         _currentResponse.value = ""
@@ -387,7 +442,7 @@ class ChatViewModel @Inject constructor(
                                 Log.e("ChatViewModel", "Generation failed: $error")
                                 addMessage(
                                     ChatMessage.system(
-                                        "❌ Ollama request failed: $error",
+                                        "❌ Request failed: $error",
                                         conversationId
                                     )
                                 )
@@ -442,11 +497,20 @@ class ChatViewModel @Inject constructor(
         }
         
         // Compact system prompt and sanitize macros
-        val cleanSystemPrompt = SillyTavernCardParser.replaceTemplateMacros(rawSystemPrompt, charName, "User")
+        val cleanSystemPrompt = SillyTavernCardParser.replaceTemplateMacros(rawSystemPrompt, charName, userName())
         // Nudge the small on-device model into the cute [emotion] *action* reply format
-        val styledSystemPrompt = cleanSystemPrompt + "\n" + com.cupcake.ai.LilTiiPromptTemplate.CUTE_STYLE
-        val systemPrompt = if (styledSystemPrompt.length > 1100) {
-            styledSystemPrompt.take(1100)
+        val profile = userProfileBlock()
+        val styledSystemPrompt = buildString {
+            append(cleanSystemPrompt)
+            if (profile.isNotBlank()) {
+                append("\n")
+                append(profile)
+            }
+            append("\n")
+            append(com.cupcake.ai.LilTiiPromptTemplate.CUTE_STYLE)
+        }
+        val systemPrompt = if (styledSystemPrompt.length > 1400) {
+            styledSystemPrompt.take(1400)
         } else {
             styledSystemPrompt
         }
@@ -467,7 +531,7 @@ class ChatViewModel @Inject constructor(
         if (!hasAssistantHistory) {
             val defaultGreeting = _currentCharacter.value?.firstMessage?.ifBlank { null }
                 ?: "*smiles cheerfully and waves* Hey! I was waiting for you! What's on your mind today?"
-            val cleanGreeting = SillyTavernCardParser.replaceTemplateMacros(defaultGreeting, charName, "User")
+            val cleanGreeting = SillyTavernCardParser.replaceTemplateMacros(defaultGreeting, charName, userName())
             builder.append("<|im_start|>assistant\n")
             builder.append(cleanGreeting)
             builder.append("<|im_end|>\n")
@@ -475,7 +539,7 @@ class ChatViewModel @Inject constructor(
 
         for (msg in recentMessages) {
             val rawContent = if (msg.content.length > 400) msg.content.take(400) else msg.content
-            val cleanContent = SillyTavernCardParser.replaceTemplateMacros(rawContent, charName, "User")
+            val cleanContent = SillyTavernCardParser.replaceTemplateMacros(rawContent, charName, userName())
             val role = if (msg.role == ChatMessage.MessageRole.USER) "user" else "assistant"
             builder.append("<|im_start|>")
             builder.append(role)
@@ -575,7 +639,20 @@ class ChatViewModel @Inject constructor(
     }
 
     override fun onCleared() {
+        idleChatterJob?.cancel()
         espServer.setOnConnectionChangeListener(null)
         super.onCleared()
     }
 }
+
+/** Cute spontaneous lines the companion may send on its own while the chat is open. */
+private val IDLE_CHATTER_LINES = listOf(
+    "*hums softly and glances at you* [lovely] Still there? I like having you around~",
+    "[excited] Ooh, I just thought of something fun! Want to hear it?",
+    "*stretches* [normal] Taking a tiny break... don't wander off too far, okay?",
+    "[lovely] Hey, you've been quiet. Everything okay?",
+    "*tilts head* [thinking] What are you up to right now?",
+    "[flirty] I was thinking about you again... oops, said that out loud!",
+    "*brings you a little snack* [eating] You should eat something too, you know!",
+    "[confident] I bet you're doing amazing today. Just saying~"
+)

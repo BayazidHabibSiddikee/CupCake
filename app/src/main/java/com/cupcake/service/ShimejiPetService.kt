@@ -53,6 +53,7 @@ class ShimejiPetService : Service() {
 
     private val handler = Handler(Looper.getMainLooper())
     private var speechBubbleDismissRunnable: Runnable? = null
+    private var faceRestoreRunnable: Runnable? = null
 
     private var isVrmMode = false
     private var baseImageSource: String? = null
@@ -76,6 +77,9 @@ class ShimejiPetService : Service() {
                 val text = intent.getStringExtra(EXTRA_TEXT) ?: "Hello!"
                 val emotionAsset = intent.getStringExtra(EXTRA_EMOTION)
                 showSpeechBubble(text, emotionAsset)
+            }
+            ACTION_SET_FACE -> {
+                intent.getStringExtra(EXTRA_FACE_ASSET)?.let { setEmotionFace(it) }
             }
             else -> {
                 val avatar = intent?.getStringExtra(EXTRA_AVATAR)
@@ -306,6 +310,33 @@ class ShimejiPetService : Service() {
         }
     }
 
+    /**
+     * Swaps the 2D pet face to [asset] for a few seconds, then restores the base look.
+     * Reflects the companion's live emotion without opening a speech bubble.
+     */
+    private fun setEmotionFace(asset: String) {
+        val view = floatView ?: return
+        if (isVrmMode) return
+        if (baseImageSource == null) return
+        val petImageView = view.findViewById<ImageView>(R.id.pet_image) ?: return
+
+        faceRestoreRunnable?.let { handler.removeCallbacks(it) }
+        petImageView.visibility = View.VISIBLE
+        petImageView.load(asset) {
+            crossfade(true)
+            placeholder(R.drawable.ic_pet_placeholder)
+            error(R.drawable.ic_pet_placeholder)
+        }
+
+        faceRestoreRunnable = Runnable {
+            val restore = baseImageSource
+            if (restore != null) {
+                petImageView.load(restore) { crossfade(true) }
+            }
+        }
+        handler.postDelayed(faceRestoreRunnable!!, 4000)
+    }
+
     fun showSpeechBubble(text: String, emotionAsset: String? = null) {
         val view = floatView ?: return
         val speechBubble = view.findViewById<View>(R.id.speech_bubble) ?: return
@@ -403,6 +434,7 @@ class ShimejiPetService : Service() {
         petVrmView?.destroy()
         petVrmView = null
         speechBubbleDismissRunnable?.let { handler.removeCallbacks(it) }
+        faceRestoreRunnable?.let { handler.removeCallbacks(it) }
         isRunning = false
         super.onDestroy()
     }
@@ -419,12 +451,14 @@ class ShimejiPetService : Service() {
         const val ACTION_START = "com.cupcake.shimeji.START"
         const val ACTION_STOP = "com.cupcake.shimeji.STOP"
         const val ACTION_SHOW_SPEECH = "com.cupcake.shimeji.SHOW_SPEECH"
+        const val ACTION_SET_FACE = "com.cupcake.shimeji.SET_FACE"
 
         const val EXTRA_AVATAR = "extra_avatar"
         const val EXTRA_GIF = "extra_gif"
         const val EXTRA_NAME = "extra_name"
         const val EXTRA_TEXT = "extra_text"
         const val EXTRA_EMOTION = "extra_emotion"
+        const val EXTRA_FACE_ASSET = "extra_face_asset"
 
         fun start(context: Context, avatar: String? = null, gif: String? = null, name: String? = null) {
             val intent = Intent(context, ShimejiPetService::class.java).apply {
@@ -451,6 +485,15 @@ class ShimejiPetService : Service() {
                 action = ACTION_SHOW_SPEECH
                 putExtra(EXTRA_TEXT, text)
                 if (emotionAsset != null) putExtra(EXTRA_EMOTION, emotionAsset)
+            }
+            context.startService(intent)
+        }
+
+        /** Briefly swaps the floating pet's face to [emotionAsset] with no speech bubble. */
+        fun setFace(context: Context, emotionAsset: String) {
+            val intent = Intent(context, ShimejiPetService::class.java).apply {
+                action = ACTION_SET_FACE
+                putExtra(EXTRA_FACE_ASSET, emotionAsset)
             }
             context.startService(intent)
         }

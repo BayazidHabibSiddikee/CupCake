@@ -81,6 +81,23 @@ class LlamaEngine private constructor() {
             Log.i(TAG, "Model copied: ${modelFile.length()} bytes")
             return modelFile
         }
+
+        /** True when [file] begins with the 4-byte "GGUF" magic. */
+        fun isValidGguf(file: File): Boolean {
+            if (!file.exists() || file.length() < 8L) return false
+            return try {
+                file.inputStream().use { input ->
+                    val magic = ByteArray(4)
+                    input.read(magic) == 4 &&
+                        magic[0] == 'G'.code.toByte() &&
+                        magic[1] == 'G'.code.toByte() &&
+                        magic[2] == 'U'.code.toByte() &&
+                        magic[3] == 'F'.code.toByte()
+                }
+            } catch (e: Exception) {
+                false
+            }
+        }
     }
 
     // Native methods
@@ -131,6 +148,14 @@ class LlamaEngine private constructor() {
         val modelFile = copyModelFromAssets(context, config.modelFileName, onProgressBytes)
         val targetName = modelFile.name
 
+        // Guard against truncated/placeholder files: a non-GGUF file makes the
+        // native loader fail with an opaque code (-1). Surface a clear message.
+        if (!isValidGguf(modelFile)) {
+            Log.e(TAG, "Model file is not a valid GGUF: ${modelFile.absolutePath} (${modelFile.length()} bytes)")
+            modelFile.delete()
+            return Result.failure(Exception("Model file is invalid"))
+        }
+
         if (isReady() && _loadedModelName == targetName) {
             return Result.success(Unit)
         }
@@ -160,8 +185,9 @@ class LlamaEngine private constructor() {
                 )
                 Result.success(Unit)
             } else {
+                Log.e(TAG, "initModel returned $result for $targetName")
                 _loadedModelName = null
-                Result.failure(Exception("Init failed: $result"))
+                Result.failure(Exception("Init failed"))
             }
         } catch (e: Exception) {
             _loadedModelName = null

@@ -71,6 +71,14 @@ fun SettingsScreen(
     val newProviderModel by viewModel.newProviderModel.collectAsStateWithLifecycle()
     val statusMessage by viewModel.statusMessage.collectAsStateWithLifecycle()
 
+    val userName by viewModel.userName.collectAsStateWithLifecycle()
+    val userAge by viewModel.userAge.collectAsStateWithLifecycle()
+    val userGender by viewModel.userGender.collectAsStateWithLifecycle()
+    val userRelationship by viewModel.userRelationship.collectAsStateWithLifecycle()
+    val userLikes by viewModel.userLikes.collectAsStateWithLifecycle()
+    val userDislikes by viewModel.userDislikes.collectAsStateWithLifecycle()
+    val userNotes by viewModel.userNotes.collectAsStateWithLifecycle()
+
     val activeLocalModel by viewModel.modelDownloadManager.activeModel.collectAsStateWithLifecycle()
     val downloadProgressMap by viewModel.modelDownloadManager.downloadProgress.collectAsStateWithLifecycle()
     val isLocalActive = providers.none { it.isEnabled }
@@ -130,6 +138,70 @@ fun SettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(14.dp),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 12.dp)
             ) {
+                // Section: About You — the companion uses this to know who it's talking to
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("About You", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                        Text(
+                            "Tell your companion who you are. It uses these details to address you and tailor its replies.",
+                            fontSize = 12.sp,
+                            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        androidx.compose.material3.OutlinedTextField(
+                            value = userName,
+                            onValueChange = { viewModel.userName.value = it },
+                            label = { Text("Your name") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        androidx.compose.material3.OutlinedTextField(
+                            value = userAge,
+                            onValueChange = { viewModel.userAge.value = it },
+                            label = { Text("Age") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        androidx.compose.material3.OutlinedTextField(
+                            value = userGender,
+                            onValueChange = { viewModel.userGender.value = it },
+                            label = { Text("Gender / pronouns") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        androidx.compose.material3.OutlinedTextField(
+                            value = userRelationship,
+                            onValueChange = { viewModel.userRelationship.value = it },
+                            label = { Text("Who are you to them? (friend, owner…)") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        androidx.compose.material3.OutlinedTextField(
+                            value = userLikes,
+                            onValueChange = { viewModel.userLikes.value = it },
+                            label = { Text("Likes") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        androidx.compose.material3.OutlinedTextField(
+                            value = userDislikes,
+                            onValueChange = { viewModel.userDislikes.value = it },
+                            label = { Text("Dislikes") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        androidx.compose.material3.OutlinedTextField(
+                            value = userNotes,
+                            onValueChange = { viewModel.userNotes.value = it },
+                            label = { Text("Anything else to remember") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        androidx.compose.material3.Button(
+                            onClick = { viewModel.saveUserProfile() },
+                            modifier = Modifier.align(Alignment.End)
+                        ) {
+                            Text("Save")
+                        }
+                    }
+                }
+
                 // Section: On-Device Models
                 item {
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {

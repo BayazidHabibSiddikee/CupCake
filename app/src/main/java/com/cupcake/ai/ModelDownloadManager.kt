@@ -58,15 +58,6 @@ class ModelDownloadManager @Inject constructor(
                 sizeBytes = 338_000_000L,
                 downloadUrl = null,
                 isBundled = true
-            ),
-            GgufModelInfo(
-                fileName = "bangla-smollm-135m-v3-q2_k.gguf",
-                displayName = "Bangla SmolLM 135M",
-                tag = "Custom • Bangla Native",
-                description = "Fine-tuned SmolLM 135M on Bangla/Banglish. Ultra-fast, tiny (~15 MB).",
-                sizeBytes = 15_000_000L,
-                downloadUrl = null,
-                isBundled = true
             )
         )
 

@@ -1,6 +1,5 @@
 package com.cupcake.ui.screen.chat
 
-import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -34,7 +33,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -47,7 +45,6 @@ import com.cupcake.ui.component.MessageInput
 import com.cupcake.ui.component.MessengerBlue
 import com.cupcake.ui.component.MessengerTypingBubble
 import com.cupcake.ui.theme.CupCakeTheme
-import coil.compose.AsyncImage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -62,7 +59,6 @@ fun ChatScreen(
     val currentResponse by viewModel.currentResponse.collectAsStateWithLifecycle()
     val currentCharacter by viewModel.currentCharacter.collectAsStateWithLifecycle()
     val modelLoadState by viewModel.modelLoadState.collectAsStateWithLifecycle()
-    val liveEmotionStem by viewModel.liveEmotionStem.collectAsStateWithLifecycle()
     val isModelLoading = modelLoadState is ChatViewModel.ModelLoadState.Loading
 
     var scrollToBottom by remember { mutableStateOf(false) }
@@ -145,31 +141,6 @@ fun ChatScreen(
                 }
             }
 
-            // Live 2D emotion face — morphs as the companion talks, mirrored to the ESP board
-            val displayStem = liveEmotionStem
-                ?: messages.lastOrNull { it.role == ChatMessage.MessageRole.ASSISTANT }
-                    ?.let { com.cupcake.ai.EmotionAssets.stemForText(it.content) }
-
-            if (!showVrm3dView && displayStem != null) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 4.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Crossfade(targetState = displayStem, label = "companion_face") { stem ->
-                        AsyncImage(
-                            model = com.cupcake.ai.EmotionAssets.assetForStem(stem),
-                            contentDescription = "Companion emotion: $stem",
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .size(120.dp)
-                                .clip(RoundedCornerShape(24.dp))
-                        )
-                    }
-                }
-            }
-
             // Load status without technical details
             when (val state = modelLoadState) {
                 is ChatViewModel.ModelLoadState.Loading -> {
@@ -190,7 +161,7 @@ fun ChatScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "⚠️ Ollama: ${state.message}",
+                            text = "⚠️ ${state.message}",
                             fontSize = 12.sp,
                             color = androidx.compose.material3.MaterialTheme.colorScheme.error,
                             modifier = Modifier.weight(1f)
@@ -254,16 +225,9 @@ fun ChatScreen(
                     }
                 ) { i ->
                     val message = messages[messages.lastIndex - i]
-                    val isAssistant = message.role == ChatMessage.MessageRole.ASSISTANT
-                    val emotionImage = if (isAssistant) {
-                        remember(message.content) {
-                            com.cupcake.ai.EmotionAssets.assetForText(message.content)
-                        }
-                    } else null
                     ChatMessageItem(
                         message = message,
-                        characterAvatar = currentCharacter?.avatar,
-                        emotionImage = emotionImage
+                        characterAvatar = currentCharacter?.avatar
                     )
                 }
             }

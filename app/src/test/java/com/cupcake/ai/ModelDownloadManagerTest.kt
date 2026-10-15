@@ -13,8 +13,8 @@ class ModelDownloadManagerTest {
     @Test
     fun `catalog model is preserved`() {
         assertEquals(
-            "bangla-smollm-135m-v3-q2_k.gguf",
-            ModelDownloadManager.resolveStoredActiveModel("bangla-smollm-135m-v3-q2_k.gguf")
+            ModelDownloadManager.DEFAULT_MODEL,
+            ModelDownloadManager.resolveStoredActiveModel(ModelDownloadManager.DEFAULT_MODEL)
         )
     }
 
