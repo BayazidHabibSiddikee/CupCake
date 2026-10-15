@@ -69,11 +69,11 @@ fun TicTacToe4x4BoardUI(
     ) {
         Text(
             text = when (state.status) {
-                com.cupcake.game.Game.GameStatus.PLAYING -> "Your turn (X) — 4 in a row to win!"
                 com.cupcake.game.Game.GameStatus.HUMAN_WON -> "You won! 🎉"
                 com.cupcake.game.Game.GameStatus.BOT_WON -> "Bot won! 🤖"
                 com.cupcake.game.Game.GameStatus.DRAW -> "Draw! 🤝"
                 com.cupcake.game.Game.GameStatus.CHEATING_DETECTED -> "Cheating detected! 😤"
+                else -> if (state.currentPlayer == com.cupcake.game.Game.Player.BOT) "Bot is thinking… 🤔" else "Your turn (X) — 4 in a row to win!"
             },
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
@@ -106,7 +106,9 @@ fun TicTacToe4x4BoardUI(
                                 value = board.get(pos)?.symbol ?: "",
                                 isWinningCell = isWinningCell4x4(board, pos, state.winner),
                                 onClick = {
-                                    if (state.status == com.cupcake.game.Game.GameStatus.PLAYING) {
+                                    if (state.status == com.cupcake.game.Game.GameStatus.PLAYING &&
+                                        state.currentPlayer == com.cupcake.game.Game.Player.HUMAN
+                                    ) {
                                         onCellClick(pos)
                                     }
                                 }
@@ -143,17 +145,17 @@ fun ConnectFourBoardUI(
     val botColor = Color(0xFFFDD835)
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            text = when (state.status) {
-                com.cupcake.game.Game.GameStatus.PLAYING -> "Your turn (🔴)"
-                com.cupcake.game.Game.GameStatus.HUMAN_WON -> "You connected 4! 🎉"
-                com.cupcake.game.Game.GameStatus.BOT_WON -> "Bot connected 4! 🤖"
-                com.cupcake.game.Game.GameStatus.DRAW -> "Board full — draw! 🤝"
-                else -> "Game Over"
+            text = when {
+                state.status == com.cupcake.game.Game.GameStatus.HUMAN_WON -> "You connected 4! 🎉"
+                state.status == com.cupcake.game.Game.GameStatus.BOT_WON -> "Bot connected 4! 🤖"
+                state.status == com.cupcake.game.Game.GameStatus.DRAW -> "Board full — draw! 🤝"
+                state.currentPlayer == com.cupcake.game.Game.Player.BOT -> "Bot is thinking… 🤔"
+                else -> "Your turn (🔴)"
             },
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
@@ -181,7 +183,9 @@ fun ConnectFourBoardUI(
                         val cell = board.get(row * 7 + col)
                         androidx.compose.material3.Surface(
                             onClick = {
-                                if (state.status == com.cupcake.game.Game.GameStatus.PLAYING) {
+                                if (state.status == com.cupcake.game.Game.GameStatus.PLAYING &&
+                                    state.currentPlayer == com.cupcake.game.Game.Player.HUMAN
+                                ) {
                                     onColumnClick(col)
                                 }
                             },

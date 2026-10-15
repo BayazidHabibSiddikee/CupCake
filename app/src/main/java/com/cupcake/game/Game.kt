@@ -57,10 +57,13 @@ sealed interface Game {
     }
 
     // Tic Tac Toe Board
-    data class TicTacToeBoard(
-        override val size: Int = 9,
+    // NOTE: plain class (not data class) so copy() can deep-copy the backing
+    // array. A data class would share `cells` across copies and every
+    // look-ahead (minimax, cheating-mind simulation) would corrupt the live board.
+    class TicTacToeBoard(
         val cells: Array<Player?> = Array(9) { null }
     ) : Board {
+        override val size: Int = 9
         override fun get(position: Int): Player? = cells[position]
         override fun set(position: Int, player: Player): Boolean {
             if (position in 0..8 && cells[position] == null) {
@@ -70,6 +73,15 @@ sealed interface Game {
             return false
         }
         override fun isFull(): Boolean = cells.none { it == null }
+
+        /** Independent copy: mutating the returned board never touches this one. */
+        fun copy(): TicTacToeBoard = TicTacToeBoard(cells.copyOf())
+
+        override fun equals(other: Any?): Boolean =
+            other is TicTacToeBoard && cells.contentEquals(other.cells)
+        override fun hashCode(): Int = cells.contentHashCode()
+        override fun toString(): String =
+            "TicTacToeBoard(${cells.joinToString("") { it?.symbol ?: "." }})"
     }
 
     // Rock Paper Scissors Board
@@ -214,12 +226,13 @@ sealed interface Game {
     }
 
     // Connect Four Board
-    data class ConnectFourBoard(
-        override val size: Int = 42,
+    // Plain class so look-ahead simulations get a genuinely independent grid.
+    class ConnectFourBoard(
         private val grid: Array<Player?> = Array(42) { null },
         var currentPlayer: Player = Player.HUMAN,
         var winner: Player? = null
     ) : Board {
+        override val size: Int = 42
         override fun get(position: Int): Player? = grid[position]
         override fun set(position: Int, player: Player): Boolean {
             if (position in 0..41 && grid[position] == null) {
@@ -229,6 +242,14 @@ sealed interface Game {
             return false
         }
         override fun isFull(): Boolean = grid.none { it == null } || winner != null
+
+        /** Independent copy: mutating the returned board never touches this one. */
+        fun copy(): ConnectFourBoard =
+            ConnectFourBoard(grid.copyOf(), currentPlayer, winner)
+
+        override fun equals(other: Any?): Boolean =
+            other is ConnectFourBoard && grid.contentEquals(other.grid)
+        override fun hashCode(): Int = grid.contentHashCode()
     }
 
     // Mastermind Board
@@ -251,10 +272,11 @@ sealed interface Game {
     }
 
     // 4x4 Tic Tac Toe Board
-    data class TicTacToe4x4Board(
-        override val size: Int = 16,
+    // Plain class so look-ahead simulations get a genuinely independent array.
+    class TicTacToe4x4Board(
         val cells: Array<Player?> = Array(16) { null }
     ) : Board {
+        override val size: Int = 16
         override fun get(position: Int): Player? = cells[position]
         override fun set(position: Int, player: Player): Boolean {
             if (position in 0..15 && cells[position] == null) {
@@ -264,5 +286,14 @@ sealed interface Game {
             return false
         }
         override fun isFull(): Boolean = cells.none { it == null }
+
+        /** Independent copy: mutating the returned board never touches this one. */
+        fun copy(): TicTacToe4x4Board = TicTacToe4x4Board(cells.copyOf())
+
+        override fun equals(other: Any?): Boolean =
+            other is TicTacToe4x4Board && cells.contentEquals(other.cells)
+        override fun hashCode(): Int = cells.contentHashCode()
+        override fun toString(): String =
+            "TicTacToe4x4Board(${cells.joinToString("") { it?.symbol ?: "." }})"
     }
 }

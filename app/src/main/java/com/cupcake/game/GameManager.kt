@@ -68,7 +68,6 @@ class GameManager(
 
     // ML Models for different games
     private val ticTacToeML = BotMLModel()
-    private val connectFourML = ConnectFourMLModel()
     private val ticTacToe4x4ML = TicTacToe4x4MLModel()
     
     // Jealousy tracker (shared across all games)
@@ -85,6 +84,10 @@ class GameManager(
         difficulty = diff
         cheatMode = (diff == TicTacToeEngine.Difficulty.CHEATING)
         pendingMemoryUnflip = null
+
+        if (type == Game.GameType.ROCK_PAPER_SCISSORS) {
+            RockPaperScissorsEngine.reset()
+        }
 
         currentGame = when (type) {
             Game.GameType.TIC_TAC_TOE -> Game.State(
@@ -227,7 +230,7 @@ class GameManager(
 
         if (game.gameType == Game.GameType.ROCK_PAPER_SCISSORS) {
             val board = game.board as? Game.RpsBoard ?: return Result(false, "Invalid board")
-            val botMove = RockPaperScissorsEngine.getBotMove()
+            val botMove = RockPaperScissorsEngine.getBotMove(position)
             val winner = RockPaperScissorsEngine.getWinner(position, botMove)
             
             val newBoard = board.copy() as Game.RpsBoard
@@ -518,60 +521,61 @@ class GameManager(
             val movePos = row * 7 + col
             if (!board.set(movePos, Game.Player.HUMAN)) return Result(false, "Invalid move")
 
-            val newMove = Game.Move(Game.Player.HUMAN, movePos)
-            val newHistory = game.moveHistory + newMove
-
             val winner = ConnectFourEngine.checkWinner(board)
             var newStatus = Game.GameStatus.PLAYING
             var gameWinner: Game.Player? = null
+            var newHistory = game.moveHistory + Game.Move(Game.Player.HUMAN, movePos)
 
             if (winner != null) {
                 newStatus = if (winner == Game.Player.HUMAN) Game.GameStatus.HUMAN_WON else Game.GameStatus.BOT_WON
                 gameWinner = winner
                 triggerReaction(winner == Game.Player.HUMAN)
                 awardGamePoints(game.gameType, winner == Game.Player.HUMAN, if (winner == Game.Player.HUMAN) 300 else 50)
-                // Record game result for jealousy tracking
-                jealousyTracker.recordGameResult(false, game.gameType!!)
-            } else if (board.isFull()) {
+                jealousyTracker.recordGameResult(winner == Game.Player.HUMAN, game.gameType!!)
+                currentGame = game.copy(
+                    board = board,
+                    currentPlayer = Game.Player.HUMAN,
+                    status = newStatus,
+                    winner = gameWinner,
+                    moveHistory = newHistory
+                )
+                onGameStateChanged?.invoke(currentGame)
+                return Result(true, "Dropped in column ${col + 1}", currentGame)
+            }
+
+            if (board.isFull()) {
                 newStatus = Game.GameStatus.DRAW
                 triggerReaction(false, isDraw = true)
                 awardGamePoints(game.gameType, false, 100)
                 jealousyTracker.recordGameResult(false, game.gameType!!) // Draw counts as not player win
-            } else {
-                // Bot's turn - use ML model with jealousy
-                val availableMoves = (0..6).filter { col ->
-                    var r = 5
-                    while (r >= 0 && board.get(r * 7 + col) != null) r--
-                    r >= 0
-                }
-                val botMove = connectFourML.chooseAction(board, availableMoves, jealousyTracker.getJealousyLevel())
-                if (botMove >= 0) {
-                    board.set(botMove, Game.Player.BOT)
-                    val botMoveObj = Game.Move(Game.Player.BOT, botMove)
-                    val botWinner = ConnectFourEngine.checkWinner(board)
-                    if (botWinner != null) {
-                        newStatus = if (botWinner == Game.Player.HUMAN) Game.GameStatus.HUMAN_WON else Game.GameStatus.BOT_WON
-                        gameWinner = botWinner
-                        triggerReaction(botWinner == Game.Player.HUMAN)
-                        awardGamePoints(game.gameType, botWinner == Game.Player.HUMAN, if (botWinner == Game.Player.HUMAN) 300 else 50)
-                        jealousyTracker.recordGameResult(true, game.gameType!!)
-                    } else if (board.isFull()) {
-                        newStatus = Game.GameStatus.DRAW
-                        triggerReaction(false, isDraw = true)
-                        awardGamePoints(game.gameType, false, 100)
-                        jealousyTracker.recordGameResult(false, game.gameType!!)
-                    }
-                }
+                currentGame = game.copy(
+                    board = board,
+                    currentPlayer = Game.Player.HUMAN,
+                    status = newStatus,
+                    winner = gameWinner,
+                    moveHistory = newHistory
+                )
+                onGameStateChanged?.invoke(currentGame)
+                return Result(true, "Dropped in column ${col + 1}", currentGame)
             }
 
+            // Human move stands; bot answers after a short "thinking" delay so it
+            // feels like a real opponent rather than an instant computer reply.
             currentGame = game.copy(
                 board = board,
-                currentPlayer = Game.Player.HUMAN,
-                status = newStatus,
-                winner = gameWinner,
+                currentPlayer = Game.Player.BOT,
+                status = Game.GameStatus.PLAYING,
                 moveHistory = newHistory
             )
             onGameStateChanged?.invoke(currentGame)
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    kotlinx.coroutines.delay(500)
+                    makeBotMoveConnectFour()
+                } catch (e: Exception) {
+                    android.util.Log.e("GameManager", "Connect Four bot move failed", e)
+                }
+            }
             return Result(true, "Dropped in column ${col + 1}", currentGame)
         }
 
@@ -854,23 +858,16 @@ class GameManager(
         // Use ML model with adaptive difficulty based on jealousy
         val adaptiveDifficulty = ticTacToeML.getAdaptiveDifficulty(difficulty)
         val availableMoves = (0..8).filter { board.get(it) == null }
-        
+        if (availableMoves.isEmpty()) return
+
         // Check if cheating mind wants to cheat
         val mlCheat = if (ticTacToeML.isCheatingEnabled()) ticTacToeML.executeCheat(board, availableMoves) else null
-        
-        val move = if (cheatMode) {
-            TicTacToeEngine.getCheatingMove(board)
-        } else if (mlCheat != null) {
-            mlCheat
-        } else if (availableMoves.isNotEmpty()) {
-            // Use ML model with jealousy-based exploration
-            val chosen = ticTacToeML.chooseAction(board, availableMoves)
-            if (chosen >= 0) {
-                ticTacToeML.learnFromGame(board, chosen, false) // Assume bot perspective
-            }
-            chosen
-        } else {
-            -1
+
+        val move = when {
+            cheatMode -> TicTacToeEngine.getCheatingMove(board)
+            mlCheat != null -> mlCheat
+            // Real opponent: perfect minimax on HARD/CHEATING, heuristic below that.
+            else -> TicTacToeEngine.getBestMove(board, adaptiveDifficulty)
         }
 
         if (move >= 0 && board.set(move, Game.Player.BOT)) {
@@ -928,12 +925,10 @@ class GameManager(
         // Check if cheating mind wants to cheat
         val mlCheat = if (ticTacToe4x4ML.isCheatingEnabled()) ticTacToe4x4ML.executeCheat(board, availableMoves) else null
         
-        val move = if (mlCheat != null) {
-            mlCheat
-        } else if (availableMoves.isNotEmpty()) {
-            ticTacToe4x4ML.chooseAction(board, availableMoves, jealousyTracker.getJealousyLevel())
-        } else {
-            -1
+        val move = when {
+            mlCheat != null -> mlCheat
+            availableMoves.isNotEmpty() -> TicTacToe4x4Engine.getBestMove(board, difficulty)
+            else -> -1
         }
 
         if (move >= 0 && board.set(move, Game.Player.BOT)) {
@@ -965,6 +960,51 @@ class GameManager(
             if (currentGame?.status == Game.GameStatus.PLAYING) {
                 currentGame?.let { notifyLLMMove(game.gameType, "bot", move, it) }
             }
+        }
+    }
+
+    private fun makeBotMoveConnectFour() {
+        val game = currentGame ?: return
+        val board = game.board as? Game.ConnectFourBoard ?: return
+        if (board.isFull() || ConnectFourEngine.checkWinner(board) != null) return
+
+        // The engine returns a drop position (row * 7 + col).
+        val move = ConnectFourEngine.getBestMove(board, difficulty)
+        if (move < 0 || !board.set(move, Game.Player.BOT)) return
+
+        val newMove = Game.Move(Game.Player.BOT, move)
+        val newHistory = game.moveHistory + newMove
+        val winner = ConnectFourEngine.checkWinner(board)
+
+        when {
+            winner != null -> {
+                currentGame = game.copy(
+                    board = board,
+                    currentPlayer = Game.Player.HUMAN,
+                    status = if (winner == Game.Player.HUMAN) Game.GameStatus.HUMAN_WON else Game.GameStatus.BOT_WON,
+                    winner = winner,
+                    moveHistory = newHistory
+                )
+                triggerReaction(winner == Game.Player.HUMAN)
+                awardGamePoints(game.gameType, winner == Game.Player.HUMAN, if (winner == Game.Player.HUMAN) 300 else 50)
+                jealousyTracker.recordGameResult(winner == Game.Player.HUMAN, game.gameType!!)
+            }
+            board.isFull() -> {
+                currentGame = game.copy(
+                    board = board,
+                    currentPlayer = Game.Player.HUMAN,
+                    status = Game.GameStatus.DRAW,
+                    moveHistory = newHistory
+                )
+                triggerReaction(false, isDraw = true)
+                awardGamePoints(game.gameType, false, 100)
+                jealousyTracker.recordGameResult(false, game.gameType!!)
+            }
+            else -> currentGame = game.copy(board = board, currentPlayer = Game.Player.HUMAN, moveHistory = newHistory)
+        }
+        onGameStateChanged?.invoke(currentGame)
+        if (currentGame?.status == Game.GameStatus.PLAYING) {
+            currentGame?.let { notifyLLMMove(game.gameType, "bot", move, it) }
         }
     }
 
@@ -1032,12 +1072,14 @@ class GameManager(
         val anger = jealousyTracker.getAngerLevel()
 
         val moveDesc = describeMove(gameType, player, position, gameState, detail)
+        val boardDesc = describeBoard(gameState)
 
         val prompt = if (player == "bot") {
             // Marin is announcing HER OWN move — first-person, playful
             """
                 Game: ${gameType.name}
                 You ($characterName) just played: $moveDesc
+                Board: $boardDesc
                 Bot wins: ${jealousyTracker.getBotWins()}, Player wins: ${jealousyTracker.getPlayerWins()}
                 Mood: ${mood.name}
                 
@@ -1052,7 +1094,8 @@ class GameManager(
             // Reacting to the player's move
             """
                 Game: ${gameType.name}
-                Player just moved: $moveDesc
+                Player: $player $moveDesc
+                Board: $boardDesc
                 Mood: ${mood.name} (Jealousy: ${(jealousy * 100).toInt()}%, Anger: ${(anger * 100).toInt()}%)
                 
                 React to this move as $characterName. Be ${when {
@@ -1291,4 +1334,40 @@ internal fun describeMove(
     Game.GameType.REACTION_TIME -> "tapped (reaction round)"
     Game.GameType.CONNECT_FOUR -> "dropped a disc in column ${position % 7 + 1}"
     Game.GameType.MASTERMIND -> "guessed ${detail ?: position}"
+}
+
+/**
+ * Compact, human-readable snapshot of the live board for the bot's prompt.
+ * The bot has no memory of the board, so every move message carries the full
+ * position — otherwise it reacts to moves it cannot actually see.
+ */
+internal fun describeBoard(gameState: Game.State): String = when (val board = gameState.board) {
+    is Game.GuessNumberBoard ->
+        "guesses=${board.guesses}"
+    is Game.TicTacToeBoard ->
+        board.cells.joinToString("") { it?.symbol ?: "." }
+    is Game.TicTacToe4x4Board ->
+        "[" + (0..3).joinToString("/") { r -> (0..3).joinToString("") { c -> board.get(r * 4 + c)?.symbol ?: "." } } + "]"
+    is Game.ConnectFourBoard ->
+        "[" + (0..5).joinToString("/") { r -> (0..6).joinToString("") { c -> board.get(r * 7 + c)?.symbol ?: "." } } + "]"
+    is Game.MemoryMatchBoard ->
+        "pairs=${board.matchedPairs.size}/${board.pairs} moves=${board.moves}"
+    is Game.HangmanBoard ->
+        "${board.getDisplayWord()} (misses ${board.wrongGuesses}/${board.maxWrongGuesses})"
+    is Game.WordScrambleBoard ->
+        "scrambled=\"${board.scrambledWord}\" attempts=${board.attempts}/${board.maxAttempts}"
+    is Game.NumberBaseBoard ->
+        board.currentQuestion?.let { "convert ${it.number} from base ${it.fromBase} to base ${it.toBase}" } ?: "finished"
+    is Game.MastermindBoard ->
+        if (board.guesses.isEmpty()) "no guesses yet"
+        else board.guesses.takeLast(3).joinToString("; ") { "${it.guess}=>exact${it.exactMatches},color${it.colorMatches}" }
+    is Game.ReactionTimeBoard ->
+        "rounds=${board.rounds.size}"
+    is Game.MathQuizBoard ->
+        board.currentQuestion?.let { "${it.expression} = ?" } ?: "finished"
+    is Game.RpsBoard ->
+        "human=${board.humanChoice ?: "-"} bot=${board.botChoice ?: "-"}"
+    is Game.ClickerBoard ->
+        "score=${board.score}"
+    else -> ""
 }

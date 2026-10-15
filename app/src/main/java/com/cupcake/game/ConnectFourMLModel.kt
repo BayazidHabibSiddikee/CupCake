@@ -81,7 +81,7 @@ class ConnectFourMLModel {
             var row = 5
             while (row >= 0 && board.get(row * 7 + col) != null) row--
             if (row >= 0) {
-                val testBoard = board.copy() as Game.ConnectFourBoard
+                val testBoard = board.copy()
                 testBoard.set(row * 7 + col, Game.Player.HUMAN)
                 if (ConnectFourEngine.checkWinner(testBoard) == Game.Player.HUMAN) {
                     return row * 7 + col

@@ -84,7 +84,7 @@ object TicTacToeEngine {
                 val results = mutableListOf<MinimaxResult>()
                 for (i in 0..8) {
                     if (board.get(i) == null) {
-                        val newBoard = board.copy() as Game.TicTacToeBoard
+                        val newBoard = board.copy()
                         newBoard.set(i, player)
                         val nextPlayer = if (player == Game.Player.BOT) Game.Player.HUMAN else Game.Player.BOT
                         results.add(minimax(newBoard, nextPlayer).copy(position = i))
@@ -100,8 +100,57 @@ object TicTacToeEngine {
 }
 
 object RockPaperScissorsEngine {
-    fun getBotMove(): Int = (0..2).random()
     // 0: Rock, 1: Paper, 2: Scissors
+    // A move that beats the given move.
+    private val BEATS = mapOf(0 to 1, 1 to 2, 2 to 0)
+
+    private val transitionCounts = HashMap<Pair<Int, Int>, Int>()
+    private var lastOpponentMove: Int? = null
+    private var rounds = 0
+    private val random = kotlin.random.Random
+
+    /** Call when a fresh game starts so the opponent forgets old patterns. */
+    fun reset() {
+        transitionCounts.clear()
+        lastOpponentMove = null
+        rounds = 0
+    }
+
+    /**
+     * Pattern-learning opponent: predicts the player's next move from how they
+     * followed their previous move, then plays the counter to that prediction.
+     * Falls back to randomness early on so it never looks like a cheat bot.
+     */
+    fun getBotMove(opponentMove: Int): Int {
+        val predicted = predictNext(opponentMove)
+        // Record the observed transition for future predictions.
+        val previous = lastOpponentMove
+        if (previous != null) {
+            val key = previous to opponentMove
+            transitionCounts[key] = (transitionCounts[key] ?: 0) + 1
+        }
+        lastOpponentMove = opponentMove
+        rounds++
+
+        if (predicted == null || rounds < 3 || random.nextDouble() < 0.20) {
+            return random.nextInt(3)
+        }
+        return BEATS[predicted] ?: random.nextInt(3)
+    }
+
+    private fun predictNext(opponentMove: Int): Int? {
+        // Most common move the player made after previously playing opponentMove.
+        val candidates = transitionCounts.entries
+            .filter { it.key.first == opponentMove }
+            .maxByOrNull { it.value }
+        if (candidates != null) return candidates.key.second
+        // No data for this state yet: assume they repeat their last move.
+        return if (lastOpponentMove != null) opponentMove else null
+    }
+
+    /** Kept for backwards compatibility / tests: purely random choice. */
+    fun getBotMove(): Int = random.nextInt(3)
+
     fun getWinner(human: Int, bot: Int): Game.Player? {
         if (human == bot) return null
         return if ((human == 0 && bot == 2) || (human == 1 && bot == 0) || (human == 2 && bot == 1)) {
@@ -435,35 +484,137 @@ object ConnectFourEngine {
     fun getValidMoves(board: Game.ConnectFourBoard): List<Int> {
         val moves = mutableListOf<Int>()
         for (col in 0..COLS-1) {
-            for (row in ROWS-1 downTo 0) {
-                val pos = row * COLS + col
-                if (board.get(pos) == null) {
-                    moves.add(pos)
-                    break
-                }
-            }
+            val pos = dropPosition(board, col)
+            if (pos >= 0) moves.add(pos)
         }
         return moves
     }
 
+    /** Lowest empty cell of [col] as a board position, or -1 when the column is full. */
+    private fun dropPosition(board: Game.ConnectFourBoard, col: Int): Int {
+        for (row in ROWS - 1 downTo 0) {
+            val pos = row * COLS + col
+            if (board.get(pos) == null) return pos
+        }
+        return -1
+    }
+
+    /** Column index (0..6) for a board position. */
+    private fun columnOf(position: Int): Int = position % COLS
+
     fun getBestMove(board: Game.ConnectFourBoard): Int {
         val validMoves = getValidMoves(board)
+        if (validMoves.isEmpty()) return -1
         // Try to win
         for (move in validMoves) {
-            val testBoard = board.copy() as Game.ConnectFourBoard
+            val testBoard = board.copy()
             testBoard.set(move, Game.Player.BOT)
             if (checkWinner(testBoard) == Game.Player.BOT) return move
         }
         // Block human
         for (move in validMoves) {
-            val testBoard = board.copy() as Game.ConnectFourBoard
+            val testBoard = board.copy()
             testBoard.set(move, Game.Player.HUMAN)
             if (checkWinner(testBoard) == Game.Player.HUMAN) return move
         }
         // Prefer center columns
-        val centerMoves = validMoves.filter { it % COLS in 2..4 }
+        val centerMoves = validMoves.filter { columnOf(it) in 2..4 }
         if (centerMoves.isNotEmpty()) return centerMoves.random()
-        return validMoves.randomOrNull() ?: -1
+        return validMoves.random()
+    }
+
+    /**
+     * Difficulty-aware move. EASY is random, NORMAL is the fast win/block
+     * heuristic, HARD/CHEATING searches several plies ahead with alpha-beta.
+     */
+    fun getBestMove(board: Game.ConnectFourBoard, difficulty: TicTacToeEngine.Difficulty): Int {
+        return when (difficulty) {
+            TicTacToeEngine.Difficulty.EASY -> getValidMoves(board).randomOrNull() ?: -1
+            TicTacToeEngine.Difficulty.NORMAL -> getBestMove(board)
+            TicTacToeEngine.Difficulty.HARD,
+            TicTacToeEngine.Difficulty.CHEATING -> getSearchMove(board, depth = 5)
+        }
+    }
+
+    private fun getSearchMove(board: Game.ConnectFourBoard, depth: Int): Int {
+        var bestScore = Int.MIN_VALUE
+        var bestMove = -1
+        // Search center-out so equal-scoring moves prefer the middle.
+        val ordered = getValidMoves(board).sortedBy { kotlin.math.abs(3 - columnOf(it)) }
+        for (move in ordered) {
+            val next = board.copy()
+            next.set(move, Game.Player.BOT)
+            if (checkWinner(next) == Game.Player.BOT) return move
+            val score = minimax(next, depth - 1, Game.Player.HUMAN, Int.MIN_VALUE, Int.MAX_VALUE)
+            if (score > bestScore) {
+                bestScore = score
+                bestMove = move
+            }
+        }
+        return if (bestMove >= 0) bestMove else getValidMoves(board).randomOrNull() ?: -1
+    }
+
+    private fun minimax(
+        board: Game.ConnectFourBoard,
+        depth: Int,
+        toMove: Game.Player,
+        alphaIn: Int,
+        betaIn: Int
+    ): Int {
+        val winner = checkWinner(board)
+        if (winner == Game.Player.BOT) return 1_000_000 + depth
+        if (winner == Game.Player.HUMAN) return -1_000_000 - depth
+        if (depth == 0 || getValidMoves(board).isEmpty()) return evaluate(board)
+
+        var alpha = alphaIn
+        var beta = betaIn
+        if (toMove == Game.Player.BOT) {
+            var best = Int.MIN_VALUE
+            for (move in getValidMoves(board).sortedBy { kotlin.math.abs(3 - columnOf(it)) }) {
+                val next = board.copy()
+                next.set(move, Game.Player.BOT)
+                best = maxOf(best, minimax(next, depth - 1, Game.Player.HUMAN, alpha, beta))
+                alpha = maxOf(alpha, best)
+                if (beta <= alpha) break
+            }
+            return best
+        }
+        var best = Int.MAX_VALUE
+        for (move in getValidMoves(board).sortedBy { kotlin.math.abs(3 - columnOf(it)) }) {
+            val next = board.copy()
+            next.set(move, Game.Player.HUMAN)
+            best = minOf(best, minimax(next, depth - 1, Game.Player.BOT, alpha, beta))
+            beta = minOf(beta, best)
+            if (beta <= alpha) break
+        }
+        return best
+    }
+
+    /** Scores every 4-window from the bot's perspective. */
+    private fun evaluate(board: Game.ConnectFourBoard): Int {
+        var score = 0
+        for (line in WIN_LINES) {
+            var bot = 0
+            var human = 0
+            for (pos in line) {
+                when (board.get(pos)) {
+                    Game.Player.BOT -> bot++
+                    Game.Player.HUMAN -> human++
+                    else -> {}
+                }
+            }
+            if (bot > 0 && human > 0) continue // blocked window
+            score += when {
+                bot == 3 -> 50
+                bot == 2 -> 10
+                bot == 1 -> 1
+                human == 3 -> -50
+                human == 2 -> -10
+                human == 1 -> -1
+                else -> 0
+            }
+        }
+        return score
     }
 }
 
@@ -539,13 +690,13 @@ object TicTacToe4x4Engine {
         val empty = (0..15).filter { board.get(it) == null }
         // Try to win
         for (move in empty) {
-            val testBoard = board.copy() as Game.TicTacToe4x4Board
+            val testBoard = board.copy()
             testBoard.set(move, Game.Player.BOT)
             if (checkWinner(testBoard) == Game.Player.BOT) return move
         }
         // Block human
         for (move in empty) {
-            val testBoard = board.copy() as Game.TicTacToe4x4Board
+            val testBoard = board.copy()
             testBoard.set(move, Game.Player.HUMAN)
             if (checkWinner(testBoard) == Game.Player.HUMAN) return move
         }
@@ -556,5 +707,70 @@ object TicTacToe4x4Engine {
         val corners = listOf(0, 3, 12, 15).filter { board.get(it) == null }
         if (corners.isNotEmpty()) return corners.random()
         return empty.randomOrNull() ?: -1
+    }
+
+    /**
+     * Difficulty-aware move. EASY plays randomly, NORMAL uses the fast
+     * win/block/center heuristic, HARD/CHEATING searches a few plies deep.
+     */
+    fun getBestMove(board: Game.TicTacToe4x4Board, difficulty: TicTacToeEngine.Difficulty): Int {
+        return when (difficulty) {
+            TicTacToeEngine.Difficulty.EASY -> (0..15).filter { board.get(it) == null }.randomOrNull() ?: -1
+            TicTacToeEngine.Difficulty.NORMAL -> getBestMove(board)
+            TicTacToeEngine.Difficulty.HARD,
+            TicTacToeEngine.Difficulty.CHEATING -> getSearchMove(board, depth = 4)
+        }
+    }
+
+    /** Depth-limited alpha-beta search; depth 4 keeps it responsive on device. */
+    private fun getSearchMove(board: Game.TicTacToe4x4Board, depth: Int): Int {
+        var bestScore = Int.MIN_VALUE
+        var bestMove = -1
+        for (move in (0..15).filter { board.get(it) == null }) {
+            val next = board.copy()
+            next.set(move, Game.Player.BOT)
+            val score = minimax4x4(next, depth - 1, Game.Player.HUMAN, Int.MIN_VALUE, Int.MAX_VALUE)
+            if (score > bestScore) {
+                bestScore = score
+                bestMove = move
+            }
+        }
+        return if (bestMove >= 0) bestMove else (0..15).firstOrNull { board.get(it) == null } ?: -1
+    }
+
+    private fun minimax4x4(
+        board: Game.TicTacToe4x4Board,
+        depth: Int,
+        toMove: Game.Player,
+        alphaIn: Int,
+        betaIn: Int
+    ): Int {
+        val winner = checkWinner(board)
+        if (winner == Game.Player.BOT) return 1000 + depth
+        if (winner == Game.Player.HUMAN) return -1000 - depth
+        if (board.isFull() || depth == 0) return 0
+
+        var alpha = alphaIn
+        var beta = betaIn
+        if (toMove == Game.Player.BOT) {
+            var best = Int.MIN_VALUE
+            for (move in (0..15).filter { board.get(it) == null }) {
+                val next = board.copy()
+                next.set(move, Game.Player.BOT)
+                best = maxOf(best, minimax4x4(next, depth - 1, Game.Player.HUMAN, alpha, beta))
+                alpha = maxOf(alpha, best)
+                if (beta <= alpha) break
+            }
+            return best
+        }
+        var best = Int.MAX_VALUE
+        for (move in (0..15).filter { board.get(it) == null }) {
+            val next = board.copy()
+            next.set(move, Game.Player.HUMAN)
+            best = minOf(best, minimax4x4(next, depth - 1, Game.Player.BOT, alpha, beta))
+            beta = minOf(beta, best)
+            if (beta <= alpha) break
+        }
+        return best
     }
 }

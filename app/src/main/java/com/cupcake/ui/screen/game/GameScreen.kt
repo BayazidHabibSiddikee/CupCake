@@ -63,7 +63,6 @@ fun GameScreen(
 ) {
     val gameState by viewModel.gameState.collectAsStateWithLifecycle()
     val availableGames by viewModel.availableGames.collectAsStateWithLifecycle()
-    val showGameSelector by viewModel.showGameSelector.collectAsStateWithLifecycle()
     val selectedDifficulty by viewModel.selectedDifficulty.collectAsStateWithLifecycle()
     val botComment by viewModel.botComment.collectAsStateWithLifecycle()
 
@@ -417,11 +416,11 @@ fun TicTacToeBoard(
         // Status
         Text(
             text = when (state.status) {
-                com.cupcake.game.Game.GameStatus.PLAYING -> "Your turn (X)"
                 com.cupcake.game.Game.GameStatus.HUMAN_WON -> "You won! 🎉"
                 com.cupcake.game.Game.GameStatus.BOT_WON -> "Bot won! 🤖"
                 com.cupcake.game.Game.GameStatus.DRAW -> "Draw! 🤝"
                 com.cupcake.game.Game.GameStatus.CHEATING_DETECTED -> "Cheating detected! 😤"
+                else -> if (state.currentPlayer == com.cupcake.game.Game.Player.BOT) "Bot is thinking… 🤔" else "Your turn (X)"
             },
             fontSize = 22.sp,
             fontWeight = FontWeight.Bold,
@@ -456,7 +455,9 @@ fun TicTacToeBoard(
                                 value = cell?.symbol ?: "",
                                 isWinningCell = isWinningCell(board, pos, state.winner),
                                 onClick = { 
-                                    if (state.status == com.cupcake.game.Game.GameStatus.PLAYING) {
+                                    if (state.status == com.cupcake.game.Game.GameStatus.PLAYING &&
+                                        state.currentPlayer == com.cupcake.game.Game.Player.HUMAN
+                                    ) {
                                         onCellClick(pos)
                                     }
                                 }
@@ -584,10 +585,9 @@ fun GuessNumberBoardUI(
     onRestart: () -> Unit
 ) {
     val board = state.board as? com.cupcake.game.Game.GuessNumberBoard ?: return
-    var currentGuess by remember { mutableStateOf(0) }
-    
+
     Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {

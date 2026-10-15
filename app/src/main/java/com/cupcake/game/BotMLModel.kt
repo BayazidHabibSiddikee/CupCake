@@ -179,7 +179,7 @@ class BotMLModel {
         val blockMove = occupyWinningSpot(board)
         if (blockMove != null) return blockMove
         for (move in availableMoves) {
-            val testBoard = board.copy() as Game.TicTacToeBoard
+            val testBoard = board.copy()
             testBoard.set(move, Game.Player.BOT)
             val winningLines = TicTacToeEngine.WIN_LINES.count { line -> val cells = line.map { testBoard.get(it) }; cells.count { it == Game.Player.BOT } == 2 && cells.count { it == null } == 1 }
             if (winningLines >= 2) return move
@@ -207,12 +207,12 @@ class BotMLModel {
 
     fun fakeMistake(board: Game.TicTacToeBoard, availableMoves: List<Int>): Int? {
         for (move in availableMoves) {
-            val testBoard = board.copy() as Game.TicTacToeBoard
+            val testBoard = board.copy()
             testBoard.set(move, Game.Player.BOT)
             val nextAvailable = (0..8).filter { testBoard.get(it) == null }
             var forkCount = 0
             for (nextMove in nextAvailable) {
-                val testBoard2 = testBoard.copy() as Game.TicTacToeBoard
+                val testBoard2 = testBoard.copy()
                 testBoard2.set(nextMove, Game.Player.BOT)
                 if (TicTacToeEngine.checkWinner(testBoard2) == Game.Player.BOT) forkCount++
             }

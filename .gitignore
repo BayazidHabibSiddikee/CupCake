@@ -67,3 +67,7 @@ training/outputs/*.gguf
 training/outputs/*-merged/
 training/outputs/*-original/
 training/outputs/*-v3/
+
+# Training artifacts (large models/outputs)
+training/outputs/
+training/models/
