@@ -3,6 +3,7 @@ package com.cupcake.di
 import android.content.Context
 import com.cupcake.ai.CharacterManager
 import com.cupcake.ai.EnergyManager
+import com.cupcake.ai.LlamaEngine
 import com.cupcake.ai.OllamaEngine
 import com.cupcake.data.source.local.AppDatabase
 import com.cupcake.data.source.remote.ApiClient
@@ -59,6 +60,13 @@ object AppModule {
     @Singleton
     fun provideEnergyManager(@dagger.hilt.android.qualifiers.ApplicationContext context: Context): EnergyManager {
         return EnergyManager(context)
+    }
+
+    @Provides
+    @Singleton
+    fun provideLlamaEngine(@dagger.hilt.android.qualifiers.ApplicationContext context: Context): LlamaEngine {
+        LlamaEngine.initialize(context)
+        return LlamaEngine.getInstance()
     }
 
     @Provides

@@ -1,0 +1,23 @@
+base_model: "Qwen/Qwen2.5-0.5B-Instruct"
+output_dir: "training/outputs/liltii-v0.2-small-lora"
+max_seq_length: 2048
+
+lora_r: 8
+lora_alpha: 16
+lora_dropout: 0.05
+target_modules:
+  - "q_proj"
+  - "k_proj"
+  - "v_proj"
+  - "o_proj"
+
+train_batch_size: 4
+gradient_accumulation_steps: 4
+learning_rate: 2e-4
+num_train_epochs: 3
+
+dataset:
+  train: "training/dataset/train.jsonl"
+  val: "training/dataset/val.jsonl"
+  multiturn_train: "training/dataset/multiturn_train.jsonl"
+  multiturn_val: "training/dataset/multiturn_val.jsonl"

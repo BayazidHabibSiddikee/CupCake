@@ -47,17 +47,35 @@ class ModelDownloadManager @Inject constructor(
         private const val TAG = "ModelDownloadManager"
         private const val PREFS_NAME = "cupcake_model_prefs"
         private const val KEY_ACTIVE_MODEL = "active_local_model"
-        const val DEFAULT_MODEL = "qwen2.5-0.5b-instruct-q2_k.gguf"
+        const val DEFAULT_MODEL = "liltii-v0.2-small-q2_k.gguf"
 
         val CATALOG = listOf(
             GgufModelInfo(
-                fileName = "qwen2.5-0.5b-instruct-q2_k.gguf",
-                displayName = "Qwen 2.5 0.5B Instruct",
-                tag = "Bundled • Default",
-                description = "Fast, coherent, context-aware 0.5B model. Built-in.",
-                sizeBytes = 396_000_000L,
+                fileName = "liltii-v0.2-small-q2_k.gguf",
+                displayName = "LilTii v0.2 (Qwen 0.5B)",
+                tag = "Custom • Banglish + Emotions",
+                description = "Fine-tuned on Banglish emotion-tagged data. Emits [emotion] *action* responses. Q2_K ~40 MB.",
+                sizeBytes = 45_000_000L,
                 downloadUrl = null,
                 isBundled = true
+            ),
+            GgufModelInfo(
+                fileName = "bangla-smollm-135m-v0.2-q2_k.gguf",
+                displayName = "Bangla SmolLM 135M",
+                tag = "Custom • Bangla Native",
+                description = "Fine-tuned SmolLM 135M on Bangla/Banglish. Ultra-fast, tiny (~15 MB Q2_K).",
+                sizeBytes = 15_000_000L,
+                downloadUrl = null,
+                isBundled = true
+            ),
+            GgufModelInfo(
+                fileName = "qwen2.5-0.5b-instruct-q2_k.gguf",
+                displayName = "Qwen 2.5 0.5B Instruct (Base)",
+                tag = "Base Model",
+                description = "Original Qwen 2.5 0.5B instruct. No emotion training.",
+                sizeBytes = 45_000_000L,
+                downloadUrl = "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q2_k.gguf",
+                isBundled = false
             ),
             GgufModelInfo(
                 fileName = "qwen2.5-1.5b-instruct-q2_k.gguf",

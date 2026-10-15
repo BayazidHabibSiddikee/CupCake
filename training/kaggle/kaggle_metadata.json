@@ -1,0 +1,13 @@
+{
+  "title": "LilTii Banglish Emotion LLM Training",
+  "id": "bayazidhabibsiddikee/liltii-banglish-emotion-llm",
+  "licenses": [{"name": "MIT"}],
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": false,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "dataset_sources": [],
+  "kernel_sources": [],
+  "code_sources": []
+}

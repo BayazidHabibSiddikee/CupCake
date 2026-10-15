@@ -1,0 +1,16 @@
+{
+  "id": "bayazidhs/bangla-smollm-135m-training-v3",
+  "title": "bangla-smollm-135m-training-v3",
+  "code_file": "train_liltii.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": "false",
+  "enable_gpu": "true",
+  "enable_tpu": "false",
+  "enable_internet": "true",
+  "machine_shape": "gpu-t4-x2",
+  "dataset_sources": [],
+  "competition_sources": [],
+  "kernel_sources": [],
+  "model_sources": []
+}
