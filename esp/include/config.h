@@ -7,20 +7,31 @@
 // Device name for BLE
 #define DEVICE_NAME "CupCake-ESP32"
 
-// Pin assignments (ESP32-S3 DevKitC-1)
+// Pin assignments. Defaults target the ESP32-S3 DevKitC-1; other boards can
+// override via build_flags (-D...) in platformio.ini.
+#ifndef I2C_SDA_PIN
 #define I2C_SDA_PIN 8
+#endif
+#ifndef I2C_SCL_PIN
 #define I2C_SCL_PIN 9
+#endif
 
+#ifndef BATTERY_ADC_PIN
 #define BATTERY_ADC_PIN 4
+#endif
 #define BATTERY_R1 100000.0  // 100k upper resistor
 #define BATTERY_R2 10000.0   // 10k lower resistor (divider ratio 11:1)
 
 // IMU (MPU6050)
 #define IMU_ADDRESS 0x68
+#ifndef IMU_INT_PIN
 #define IMU_INT_PIN 10
+#endif
 
-// LED
+// LED (unused on boards without a built-in addressable LED)
+#ifndef STATUS_LED_PIN
 #define STATUS_LED_PIN 48  // Built-in RGB LED on ESP32-S3
+#endif
 
 // BLE
 #define BLE_DEVICE_NAME "CupCake"

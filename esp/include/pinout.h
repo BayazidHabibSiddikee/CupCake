@@ -4,9 +4,13 @@
 // ESP32-S3 DevKitC-1 Pinout Reference
 // https://docs.espressif.com/projects/esp-idf/en/latest/esp32s3/hw-reference/esp32s3/user-guide-devkitc-1.html
 
-// I2C
+// I2C (defaults for ESP32-S3; overridable via build_flags, see config.h)
+#ifndef I2C_SDA_PIN
 #define I2C_SDA_PIN     8   // GPIO8
+#endif
+#ifndef I2C_SCL_PIN
 #define I2C_SCL_PIN     9   // GPIO9
+#endif
 
 // SPI (if needed)
 #define SPI_MOSI_PIN    11  // GPIO11
@@ -43,7 +47,9 @@
 #define ADC2_CH9_PIN    18  // GPIO18
 
 // Battery voltage divider (using ADC1_CH3 = GPIO4)
+#ifndef BATTERY_ADC_PIN
 #define BATTERY_ADC_PIN ADC1_CH3_PIN
+#endif
 
 // Built-in RGB LED (WS2812 on GPIO48)
 #define RGB_LED_PIN 48

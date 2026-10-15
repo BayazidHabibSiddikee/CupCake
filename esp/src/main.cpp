@@ -186,18 +186,15 @@ void handleCommand(const Command& cmd) {
             const String password = cmd.params["password"] | "";
             if (ssid.isEmpty()) {
                 ble.sendResponse(cmd.id, "error", "Missing ssid");
+            } else if (wifiProv.connect(ssid, password)) {
+                // Association happens in the background; the phone polls status.
+                JsonDocument data;
+                data["message"] = "connecting";
+                data["ssid"] = ssid;
+                ble.sendResponse(cmd.id, "ok", data);
             } else {
-                String ip, err;
-                if (wifiProv.connect(ssid, password)) {
-                    JsonDocument data;
-                    data["message"] = "connected";
-                    data["ssid"] = wifiProv.ssid();
-                    data["ip"] = wifiProv.ip();
-                    ble.sendResponse(cmd.id, "ok", data);
-                } else {
-                    ble.sendResponse(cmd.id, "error",
-                                     "Could not connect to WiFi");
-                }
+                ble.sendResponse(cmd.id, "error",
+                                 "Could not start WiFi connect");
             }
         }
         else if (cmd.action == "status") {
