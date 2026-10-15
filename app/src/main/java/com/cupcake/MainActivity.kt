@@ -10,6 +10,7 @@ import androidx.navigation.compose.rememberNavController
 import com.cupcake.ui.screen.chat.ChatScreen
 import com.cupcake.ui.screen.character.CharacterScreen
 import com.cupcake.ui.screen.device.DeviceScreen
+import com.cupcake.ui.screen.device.WifiSetupScreen
 import com.cupcake.ui.screen.game.GameScreen
 import com.cupcake.ui.screen.home.HomeScreen
 import com.cupcake.ui.screen.home.HomeViewModel
@@ -131,11 +132,18 @@ class MainActivity : ComponentActivity() {
                     composable("settings") {
                         SettingsScreen(
                             onClose = { navController.popBackStack() },
+                            onNavigateToWifiSetup = { navController.navigate("wifi-setup") },
                             onNavigateToLilTiiEval = {
                                 if (BuildConfig.DEBUG) {
                                     navController.navigate("liltii-eval")
                                 }
                             }
+                        )
+                    }
+
+                    composable("wifi-setup") {
+                        WifiSetupScreen(
+                            onClose = { navController.popBackStack() }
                         )
                     }
                     

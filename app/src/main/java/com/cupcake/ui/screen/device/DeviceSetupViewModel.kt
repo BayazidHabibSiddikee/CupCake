@@ -1,0 +1,196 @@
+package com.cupcake.ui.screen.device
+
+import android.Manifest
+import android.bluetooth.BluetoothDevice
+import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.cupcake.ble.BleGattClient
+import com.cupcake.network.WifiNetwork
+import com.cupcake.network.WifiProvisioner
+import com.cupcake.network.WifiStatus
+import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+
+/**
+ * Drives the "connect to a nearby ESP32 over BLE, then provision its WiFi" flow.
+ */
+@HiltViewModel
+class DeviceSetupViewModel @Inject constructor(
+    @ApplicationContext private val context: Context
+) : ViewModel() {
+
+    data class DeviceUi(val name: String, val address: String, val rssi: Int)
+
+    private val client = BleGattClient(context)
+    private val provisioner = WifiProvisioner(client)
+    private val deviceMap = mutableMapOf<String, BluetoothDevice>()
+
+    private val _devices = MutableStateFlow<List<DeviceUi>>(emptyList())
+    val devices: StateFlow<List<DeviceUi>> = _devices.asStateFlow()
+
+    private val _isScanning = MutableStateFlow(false)
+    val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
+
+    private val _connection =
+        MutableStateFlow<BleGattClient.ConnectionState>(BleGattClient.ConnectionState.Disconnected())
+    val connection: StateFlow<BleGattClient.ConnectionState> = _connection.asStateFlow()
+
+    private val _wifiNetworks = MutableStateFlow<List<WifiNetwork>>(emptyList())
+    val wifiNetworks: StateFlow<List<WifiNetwork>> = _wifiNetworks.asStateFlow()
+
+    private val _wifiStatus = MutableStateFlow<WifiStatus?>(null)
+    val wifiStatus: StateFlow<WifiStatus?> = _wifiStatus.asStateFlow()
+
+    private val _busy = MutableStateFlow(false)
+    val busy: StateFlow<Boolean> = _busy.asStateFlow()
+
+    private val _message = MutableStateFlow<String?>(null)
+    val message: StateFlow<String?> = _message.asStateFlow()
+
+    val isBleSupported: Boolean = BleGattClient.isBleSupported(context)
+
+    init {
+        viewModelScope.launch {
+            client.scanResultsFlow.collect { result -> recordDevice(result.device, result.rssi) }
+        }
+        viewModelScope.launch {
+            client.connectionState.collect { state ->
+                _connection.value = state
+                if (state is BleGattClient.ConnectionState.Connected) {
+                    _isScanning.value = false
+                    _message.value = "Connected to ${state.deviceName}"
+                    refreshStatus()
+                }
+            }
+        }
+    }
+
+    @Suppress("MissingPermission")
+    private fun recordDevice(device: BluetoothDevice, rssi: Int) {
+        val address = device.address ?: return
+        deviceMap[address] = device
+        val name = runCatching { device.name }.getOrNull() ?: "Unknown device"
+        val current = _devices.value
+        if (current.none { it.address == address }) {
+            _devices.value = (current + DeviceUi(name, address, rssi))
+                .sortedByDescending { it.rssi }
+        }
+    }
+
+    fun hasPermissions(): Boolean = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        has(Manifest.permission.BLUETOOTH_SCAN) && has(Manifest.permission.BLUETOOTH_CONNECT)
+    } else {
+        has(Manifest.permission.ACCESS_FINE_LOCATION)
+    }
+
+    private fun has(permission: String): Boolean =
+        ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+
+    fun startScan() {
+        if (!hasPermissions()) {
+            _message.value = "Bluetooth permission required"
+            return
+        }
+        _devices.value = emptyList()
+        deviceMap.clear()
+        client.startScan()
+        _isScanning.value = true
+        viewModelScope.launch {
+            delay(10_000)
+            _isScanning.value = false
+        }
+    }
+
+    fun stopScan() {
+        client.stopScan()
+        _isScanning.value = false
+    }
+
+    fun connect(address: String) {
+        val device = deviceMap[address] ?: return
+        stopScan()
+        _message.value = "Connecting…"
+        client.connect(device)
+    }
+
+    fun disconnect() {
+        client.disconnect()
+        _wifiStatus.value = null
+    }
+
+    fun scanWifiNetworks() {
+        viewModelScope.launch {
+            _busy.value = true
+            _message.value = "Scanning WiFi networks…"
+            provisioner.scanNetworks()
+                .onSuccess { nets ->
+                    _wifiNetworks.value = nets.sortedByDescending { it.rssi }
+                    _message.value = if (nets.isEmpty()) "No networks found" else "Found ${nets.size} networks"
+                }
+                .onFailure { _message.value = it.message ?: "Scan failed" }
+            _busy.value = false
+        }
+    }
+
+    /** Sends credentials, then polls status until connected / failed / timeout. */
+    fun connectWifi(ssid: String, password: String) {
+        viewModelScope.launch {
+            _busy.value = true
+            _message.value = "Connecting to $ssid…"
+            val started = provisioner.connect(ssid, password)
+            if (started.isFailure) {
+                _message.value = started.exceptionOrNull()?.message ?: "Connect failed"
+                _busy.value = false
+                return@launch
+            }
+            var status: WifiStatus? = null
+            repeat(20) {
+                delay(1000)
+                status = provisioner.status()
+                _wifiStatus.value = status
+                if (status?.isConnected == true || status?.hasFailed == true) return@repeat
+            }
+            _busy.value = false
+            val settled = status
+            _message.value = when {
+                settled?.isConnected == true -> "Connected to ${settled.ssid} (${settled.ip})"
+                settled?.hasFailed == true -> "Could not connect to $ssid"
+                else -> "Still connecting… check the device"
+            }
+        }
+    }
+
+    fun refreshStatus() {
+        viewModelScope.launch {
+            provisioner.status()?.let { _wifiStatus.value = it }
+        }
+    }
+
+    fun forgetWifi() {
+        viewModelScope.launch {
+            if (provisioner.forget()) {
+                _wifiStatus.value = null
+                _message.value = "Saved WiFi cleared"
+            }
+        }
+    }
+
+    fun clearMessage() {
+        _message.value = null
+    }
+
+    override fun onCleared() {
+        client.shutdown()
+        super.onCleared()
+    }
+}

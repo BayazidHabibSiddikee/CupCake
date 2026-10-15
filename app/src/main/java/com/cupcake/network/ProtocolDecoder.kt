@@ -8,6 +8,10 @@ import com.cupcake.protocol.EventData
 import com.cupcake.protocol.BatteryData
 import com.cupcake.protocol.SensorData
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.decodeFromString
 import java.nio.ByteBuffer
@@ -43,6 +47,11 @@ object ProtocolDecoder {
             1 -> null
             else -> {
                 val type = data[0].toInt() and 0xFF
+                // The ESP32 speaks JSON for command envelopes/responses
+                // (e.g. {"type":"resp",...}); detect that before the binary types.
+                if (type == '{'.code) {
+                    return decodeJson(data)
+                }
                 when (type) {
                     MSG_TYPE_SENSOR -> if (data.size >= SENSOR_PAYLOAD_SIZE) decodeSensor(data) else null
                     MSG_TYPE_BATTERY -> if (data.size >= BATTERY_PAYLOAD_SIZE) decodeBattery(data) else null
@@ -113,6 +122,40 @@ object ProtocolDecoder {
             eventName = "pong",
             data = mapOf("timestamp" to timestamp.toString())
         )
+    }
+
+    /**
+     * Decodes the ESP32's JSON envelope. Command responses look like
+     * `{"type":"resp","id":..,"status":..,"data":{..}}`; `data` values are
+     * flattened to strings so numeric/bool fields survive the Map<String,String>
+     * response model (WiFi scan results arrive as a JSON string field).
+     */
+    private fun decodeJson(data: ByteArray): DecodedMessage? {
+        val text = String(data, Charsets.UTF_8)
+        val root = try {
+            json.parseToJsonElement(text).jsonObject
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to parse JSON message: $text", e)
+            return null
+        }
+
+        return when (root["type"]?.jsonPrimitive?.contentOrNull) {
+            "resp" -> {
+                val id = root["id"]?.jsonPrimitive?.contentOrNull ?: return null
+                val status = root["status"]?.jsonPrimitive?.contentOrNull ?: "ok"
+                val dataObj = root["data"] as? JsonObject
+                val map = dataObj?.mapValues { (_, value) ->
+                    (value as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull
+                        ?: value.toString()
+                }
+                CommandResponse(id = id, status = status, data = map)
+            }
+            "event" -> {
+                val name = root["event"]?.jsonPrimitive?.contentOrNull ?: "event"
+                EventData(eventName = name, data = null)
+            }
+            else -> null
+        }
     }
 
     private fun decodeEvent(data: ByteArray): EventData? {
@@ -233,5 +276,18 @@ object ProtocolDecoder {
                 action = "start"
             )
         }
+
+        // --- WiFi provisioning (BLE) -------------------------------------
+        fun wifiScan(): Command = Command(type = "wifi", action = "scan")
+
+        fun wifiConnect(ssid: String, password: String): Command = Command(
+            type = "wifi",
+            action = "connect",
+            params = mapOf("ssid" to ssid, "password" to password)
+        )
+
+        fun wifiStatus(): Command = Command(type = "wifi", action = "status")
+
+        fun wifiForget(): Command = Command(type = "wifi", action = "forget")
     }
 }

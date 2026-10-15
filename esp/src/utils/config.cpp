@@ -54,3 +54,39 @@ String ConfigManager::getDeviceId() {
     }
     return id;
 }
+
+String ConfigManager::getWifiSsid() {
+    if (!begun_) {
+        return String();
+    }
+    return prefs_.getString("wifi_ssid", "");
+}
+
+void ConfigManager::setWifiSsid(const String& ssid) {
+    if (!begun_) {
+        return;
+    }
+    prefs_.putString("wifi_ssid", ssid);
+}
+
+String ConfigManager::getWifiPassword() {
+    if (!begun_) {
+        return String();
+    }
+    return prefs_.getString("wifi_pass", "");
+}
+
+void ConfigManager::setWifiPassword(const String& password) {
+    if (!begun_) {
+        return;
+    }
+    prefs_.putString("wifi_pass", password);
+}
+
+void ConfigManager::clearWifi() {
+    if (!begun_) {
+        return;
+    }
+    prefs_.remove("wifi_ssid");
+    prefs_.remove("wifi_pass");
+}

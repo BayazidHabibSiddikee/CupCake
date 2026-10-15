@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -59,6 +60,7 @@ import androidx.compose.foundation.BorderStroke
 @Composable
 fun SettingsScreen(
     onClose: () -> Unit,
+    onNavigateToWifiSetup: (() -> Unit)? = null,
     onNavigateToLilTiiEval: (() -> Unit)? = null,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
@@ -198,6 +200,33 @@ fun SettingsScreen(
                             modifier = Modifier.align(Alignment.End)
                         ) {
                             Text("Save")
+                        }
+                    }
+                }
+
+                // Section: Companion Device (BLE WiFi provisioning)
+                if (onNavigateToWifiSetup != null) {
+                    item {
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text("Companion Device", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                            Text(
+                                "Connect to the ESP32 over Bluetooth and set up its WiFi.",
+                                fontSize = 12.sp,
+                                color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(Modifier.size(4.dp))
+                            Button(
+                                onClick = { onNavigateToWifiSetup.invoke() },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Wifi,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(Modifier.size(8.dp))
+                                Text("Connect a device")
+                            }
                         }
                     }
                 }

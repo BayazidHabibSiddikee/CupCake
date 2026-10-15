@@ -23,6 +23,7 @@
 #include "power/ota.h"
 #include "utils/logger.h"
 #include "utils/config.h"
+#include "utils/wifi.h"
 
 // =============================================================================
 // GLOBAL STATE
@@ -35,6 +36,7 @@ static ProtocolHandler protocol;
 static SleepManager sleep;
 static OTAManager ota;
 static ConfigManager config;
+static WifiProvisioner wifiProv(config);
 
 static TaskHandle_t sensorTaskHandle = nullptr;
 static TaskHandle_t commTaskHandle = nullptr;
@@ -173,6 +175,47 @@ void handleCommand(const Command& cmd) {
             }
         }
     }
+    else if (cmd.type == "wifi") {
+        if (cmd.action == "scan") {
+            JsonDocument data;
+            data["networks"] = wifiProv.scanNetworks();
+            ble.sendResponse(cmd.id, "ok", data);
+        }
+        else if (cmd.action == "connect") {
+            const String ssid = cmd.params["ssid"] | "";
+            const String password = cmd.params["password"] | "";
+            if (ssid.isEmpty()) {
+                ble.sendResponse(cmd.id, "error", "Missing ssid");
+            } else {
+                String ip, err;
+                if (wifiProv.connect(ssid, password)) {
+                    JsonDocument data;
+                    data["message"] = "connected";
+                    data["ssid"] = wifiProv.ssid();
+                    data["ip"] = wifiProv.ip();
+                    ble.sendResponse(cmd.id, "ok", data);
+                } else {
+                    ble.sendResponse(cmd.id, "error",
+                                     "Could not connect to WiFi");
+                }
+            }
+        }
+        else if (cmd.action == "status") {
+            JsonDocument data;
+            data["state"] = wifiProv.stateString();
+            data["ssid"] = wifiProv.ssid();
+            data["ip"] = wifiProv.ip();
+            data["rssi"] = wifiProv.rssi();
+            ble.sendResponse(cmd.id, "ok", data);
+        }
+        else if (cmd.action == "forget") {
+            wifiProv.forget();
+            ble.sendResponse(cmd.id, "ok", "WiFi credentials cleared");
+        }
+        else {
+            ble.sendResponse(cmd.id, "error", "Unknown wifi action");
+        }
+    }
     else if (cmd.type == "info") {
         JsonDocument response;
         response["firmware_version"] = FIRMWARE_VERSION;
@@ -253,6 +296,9 @@ void setup() {
     // Initialize config
     config.begin();
 
+    // Initialize WiFi provisioning (reconnects stored network if present)
+    wifiProv.begin();
+
     // Initialize I2C
     Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
     Wire.setClock(400000);
@@ -312,6 +358,9 @@ void loop() {
 
     // Handle OTA
     ota.handle();
+
+    // Keep WiFi provisioning alive (retry stored network)
+    wifiProv.loop();
 
     // Handle sleep if configured
     if (sleep.shouldSleep()) {

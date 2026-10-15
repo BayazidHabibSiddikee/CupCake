@@ -453,9 +453,10 @@ class BleGattClient(private val context: Context) {
     }
 
     /**
-     * Send a command to the ESP32.
+     * Send a command to the ESP32 and await its matching response.
+     * [timeoutMs] should exceed the firmware's handling time (e.g. WiFi scans).
      */
-    suspend fun sendCommand(command: Command): CommandResponse? {
+    suspend fun sendCommand(command: Command, timeoutMs: Long = 5000L): CommandResponse? {
         if (!isConnected.get()) {
             Log.w(TAG, "Not connected, cannot send command")
             return CommandResponse(
@@ -492,7 +493,7 @@ class BleGattClient(private val context: Context) {
             )
         }
 
-        return kotlinx.coroutines.withTimeoutOrNull(5000) {
+        return kotlinx.coroutines.withTimeoutOrNull(timeoutMs) {
             suspendCancellableCoroutine { cont ->
                 pendingCommands[command.id] = CommandCompleter(command.id, cont)
                 cont.invokeOnCancellation {

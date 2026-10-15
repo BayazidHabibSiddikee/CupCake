@@ -24,6 +24,13 @@ public:
 
     String getDeviceId();
 
+    // WiFi credentials provisioned over BLE (persisted in NVS).
+    String getWifiSsid();
+    void setWifiSsid(const String& ssid);
+    String getWifiPassword();
+    void setWifiPassword(const String& password);
+    void clearWifi();
+
 private:
     Preferences prefs_;
     bool begun_ = false;
