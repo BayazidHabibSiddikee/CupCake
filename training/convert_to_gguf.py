@@ -82,7 +82,7 @@ def main():
     convert_cmd = [
         sys.executable,
         converter,
-        "--model-dir", args.model_path,
+        args.model_path,
         "--outfile", temp_gguf,
         "--outtype", "f16",
     ]
