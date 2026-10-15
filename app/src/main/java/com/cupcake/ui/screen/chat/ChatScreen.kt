@@ -146,16 +146,9 @@ fun ChatScreen(
             }
 
             // Live 2D emotion face — morphs as the companion talks, mirrored to the ESP board
-            val isMarinCompanion = currentCharacter?.let {
-                it.id.contains("marin", ignoreCase = true) ||
-                    it.name.contains("marin", ignoreCase = true) ||
-                    it.avatar.contains("marin", ignoreCase = true)
-            } ?: false
-            val displayStem = if (isMarinCompanion) {
-                liveEmotionStem
-                    ?: messages.lastOrNull { it.role == ChatMessage.MessageRole.ASSISTANT }
-                        ?.let { com.cupcake.ai.EmotionAssets.stemForText(it.content) }
-            } else null
+            val displayStem = liveEmotionStem
+                ?: messages.lastOrNull { it.role == ChatMessage.MessageRole.ASSISTANT }
+                    ?.let { com.cupcake.ai.EmotionAssets.stemForText(it.content) }
 
             if (!showVrm3dView && displayStem != null) {
                 Box(

@@ -262,13 +262,7 @@ object EspWebSocketServer {
         emotion: String? = null,
         imagePath: String? = null
     ) {
-        val payload = mutableMapOf<String, Any?>(
-            "expression" to expression,
-            "duration" to duration
-        )
-        if (emotion != null) payload["emotion"] = emotion
-        if (imagePath != null) payload["image"] = imagePath
-        broadcast(MessageType.FACE, payload)
+        broadcast(MessageType.FACE, buildFacePayload(expression, duration, emotion, imagePath))
     }
 
     fun sendMotorAction(action: String, params: Map<String, Any> = emptyMap()) {

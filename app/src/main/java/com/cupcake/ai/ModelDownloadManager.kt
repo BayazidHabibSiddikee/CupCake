@@ -69,15 +69,31 @@ class ModelDownloadManager @Inject constructor(
                 isBundled = true
             )
         )
+
+        /**
+         * Maps a persisted model name to a valid catalog entry, falling back to
+         * [DEFAULT_MODEL] when the stored name is stale (e.g. a model that was
+         * renamed or removed in a newer build).
+         */
+        fun resolveStoredActiveModel(stored: String?): String =
+            if (stored != null && CATALOG.any { it.fileName == stored }) stored else DEFAULT_MODEL
     }
 
     private val prefs: SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-    private val _activeModel = MutableStateFlow(
-        prefs.getString(KEY_ACTIVE_MODEL, DEFAULT_MODEL) ?: DEFAULT_MODEL
-    )
+    private val _activeModel = MutableStateFlow(loadInitialActiveModel())
     val activeModel: StateFlow<String> = _activeModel.asStateFlow()
+
+    private fun loadInitialActiveModel(): String {
+        val stored = prefs.getString(KEY_ACTIVE_MODEL, null)
+        val resolved = resolveStoredActiveModel(stored)
+        if (stored != null && stored != resolved) {
+            Log.w(TAG, "Stored active model '$stored' is not in the catalog; falling back to '$resolved'")
+            prefs.edit().putString(KEY_ACTIVE_MODEL, resolved).apply()
+        }
+        return resolved
+    }
 
     private val _downloadProgress = MutableStateFlow<Map<String, DownloadProgress>>(emptyMap())
     val downloadProgress: StateFlow<Map<String, DownloadProgress>> = _downloadProgress.asStateFlow()

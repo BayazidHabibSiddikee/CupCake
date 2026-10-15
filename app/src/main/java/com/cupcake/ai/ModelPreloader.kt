@@ -39,10 +39,11 @@ object ModelPreloader {
             try {
                 LlamaEngine.initialize(appContext)
 
-                val activeModel = appContext
-                    .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                    .getString(KEY_ACTIVE_MODEL, ModelDownloadManager.DEFAULT_MODEL)
-                    ?: ModelDownloadManager.DEFAULT_MODEL
+                val activeModel = ModelDownloadManager.resolveStoredActiveModel(
+                    appContext
+                        .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                        .getString(KEY_ACTIVE_MODEL, null)
+                )
 
                 // Skip if the model file is not present yet (will be copied on demand).
                 val modelFile = File(File(appContext.filesDir, "models"), activeModel)
