@@ -1,7 +1,6 @@
 package com.cupcake.game
 
 import com.cupcake.ai.CharacterManager
-import com.cupcake.ai.OllamaEngine
 import com.cupcake.chat.ChatSessionStore
 import com.google.common.truth.Truth.assertThat
 import io.mockk.mockk
@@ -18,7 +17,7 @@ class GameManagerGamesTest {
     fun setUp() {
         sessionStore = ChatSessionStore()
         gameManager = GameManager(
-            mockk<OllamaEngine>(relaxed = true),
+            mockk<GameLLMRouter>(relaxed = true),
             CharacterManager,
             PointsManager().also { pointsManager = it },
             sessionStore

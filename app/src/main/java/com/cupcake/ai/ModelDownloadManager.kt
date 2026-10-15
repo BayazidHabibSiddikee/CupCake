@@ -54,55 +54,19 @@ class ModelDownloadManager @Inject constructor(
                 fileName = "liltii-v0.2-small-q2_k.gguf",
                 displayName = "LilTii v0.2 (Qwen 0.5B)",
                 tag = "Custom • Banglish + Emotions",
-                description = "Fine-tuned on Banglish emotion-tagged data. Emits [emotion] *action* responses. Q2_K ~40 MB.",
-                sizeBytes = 45_000_000L,
+                description = "Fine-tuned on Banglish emotion-tagged data. Emits [emotion] *action* responses.",
+                sizeBytes = 338_000_000L,
                 downloadUrl = null,
                 isBundled = true
             ),
             GgufModelInfo(
-                fileName = "bangla-smollm-135m-v0.2-q2_k.gguf",
+                fileName = "bangla-smollm-135m-v3-q2_k.gguf",
                 displayName = "Bangla SmolLM 135M",
                 tag = "Custom • Bangla Native",
-                description = "Fine-tuned SmolLM 135M on Bangla/Banglish. Ultra-fast, tiny (~15 MB Q2_K).",
+                description = "Fine-tuned SmolLM 135M on Bangla/Banglish. Ultra-fast, tiny (~15 MB).",
                 sizeBytes = 15_000_000L,
                 downloadUrl = null,
                 isBundled = true
-            ),
-            GgufModelInfo(
-                fileName = "qwen2.5-0.5b-instruct-q2_k.gguf",
-                displayName = "Qwen 2.5 0.5B Instruct (Base)",
-                tag = "Base Model",
-                description = "Original Qwen 2.5 0.5B instruct. No emotion training.",
-                sizeBytes = 45_000_000L,
-                downloadUrl = "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q2_k.gguf",
-                isBundled = false
-            ),
-            GgufModelInfo(
-                fileName = "qwen2.5-1.5b-instruct-q2_k.gguf",
-                displayName = "Qwen 2.5 1.5B Instruct (Q2_K)",
-                tag = "2B Class • Recommended",
-                description = "Smart 2B-class reasoning with compact memory footprint (~586 MB).",
-                sizeBytes = 586_000_000L,
-                downloadUrl = "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q2_k.gguf",
-                isBundled = false
-            ),
-            GgufModelInfo(
-                fileName = "qwen2.5-1.5b-instruct-q4_k_m.gguf",
-                displayName = "Qwen 2.5 1.5B Instruct (Q4_K_M)",
-                tag = "2B Class • Full Quality",
-                description = "High precision 4-bit quant of Qwen 2.5 1.5B (~986 MB).",
-                sizeBytes = 986_000_000L,
-                downloadUrl = "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf",
-                isBundled = false
-            ),
-            GgufModelInfo(
-                fileName = "Llama-3.2-1B-Instruct-Q4_K_M.gguf",
-                displayName = "Llama 3.2 1B Instruct (Q4_K_M)",
-                tag = "1B Class • Meta",
-                description = "Meta's official edge instruct model quantized in 4-bit (~770 MB).",
-                sizeBytes = 770_000_000L,
-                downloadUrl = "https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q4_K_M.gguf",
-                isBundled = false
             )
         )
     }

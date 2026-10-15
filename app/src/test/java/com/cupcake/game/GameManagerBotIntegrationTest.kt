@@ -1,7 +1,6 @@
 package com.cupcake.game
 
 import com.cupcake.ai.CharacterManager
-import com.cupcake.ai.OllamaEngine
 import com.cupcake.chat.ChatSessionStore
 import com.cupcake.data.model.ChatMessage
 import com.google.common.truth.Truth.assertThat
@@ -24,28 +23,25 @@ import org.junit.Test
  */
 class GameManagerBotIntegrationTest {
 
-    private lateinit var ollamaEngine: OllamaEngine
+    private lateinit var llmRouter: GameLLMRouter
     private lateinit var sessionStore: ChatSessionStore
     private lateinit var gameManager: GameManager
 
     @Before
     fun setUp() {
-        ollamaEngine = mockk<OllamaEngine>()
+        llmRouter = mockk<GameLLMRouter>()
         sessionStore = ChatSessionStore()
-        gameManager = GameManager(ollamaEngine, CharacterManager, PointsManager(), sessionStore)
+        gameManager = GameManager(llmRouter, CharacterManager, PointsManager(), sessionStore)
     }
 
-    /** Stub the LLM so every generateStream call immediately replies with [reply]. */
+    /** Stub the LLM so every generate call immediately replies with [reply]. */
     private fun stubBotReply(reply: String, capturedPrompts: MutableList<String> = mutableListOf()) {
-        val callbackSlot = slot<OllamaEngine.GenerateCallback>()
-        val messagesSlot = slot<List<OllamaEngine.OllamaMessage>>()
+        val promptSlot = slot<String>()
         coEvery {
-            ollamaEngine.generateStream(any(), any(), capture(messagesSlot), capture(callbackSlot))
+            llmRouter.generate(any(), any(), capture(promptSlot), any(), any())
         } coAnswers {
-            capturedPrompts.add(messagesSlot.captured.first().content)
-            callbackSlot.captured.onToken(reply)
-            callbackSlot.captured.onToken("!")
-            callbackSlot.captured.onComplete()
+            capturedPrompts.add(promptSlot.captured)
+            "$reply!"
         }
     }
 

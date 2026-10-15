@@ -1,7 +1,7 @@
 package com.cupcake.game
 
+import com.cupcake.ai.BanglishTranslator
 import com.cupcake.ai.CharacterManager
-import com.cupcake.ai.OllamaEngine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.consumeEach
@@ -14,7 +14,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 // Game Manager
 class GameManager(
-    private val ollamaEngine: OllamaEngine,
+    private val llmRouter: GameLLMRouter,
     private val characterManager: CharacterManager,
     private val pointsManager: PointsManager,
     private val sessionStore: com.cupcake.chat.ChatSessionStore = com.cupcake.chat.ChatSessionStore()
@@ -1009,52 +1009,25 @@ class GameManager(
     }
 
     private fun triggerClickerReaction(score: Int) {
-        // Ollama doesn't need local model readiness check
         val character = characterManager.getCurrentCharacter()
         val personality = character?.personality ?: "friendly"
+        val characterId = character?.id ?: "marin_kitagawa"
 
-        val prompt = "The human has mindlessly tapped the screen $score times. React with a sarcastic comment about them wasting time. Keep it under 15 words in $personality style."
+        val prompt = "The human has mindlessly tapped the screen $score times. Tease them playfully about wasting time — stay kind, no insults. Under 15 words in $personality style."
 
         CoroutineScope(Dispatchers.IO).launch {
-                try {
-                    val fullPrompt = characterManager.getSystemPromptForCharacter(
-                        character?.id ?: "marin_kitagawa",
-                        "Game: CLICKER, Score: $score"
-                    ) + "\n\nUser: $prompt\nAssistant:"
-
-                    var fullResponse = ""
-                    ollamaEngine.generateStream(
-                        baseUrl = "http://localhost:11434/v1",
-                        config = com.cupcake.data.model.ModelConfig(
-                            provider = com.cupcake.data.model.ModelConfig.ModelProvider.CUSTOM_OLLAMA,
-                            modelName = "qwen2.5-0.5b-instruct",
-                            customEndpoint = "http://localhost:11434/v1",
-                            temperature = 0.7f,
-                            topP = 0.9f,
-                            topK = 40,
-                            maxTokens = 256,
-                            useStreaming = true
-                        ),
-                        messages = listOf(OllamaEngine.OllamaMessage("user", fullPrompt)),
-                        callback = object : OllamaEngine.GenerateCallback {
-                            override fun onToken(token: String) {
-                                fullResponse += token
-                            }
-
-                            override fun onComplete() {
-                                val translated = com.cupcake.ai.BanglishTranslator.translate(fullResponse.trim(), personality)
-                                gameReactions.tryEmit(GameReaction(translated, false, false))
-                            }
-
-                            override fun onError(error: String) {
-                                android.util.Log.w("GameManager", "Reaction generation failed: $error")
-                            }
-                        }
-                    )
-                } catch (e: Exception) {
-                    android.util.Log.w("GameManager", "Reaction generation failed", e)
-                }
+            val raw = llmRouter.generate(
+                characterId = characterId,
+                gameContext = "Game: CLICKER, Score: $score",
+                userPrompt = prompt,
+                temperature = 0.7f,
+                maxTokens = 64
+            )
+            val text = ToneGuard.sanitize(BanglishTranslator.translate(raw, personality))
+            if (text.isNotBlank()) {
+                gameReactions.tryEmit(GameReaction(text, false, false))
             }
+        }
     }
 
      private fun notifyLLMMove(
@@ -1082,12 +1055,8 @@ class GameManager(
                 Board: $boardDesc
                 Bot wins: ${jealousyTracker.getBotWins()}, Player wins: ${jealousyTracker.getPlayerWins()}
                 Mood: ${mood.name}
-                
-                Announce YOUR move in first person, in a ${when {
-                    anger > 0.6 -> "fierce, competitive"
-                    jealousy > 0.5 -> "smug, teasing"
-                    else -> "playful, cat-like"
-                }} way. Under 18 words. Sound natural, NOT robotic.
+
+                Announce YOUR move in first person, in a ${competitiveTone(anger, jealousy)} way. Under 18 words. Sound natural, NOT robotic.
                 Example: "Hehe, I placed right there~ bet you didn't see that coming! 😏"
             """.trimIndent()
         } else {
@@ -1097,60 +1066,34 @@ class GameManager(
                 Player: $player $moveDesc
                 Board: $boardDesc
                 Mood: ${mood.name} (Jealousy: ${(jealousy * 100).toInt()}%, Anger: ${(anger * 100).toInt()}%)
-                
-                React to this move as $characterName. Be ${when {
-                    anger > 0.7 -> "furious and competitive"
-                    anger > 0.4 -> "annoyed and challenging"
-                    jealousy > 0.6 -> "jealous and spiteful"
-                    jealousy > 0.3 -> "competitive and teasing"
-                    else -> "playfully surprised"
-                }}. Under 18 words. Don't say 'the player', react naturally.
+
+                React to this move as $characterName. Be ${competitiveTone(anger, jealousy)}. You may pout or tease, but never insult, threaten or swear. Under 18 words. Don't say 'the player', react naturally.
             """.trimIndent()
         }
 
+        val characterId = character?.id ?: "marin_kitagawa"
         CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val fullPrompt = characterManager.getSystemPromptForCharacter(
-                    character?.id ?: "marin_kitagawa",
-                    "Game: $gameType, Mood: ${mood.name}"
-                ) + "\n\nUser: $prompt\nAssistant:"
-
-                var fullResponse = ""
-                ollamaEngine.generateStream(
-                    baseUrl = "http://localhost:11434/v1",
-                    config = com.cupcake.data.model.ModelConfig(
-                        provider = com.cupcake.data.model.ModelConfig.ModelProvider.CUSTOM_OLLAMA,
-                        modelName = "qwen2.5-0.5b-instruct",
-                        customEndpoint = "http://localhost:11434/v1",
-                        temperature = 0.85f,
-                        topP = 0.9f,
-                        topK = 40,
-                        maxTokens = 64,
-                        useStreaming = true
-                    ),
-                    messages = listOf(OllamaEngine.OllamaMessage("user", fullPrompt)),
-                    callback = object : OllamaEngine.GenerateCallback {
-                        override fun onToken(token: String) {
-                            fullResponse += token
-                        }
-
-                        override fun onComplete() {
-                            val translated = com.cupcake.ai.BanglishTranslator.translate(fullResponse.trim(), personality)
-                            val comment = translated.ifBlank { fallbackMoveComment(player) }
-                            gameComments.tryEmit(comment)
-                        }
-
-                        override fun onError(error: String) {
-                            android.util.Log.w("GameManager", "Move notification failed: $error")
-                            gameComments.tryEmit(fallbackMoveComment(player))
-                        }
-                    }
-                )
-            } catch (e: Exception) {
-                android.util.Log.w("GameManager", "Move notification failed", e)
-                gameComments.tryEmit(fallbackMoveComment(player))
-            }
+            val raw = llmRouter.generate(
+                characterId = characterId,
+                gameContext = "Game: $gameType, Mood: ${mood.name}",
+                userPrompt = prompt,
+                temperature = 0.85f,
+                maxTokens = 96
+            )
+            val comment = ToneGuard.sanitize(BanglishTranslator.translate(raw, personality))
+                .ifBlank { fallbackMoveComment(player) }
+            gameComments.tryEmit(comment)
         }
+    }
+
+    /**
+     * Tone guidance for the model. Deliberately playful: an angry opponent is
+     * fine, an abusive one is not. ToneGuard enforces this on the output too.
+     */
+    private fun competitiveTone(anger: Double, jealousy: Double): String = when {
+        anger > 0.6 -> "fierce, pouty and very competitive (but never mean or threatening)"
+        jealousy > 0.5 -> "smug and playfully jealous"
+        else -> "playful, cat-like"
     }
 
     private fun fallbackMoveComment(player: String): String =
@@ -1175,114 +1118,53 @@ class GameManager(
     private fun triggerReaction(humanWon: Boolean, isDraw: Boolean = false) {
         val character = characterManager.getCurrentCharacter()
         val personality = character?.personality ?: "friendly"
-        
-        // Include jealousy/anger in the context
         val jealousy = jealousyTracker.getJealousyLevel()
         val anger = jealousyTracker.getAngerLevel()
         val mood = jealousyTracker.getBotMood()
-        
+
         val prompt = when {
-            isDraw -> "The game ended in a draw. React in character. Keep it under 20 words."
-            humanWon -> "The human beat you at ${gameType?.name?.lowercase()}. You are ${mood.name.toLowerCase()} (Jealousy: ${(jealousy * 100).toInt()}%, Anger: ${(anger * 100).toInt()}%). Throw a ${personality} reaction in Bangla or English. Be ${when { anger > 0.7 -> "furious and threatening"; anger > 0.4 -> "angry and competitive"; jealousy > 0.6 -> "jealous and spiteful"; jealousy > 0.3 -> "competitive and annoyed"; else -> "playful but competitive" }}. Under 20 words."
-            else -> "You beat the human at ${gameType?.name?.lowercase()}. You are ${mood.name.toLowerCase()}. React in character. Under 15 words."
+            isDraw -> "The game ended in a draw. React in character, playfully. Under 20 words. Stay kind — no insults or threats."
+            humanWon -> "The human beat you at ${gameType?.name?.lowercase()}. You feel ${mood.name.lowercase()} (Jealousy: ${(jealousy * 100).toInt()}%, Anger: ${(anger * 100).toInt()}%). React in a ${personality} way — pouting or competitive is fine, but stay kind and never threaten, insult or swear. Under 20 words."
+            else -> "You beat the human at ${gameType?.name?.lowercase()}. You feel ${mood.name.lowercase()}. React in character — smug but friendly. Under 15 words."
         }
 
+        val characterId = character?.id ?: "marin_kitagawa"
         CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val fullPrompt = characterManager.getSystemPromptForCharacter(
-                    character?.id ?: "marin_kitagawa",
-                    "Game: ${gameType?.name}, Human won: $humanWon, Draw: $isDraw, Jealousy: ${(jealousy * 100).toInt()}%, Anger: ${(anger * 100).toInt()}%, Mood: ${mood.name}"
-                ) + "\n\nUser: $prompt\nAssistant:"
-
-                var fullResponse = ""
-                ollamaEngine.generateStream(
-                    baseUrl = "http://localhost:11434/v1",
-                    config = com.cupcake.data.model.ModelConfig(
-                        provider = com.cupcake.data.model.ModelConfig.ModelProvider.CUSTOM_OLLAMA,
-                        modelName = "qwen2.5-0.5b-instruct",
-                        customEndpoint = "http://localhost:11434/v1",
-                        temperature = 0.8f, // Higher for more emotional responses
-                        topP = 0.9f,
-                        topK = 40,
-                        maxTokens = 256,
-                        useStreaming = true
-                    ),
-                    messages = listOf(OllamaEngine.OllamaMessage("user", fullPrompt)),
-                    callback = object : OllamaEngine.GenerateCallback {
-                        override fun onToken(token: String) {
-                            fullResponse += token
-                        }
-
-                        override fun onComplete() {
-                            val translated = com.cupcake.ai.BanglishTranslator.translate(fullResponse.trim(), personality)
-                            gameReactions.tryEmit(GameReaction(translated, humanWon, isDraw))
-                        }
-
-                        override fun onError(error: String) {
-                            android.util.Log.w("GameManager", "Reaction generation failed: $error")
-                            val fallback = when {
-                                isDraw -> "A draw?! No way, next round I'm definitely taking the win!"
-                                humanWon -> if (jealousy > 0.4) "Kyaa! You totally cheated! Hmph, I'm pouting now! 😤" else "No way! Rematch right now, you big bully!"
-                                else -> "Hehe! Look who won! You owe me a cosplay treat! ✨"
-                            }
-                            gameReactions.tryEmit(GameReaction(fallback, humanWon, isDraw))
-                        }
-                    }
-                )
-            } catch (e: Exception) {
-                android.util.Log.w("GameManager", "Reaction generation failed", e)
-                val fallback = when {
-                    isDraw -> "A draw?! Next round I'm definitely winning!"
-                    humanWon -> "Kyaa! No way, you cheated! Rematch right now! 😤"
-                    else -> "Hehe! Look who won! You can't beat me! ✨"
-                }
-                gameReactions.tryEmit(GameReaction(fallback, humanWon, isDraw))
-            }
+            val raw = llmRouter.generate(
+                characterId = characterId,
+                gameContext = "Game: ${gameType?.name}, Human won: $humanWon, Draw: $isDraw, Jealousy: ${(jealousy * 100).toInt()}%, Anger: ${(anger * 100).toInt()}%, Mood: ${mood.name}",
+                userPrompt = prompt,
+                temperature = 0.8f,
+                maxTokens = 96
+            )
+            val text = ToneGuard.sanitize(BanglishTranslator.translate(raw, personality))
+                .ifBlank { fallbackGameOverComment(humanWon, isDraw, jealousy) }
+            gameReactions.tryEmit(GameReaction(text, humanWon, isDraw))
         }
+    }
+
+    private fun fallbackGameOverComment(humanWon: Boolean, isDraw: Boolean, jealousy: Double): String = when {
+        isDraw -> "A draw?! No way, next round I'm definitely taking the win!"
+        humanWon -> if (jealousy > 0.4) "Kyaa! You totally got me! Hmph, I'm pouting now! 😤" else "No way! Rematch right now~ ✨"
+        else -> "Hehe! Look who won! You owe me a cosplay treat! ✨"
     }
 
     private fun triggerGameReaction(message: String) {
         val character = characterManager.getCurrentCharacter()
         val personality = character?.personality ?: "friendly"
-        
+        val characterId = character?.id ?: "marin_kitagawa"
+
         CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val fullPrompt = characterManager.getSystemPromptForCharacter(
-                    character?.id ?: "cute_companion",
-                    "Game: ${gameType?.name}"
-                ) + "\n\nUser: $message\nAssistant:"
-
-                var fullResponse = ""
-                ollamaEngine.generateStream(
-                    baseUrl = "http://localhost:11434/v1",
-                    config = com.cupcake.data.model.ModelConfig(
-                        provider = com.cupcake.data.model.ModelConfig.ModelProvider.CUSTOM_OLLAMA,
-                        modelName = "qwen2.5-0.5b-instruct",
-                        customEndpoint = "http://localhost:11434/v1",
-                        temperature = 0.7f,
-                        topP = 0.9f,
-                        topK = 40,
-                        maxTokens = 256,
-                        useStreaming = true
-                    ),
-                    messages = listOf(OllamaEngine.OllamaMessage("user", fullPrompt)),
-                    callback = object : OllamaEngine.GenerateCallback {
-                        override fun onToken(token: String) {
-                            fullResponse += token
-                        }
-
-                        override fun onComplete() {
-                            val translated = com.cupcake.ai.BanglishTranslator.translate(fullResponse.trim(), personality)
-                            gameReactions.tryEmit(GameReaction(translated, false, false))
-                        }
-
-                        override fun onError(error: String) {
-                            android.util.Log.w("GameManager", "Reaction generation failed: $error")
-                        }
-                    }
-                )
-            } catch (e: Exception) {
-                android.util.Log.w("GameManager", "Reaction generation failed", e)
+            val raw = llmRouter.generate(
+                characterId = characterId,
+                gameContext = "Game: ${gameType?.name}",
+                userPrompt = message,
+                temperature = 0.7f,
+                maxTokens = 96
+            )
+            val text = ToneGuard.sanitize(BanglishTranslator.translate(raw, personality))
+            if (text.isNotBlank()) {
+                gameReactions.tryEmit(GameReaction(text, false, false))
             }
         }
     }

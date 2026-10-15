@@ -12,6 +12,7 @@ import com.cupcake.domain.repository.ChatRepository
 import com.cupcake.domain.repository.ModelRepository
 import com.cupcake.domain.repository.SystemPromptRepository
 import com.cupcake.game.GameManager
+import com.cupcake.game.GameLLMRouter
 import com.cupcake.game.PointsManager
 import com.cupcake.ui.screen.points.PointsViewModel
 import com.cupcake.network.EspWebSocketServer
@@ -86,12 +87,12 @@ object AppModule {
     @Provides
     @Singleton
     fun provideGameManager(
-        ollamaEngine: OllamaEngine,
+        llmRouter: GameLLMRouter,
         characterManager: CharacterManager,
         pointsManager: PointsManager,
         sessionStore: com.cupcake.chat.ChatSessionStore
     ): GameManager {
-        return GameManager(ollamaEngine, characterManager, pointsManager, sessionStore)
+        return GameManager(llmRouter, characterManager, pointsManager, sessionStore)
     }
 
     @Provides
