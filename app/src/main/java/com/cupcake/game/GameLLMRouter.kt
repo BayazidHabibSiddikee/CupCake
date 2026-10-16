@@ -2,41 +2,41 @@ package com.cupcake.game
 
 import android.util.Log
 import com.cupcake.ai.CharacterManager
+import com.cupcake.ai.LilTiiPromptTemplate
 import com.cupcake.ai.LlamaEngine
-import com.cupcake.data.model.ApiProvider
-import com.cupcake.data.model.ChatMessage
-import com.cupcake.data.model.ModelConfig
-import com.cupcake.data.source.remote.ApiClient
-import com.cupcake.domain.repository.ModelRepository
-import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Resolves which model the in-game character speaks through, matching the chat
- * screen: an enabled remote provider when the user has configured one, otherwise
- * the bundled on-device GGUF model.
+ * Produces the companion's in-game dialogue from the bundled on-device GGUF.
  *
- * Game code used to hardcode `http://localhost:11434/v1`, which on a phone points
- * at the phone itself and so silently failed — the "bot" was really only ever
- * emitting canned fallback lines. This router uses the same sources as chat.
+ * Games always run on the local model: it is already warm (see [com.cupcake.ai.ModelPreloader]),
+ * works offline, and keeps the playful LilTii voice. Remote providers are intentionally
+ * ignored here so a half-configured cloud key can never turn the game bot into silence.
+ *
+ * Lines are cached in a small LRU because game prompts repeat heavily (same board,
+ * same mood) and a warm hit returns instantly without touching the CPU sampler.
  */
 @Singleton
 class GameLLMRouter @Inject constructor(
-    private val apiClient: ApiClient,
     private val llamaEngine: LlamaEngine,
-    private val modelRepository: ModelRepository,
     private val characterManager: CharacterManager
 ) {
 
     private companion object {
         const val TAG = "GameLLMRouter"
-        const val GAME_CONVERSATION = "game"
+        const val MAX_CACHED_LINES = 96
+        const val MAX_SYSTEM_CHARS = 1400
+    }
+
+    private val lineCache = object : LinkedHashMap<String, String>(32, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>?): Boolean =
+            size > MAX_CACHED_LINES
     }
 
     /**
-     * Produce one in-game line of dialogue. Returns "" when no model is
-     * reachable, letting callers fall back to canned in-character lines.
+     * Produce one in-game line of dialogue. Returns "" when the local model is not
+     * ready, letting callers fall back to canned in-character lines.
      */
     suspend fun generate(
         characterId: String,
@@ -45,64 +45,52 @@ class GameLLMRouter @Inject constructor(
         temperature: Float = 0.8f,
         maxTokens: Int = 96
     ): String {
+        val cacheKey = "$characterId\u0000$gameContext\u0000$userPrompt"
+        synchronized(lineCache) {
+            lineCache[cacheKey]?.let { return it }
+        }
+
         val systemPrompt = characterManager.getSystemPromptForCharacter(characterId, gameContext)
         val raw = try {
-            val provider = modelRepository.getEnabledProviders().first().firstOrNull()
-            if (provider != null && provider.providerType != ModelConfig.ModelProvider.LOCAL_LLAMA) {
-                generateRemote(provider, systemPrompt, userPrompt, temperature, maxTokens)
-            } else {
-                generateLocal(systemPrompt, userPrompt)
-            }
+            generateLocal(systemPrompt, userPrompt)
         } catch (e: Exception) {
             Log.w(TAG, "Game generation failed: ${e.message}")
             ""
         }
-        return ToneGuard.sanitize(raw)
+        val line = ToneGuard.sanitize(raw)
+        if (line.isNotBlank()) {
+            synchronized(lineCache) { lineCache[cacheKey] = line }
+        }
+        return line
     }
 
-    private suspend fun generateRemote(
-        provider: ApiProvider,
-        systemPrompt: String,
-        userPrompt: String,
-        temperature: Float,
-        maxTokens: Int
-    ): String {
-        val config = ModelConfig(
-            provider = provider.providerType,
-            modelName = provider.models.firstOrNull()?.takeIf { it.isNotBlank() }
-                ?: defaultModelName(provider.providerType),
-            customEndpoint = provider.baseUrl,
-            apiKey = provider.apiKey,
-            temperature = temperature,
-            topP = 0.9f,
-            topK = 40,
-            maxTokens = maxTokens,
-            useStreaming = true
-        )
-        val messages = listOf(
-            ChatMessage.system(systemPrompt, GAME_CONVERSATION),
-            ChatMessage.user(userPrompt, GAME_CONVERSATION)
-        )
-        val builder = StringBuilder()
-        apiClient.generateRemote(messages, config).collect { chunk ->
-            if (chunk.delta.isNotEmpty()) builder.append(chunk.delta)
-        }
-        return builder.toString()
+    fun clearCache() {
+        synchronized(lineCache) { lineCache.clear() }
     }
 
     private suspend fun generateLocal(systemPrompt: String, userPrompt: String): String {
         if (!llamaEngine.isReady()) return ""
-        val prompt = "$systemPrompt\n\nUser: $userPrompt\nAssistant:"
+
+        val styled = buildString {
+            append(systemPrompt.take(MAX_SYSTEM_CHARS))
+            append("\n")
+            append(LilTiiPromptTemplate.CUTE_STYLE)
+        }
+
+        val prompt = buildString {
+            append("<|im_start|>system\n")
+            append(styled)
+            append("<|im_end|>\n")
+            append("<|im_start|>user\n")
+            append(userPrompt)
+            append("<|im_end|>\n")
+            append("<|im_start|>assistant\n")
+        }
+
         val builder = StringBuilder()
         for (token in llamaEngine.generateStream(prompt)) {
             builder.append(token)
         }
         return builder.toString()
-    }
-
-    private fun defaultModelName(provider: ModelConfig.ModelProvider): String = when (provider) {
-        ModelConfig.ModelProvider.CUSTOM_OLLAMA -> "qwen2.5:0.5b"
-        ModelConfig.ModelProvider.LOCAL_LLAMA -> "liltii-v0.2-small-q2_k.gguf"
-        else -> "gpt-3.5-turbo"
     }
 }

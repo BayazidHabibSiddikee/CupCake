@@ -85,7 +85,9 @@ class GameViewModel @Inject constructor(
     val selectedDifficulty = MutableStateFlow(com.cupcake.game.TicTacToeEngine.Difficulty.NORMAL)
 
     fun startGame(gameOption: GameOption, difficulty: com.cupcake.game.TicTacToeEngine.Difficulty) {
-        if (!energyManager.consumeEnergy(com.cupcake.ai.EnergyManager.ENERGY_PER_GAME)) return
+        // Games are never blocked by energy: spend if available, but always start.
+        // (A hard gate here silently swallowed every tap once energy hit zero.)
+        energyManager.consumeEnergy(com.cupcake.ai.EnergyManager.ENERGY_PER_GAME)
 
         clearBotComment()
         val result = gameManager.startGame(gameOption.type, difficulty)

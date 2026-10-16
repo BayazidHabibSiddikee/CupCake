@@ -169,7 +169,7 @@ fun GameScreen(
                         columns = androidx.compose.foundation.lazy.grid.GridCells.Fixed(2),
                         horizontalArrangement = Arrangement.spacedBy(16.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp),
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxWidth().weight(1f)
                     ) {
                         items(availableGames) { game ->
                             GameOptionCard(
