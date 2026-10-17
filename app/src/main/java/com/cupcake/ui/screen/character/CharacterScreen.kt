@@ -103,60 +103,6 @@ fun CharacterScreen(
         }
     }
 
-    val sillyTavernCardLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri ->
-        uri?.let {
-            try {
-                val bytes = context.contentResolver.openInputStream(it)?.use { stream -> stream.readBytes() }
-                if (bytes != null) {
-                    var fileName: String? = null
-                    try {
-                        context.contentResolver.query(it, null, null, null, null)?.use { cursor ->
-                            val nameIdx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                            if (nameIdx >= 0 && cursor.moveToFirst()) {
-                                fileName = cursor.getString(nameIdx)
-                            }
-                        }
-                    } catch (_: Exception) {}
-                    viewModel.importSillyTavernCard(bytes, fileName)
-                }
-            } catch (e: Exception) {
-                Toast.makeText(context, "Error opening file: ${e.message}", Toast.LENGTH_LONG).show()
-            }
-        }
-    }
-
-    val shareCharacterCard: (Character) -> Unit = { character ->
-        try {
-            val cardBytes = viewModel.exportSillyTavernCard(character.id)
-            if (cardBytes != null) {
-                val exportDir = File(context.cacheDir, "tavern_cards").apply { mkdirs() }
-                val safeName = character.name.replace(Regex("[^a-zA-Z0-9_-]"), "_")
-                val file = File(exportDir, "${safeName}_card.png")
-                file.writeBytes(cardBytes)
-
-                val contentUri = FileProvider.getUriForFile(
-                    context,
-                    "${context.packageName}.fileprovider",
-                    file
-                )
-                val sendIntent = Intent(Intent.ACTION_SEND).apply {
-                    type = "image/png"
-                    putExtra(Intent.EXTRA_STREAM, contentUri)
-                    putExtra(Intent.EXTRA_SUBJECT, "${character.name} Character Card")
-                    putExtra(Intent.EXTRA_TEXT, "SillyTavern Character Card for ${character.name}")
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                }
-                context.startActivity(Intent.createChooser(sendIntent, "Share SillyTavern Character Card"))
-            } else {
-                Toast.makeText(context, "Could not export card", Toast.LENGTH_SHORT).show()
-            }
-        } catch (e: Exception) {
-            Toast.makeText(context, "Export failed: ${e.message}", Toast.LENGTH_LONG).show()
-        }
-    }
-
     CupCakeTheme {
         Column(
             modifier = Modifier.fillMaxSize(),
@@ -166,9 +112,6 @@ fun CharacterScreen(
                 title = { Text("Characters & Mascot") },
                 navigationIcon = { IconButton(onClick = onClose) { Icon(imageVector = androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } },
                 actions = {
-                    IconButton(onClick = { sillyTavernCardLauncher.launch("*/*") }) {
-                        Icon(imageVector = Icons.Default.FileOpen, contentDescription = "Import SillyTavern PNG Card")
-                    }
                     IconButton(onClick = { viewModel.showCreateDialog.value = true }) {
                         Icon(imageVector = androidx.compose.material.icons.Icons.Filled.Add, contentDescription = "Create character")
                     }
@@ -184,37 +127,6 @@ fun CharacterScreen(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // SillyTavern PNG Cards Quick Import Banner
-                item {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = androidx.compose.material3.CardDefaults.cardColors(
-                            containerColor = androidx.compose.material3.MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f)
-                        ),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        androidx.compose.foundation.layout.Row(
-                            modifier = Modifier.padding(14.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Text("🎭", fontSize = 28.sp)
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text("Custom SillyTavern PNG Cards", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                                Text("Import PNG cards with embedded persona, first messages & scenario", fontSize = 12.sp, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            androidx.compose.material3.FilledTonalButton(
-                                onClick = { sillyTavernCardLauncher.launch("*/*") },
-                                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                            ) {
-                                Icon(imageVector = Icons.Default.Download, contentDescription = null, modifier = Modifier.size(14.dp))
-                                androidx.compose.foundation.layout.Spacer(Modifier.size(4.dp))
-                                Text("Import", fontSize = 12.sp)
-                            }
-                        }
-                    }
-                }
-
                 items(characters) { character ->
                     CharacterCard(
                         character = character,
@@ -222,7 +134,6 @@ fun CharacterScreen(
                         onSelect = { viewModel.selectCharacter(character.id) },
                         onEdit = { if (!character.isBuiltIn) viewModel.editCharacter(character) },
                         onDelete = { if (!character.isBuiltIn) viewModel.deleteCharacter(character.id) },
-                        onExport = { shareCharacterCard(character) },
                         onToggleShimeji = { enabled ->
                             if (enabled && !Settings.canDrawOverlays(context)) {
                                 val intent = Intent(
@@ -314,18 +225,6 @@ fun CharacterScreen(
                                 androidx.compose.foundation.layout.Spacer(Modifier.size(6.dp))
                                 Text(if (newCharGif != null) "GIF Selected ✓" else "Choose Animated GIF Pet", fontSize = 12.sp)
                             }
-                            androidx.compose.material3.OutlinedButton(
-                                onClick = {
-                                    viewModel.showCreateDialog.value = false
-                                    sillyTavernCardLauncher.launch("*/*")
-                                },
-                                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Icon(imageVector = Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
-                                androidx.compose.foundation.layout.Spacer(Modifier.size(6.dp))
-                                Text("Import from SillyTavern PNG Card", fontSize = 12.sp)
-                            }
                             TextField(
                                 value = newCharAvatar,
                                 onValueChange = { viewModel.newCharAvatar.value = it },
@@ -387,7 +286,6 @@ fun CharacterCard(
     onSelect: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
-    onExport: () -> Unit,
     onToggleShimeji: (Boolean) -> Unit
 ) {
     Card(
@@ -467,14 +365,6 @@ fun CharacterCard(
                         onClick = { onToggleShimeji(!character.isShimejiActive) }
                     ) {
                         Text(if (character.isShimejiActive) "🐾" else "💤", fontSize = 20.sp)
-                    }
-
-                    IconButton(onClick = onExport) {
-                        Icon(
-                            imageVector = Icons.Default.Share,
-                            contentDescription = "Export SillyTavern Card",
-                            tint = androidx.compose.material3.MaterialTheme.colorScheme.primary
-                        )
                     }
 
                     if (!character.isBuiltIn) {

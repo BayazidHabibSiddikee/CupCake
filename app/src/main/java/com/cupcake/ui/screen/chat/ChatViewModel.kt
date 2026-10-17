@@ -7,7 +7,7 @@ import com.cupcake.ai.CharacterManager
 import com.cupcake.ai.EnergyManager
 import com.cupcake.ai.LlamaEngine
 import com.cupcake.ai.OllamaEngine
-import com.cupcake.ai.SillyTavernCardParser
+import com.cupcake.ai.PromptTemplates
 import com.cupcake.data.model.Character
 import com.cupcake.data.model.ChatMessage
 import com.cupcake.data.model.ModelConfig
@@ -328,7 +328,7 @@ class ChatViewModel @Inject constructor(
             val rawFirst = character.firstMessage?.ifBlank { null }
                 ?: "*smiles cheerfully and waves* Hey! I was waiting for you! What's on your mind today?"
             if (sessionStore.messages(character.id).value.isEmpty()) {
-                val cleanFirst = SillyTavernCardParser.replaceTemplateMacros(rawFirst, character.name, userName())
+                val cleanFirst = PromptTemplates.replaceTemplateMacros(rawFirst, character.name, userName())
                 sessionStore.addMessage(
                     character.id,
                     ChatMessage.assistant(
@@ -353,7 +353,7 @@ class ChatViewModel @Inject constructor(
         // Add system prompt if available
         val rawSys = _systemPrompt.value?.fullPrompt() ?: systemPromptCache
         if (rawSys.isNotBlank()) {
-            val cleanSys = SillyTavernCardParser.replaceTemplateMacros(rawSys, charName, userName())
+            val cleanSys = PromptTemplates.replaceTemplateMacros(rawSys, charName, userName())
             val profile = userProfileBlock()
             val withProfile = if (profile.isNotBlank()) "$cleanSys\n$profile" else cleanSys
             messageList.add(OllamaEngine.OllamaMessage(role = "system", content = withProfile))
@@ -365,7 +365,7 @@ class ChatViewModel @Inject constructor(
         if (!hasAssistant) {
             val defaultGreeting = _currentCharacter.value?.firstMessage?.ifBlank { null }
                 ?: "*smiles cheerfully and waves* Hey! I was waiting for you! What's on your mind today?"
-            val cleanGreeting = SillyTavernCardParser.replaceTemplateMacros(defaultGreeting, charName, userName())
+            val cleanGreeting = PromptTemplates.replaceTemplateMacros(defaultGreeting, charName, userName())
             messageList.add(OllamaEngine.OllamaMessage(role = "assistant", content = cleanGreeting))
         }
 
@@ -376,7 +376,7 @@ class ChatViewModel @Inject constructor(
                 ChatMessage.MessageRole.SYSTEM -> "system"
                 ChatMessage.MessageRole.TOOL -> "tool"
             }
-            val cleanContent = SillyTavernCardParser.replaceTemplateMacros(msg.content, charName, userName())
+            val cleanContent = PromptTemplates.replaceTemplateMacros(msg.content, charName, userName())
             messageList.add(OllamaEngine.OllamaMessage(role = role, content = cleanContent))
         }
         
@@ -511,7 +511,7 @@ class ChatViewModel @Inject constructor(
         }
         
         // Compact system prompt and sanitize macros
-        val cleanSystemPrompt = SillyTavernCardParser.replaceTemplateMacros(rawSystemPrompt, charName, userName())
+        val cleanSystemPrompt = PromptTemplates.replaceTemplateMacros(rawSystemPrompt, charName, userName())
         // Nudge the small on-device model into the cute [emotion] *action* reply format
         val profile = userProfileBlock()
         // The style line must always survive the length budget below, otherwise the
@@ -543,7 +543,7 @@ class ChatViewModel @Inject constructor(
         if (!hasAssistantHistory) {
             val defaultGreeting = _currentCharacter.value?.firstMessage?.ifBlank { null }
                 ?: "*smiles cheerfully and waves* Hey! I was waiting for you! What's on your mind today?"
-            val cleanGreeting = SillyTavernCardParser.replaceTemplateMacros(defaultGreeting, charName, userName())
+            val cleanGreeting = PromptTemplates.replaceTemplateMacros(defaultGreeting, charName, userName())
             builder.append("<|im_start|>assistant\n")
             builder.append(cleanGreeting)
             builder.append("<|im_end|>\n")
@@ -551,7 +551,7 @@ class ChatViewModel @Inject constructor(
 
         for (msg in recentMessages) {
             val rawContent = if (msg.content.length > 400) msg.content.take(400) else msg.content
-            val cleanContent = SillyTavernCardParser.replaceTemplateMacros(rawContent, charName, userName())
+            val cleanContent = PromptTemplates.replaceTemplateMacros(rawContent, charName, userName())
             val role = if (msg.role == ChatMessage.MessageRole.USER) "user" else "assistant"
             builder.append("<|im_start|>")
             builder.append(role)
