@@ -88,6 +88,35 @@ class CompanionKeyboardService : InputMethodService() {
             setTextColor(0xFF222222.toInt())
             text = "${currentMode().label} · watching what you type ~"
         }
+        // Persona chip — tap to cycle AUTO -> SLEEPY -> WINGMAN -> SNARKY
+        val personaChip = TextView(this).apply {
+            textSize = 12f
+            setTextColor(0xFF222222.toInt())
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(0xFFFCE4EC.toInt())
+                cornerRadius = px(12).toFloat()
+            }
+            setPadding(px(10), px(4), px(10), px(4))
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).also {
+                it.marginStart = px(8)
+            }
+            isHapticFeedbackEnabled = true
+        }
+        fun refreshChip() {
+            personaChip.text = currentMode().label
+            setFaceStem(currentMode().stemForChip())
+        }
+        personaChip.setOnClickListener {
+            personaChip.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
+            val next = PersonaMode.entries[
+                (PersonaMode.entries.indexOf(currentMode()) + 1) % PersonaMode.entries.size]
+            prefs.edit().putString(KEY_MODE, next.name).apply()
+            refreshChip()
+            bubbleView?.text = "${next.label} · watching what you type ~"
+        }
+        strip.addView(personaChip)
+        refreshChip()
         strip.addView(faceView)
         strip.addView(bubbleView)
 
