@@ -81,6 +81,11 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
+        <!-- Demand notification actions (Fulfill / Ignore) -->
+        <receiver
+            android:name=".ai.DemandActionReceiver"
+            android:exported="false" />
+
         <!-- Hilt -->
         <meta-data
             android:name="dagger.hilt.android.internal.DISABLE_HILT_CODE_GENERATION"

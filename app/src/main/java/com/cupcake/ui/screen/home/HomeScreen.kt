@@ -38,6 +38,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -84,6 +85,8 @@ fun HomeScreen(
     val energy by viewModel.energy.collectAsStateWithLifecycle()
     val companionQuote by viewModel.companionQuote.collectAsStateWithLifecycle()
     val companionEmotion by viewModel.companionEmotion.collectAsStateWithLifecycle()
+    val currentDemand by viewModel.currentDemand.collectAsStateWithLifecycle()
+    val marinAffection by viewModel.marinAffection.collectAsStateWithLifecycle()
 
     val activeCompanion = characters.firstOrNull { it.isSelected }
         ?: characters.firstOrNull { it.id == "marin_kitagawa" }
@@ -443,6 +446,50 @@ fun HomeScreen(
                                     fontWeight = FontWeight.Medium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
+                            }
+                        }
+                    }
+                }
+
+                // MARIN'S DEMAND (costs points to satisfy)
+                currentDemand?.let { demand ->
+                    item {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(20.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                            )
+                        ) {
+                            Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(demand.title, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                    Spacer(Modifier.weight(1f))
+                                    Text(
+                                        text = "💗 $marinAffection",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp
+                                    )
+                                }
+                                Spacer(Modifier.height(6.dp))
+                                Text(demand.message, fontSize = 14.sp)
+                                Spacer(Modifier.height(10.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    Button(
+                                        onClick = { viewModel.fulfillDemand() },
+                                        enabled = points >= demand.cost,
+                                        shape = RoundedCornerShape(12.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = MessengerBlue)
+                                    ) {
+                                        Text("Give in · ${demand.cost} pts", fontSize = 13.sp)
+                                    }
+                                    OutlinedButton(
+                                        onClick = { viewModel.ignoreDemand() },
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Text("Not now", fontSize = 13.sp)
+                                    }
+                                }
                             }
                         }
                     }

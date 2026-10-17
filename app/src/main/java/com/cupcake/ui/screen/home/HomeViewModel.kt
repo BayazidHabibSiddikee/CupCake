@@ -28,6 +28,14 @@ class HomeViewModel @Inject constructor(
     val totalWins = pointsManager.totalWins
     val energy = energyManager.energy
 
+    val currentDemand = com.cupcake.ai.DemandManager.currentDemand
+    val marinAffection = com.cupcake.ai.DemandManager.affection
+    val demandEvent = com.cupcake.ai.DemandManager.lastEvent
+
+    fun fulfillDemand() { com.cupcake.ai.DemandManager.fulfillFromUi() }
+    fun ignoreDemand() { com.cupcake.ai.DemandManager.dismissFromUi() }
+    fun clearDemandEvent() { com.cupcake.ai.DemandManager.consumeEvent() }
+
     private val _companionQuote = MutableStateFlow("Kyaa! Let's play games today! Don't you dare ignore me~ ✨")
     val companionQuote = _companionQuote.asStateFlow()
 

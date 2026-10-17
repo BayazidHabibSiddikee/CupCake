@@ -143,6 +143,15 @@ class GameViewModel @Inject constructor(
         refreshEscalation()
     }
 
+    /** Chess UI reports a completed move (squares 0..63, optional promotion piece). */
+    fun chessMove(from: Int, to: Int, promotion: Char = ' ') {
+        gameManager.chessHumanMove(from, to, promotion)
+        _gameState.value = gameManager.getCurrentState()?.let {
+            com.cupcake.game.GameManager.Result(true, "Move made", it)
+        }
+        refreshEscalation()
+    }
+
     fun submitTextAnswer(answer: String) {
         val result = gameManager.submitTextAnswer(answer)
         _gameState.value = gameManager.getCurrentState()?.let {

@@ -97,8 +97,16 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun providePointsManager(): PointsManager {
-        return PointsManager()
+    fun providePointsStore(
+        @dagger.hilt.android.qualifiers.ApplicationContext context: Context
+    ): com.cupcake.game.PointsStore {
+        return com.cupcake.game.SharedPrefsPointsStore(context)
+    }
+
+    @Provides
+    @Singleton
+    fun providePointsManager(store: com.cupcake.game.PointsStore): PointsManager {
+        return PointsManager(store)
     }
 
     @Provides

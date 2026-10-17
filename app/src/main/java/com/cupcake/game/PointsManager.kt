@@ -1,15 +1,34 @@
 package com.cupcake.game
 
+import android.util.Log
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * Owns the two economies:
+ *  - [points] are **spendable coins** (stake for Marin's demands),
+ *  - [xp] is a **lifetime** score that only ever grows and drives [level].
+ *
+ * Keeping them separate means fulfilling a demand never knocks you back a level.
+ * State is persisted through [PointsStore] so it survives process death.
+ */
 @Singleton
-class PointsManager @Inject constructor() {
+class PointsManager @Inject constructor(
+    private val store: PointsStore
+) {
+
+    /** Convenience constructor for tests / previews: in-memory, no persistence. */
+    constructor() : this(InMemoryPointsStore())
 
     private val _points = MutableStateFlow(0L)
     val points: MutableStateFlow<Long> = _points
+
+    private val _xp = MutableStateFlow(0L)
+    val xp: MutableStateFlow<Long> = _xp
 
     private val _level = MutableStateFlow(1)
     val level: MutableStateFlow<Int> = _level
@@ -29,23 +48,67 @@ class PointsManager @Inject constructor() {
     private val _achievements = MutableStateFlow<Set<String>>(emptySet())
     val achievements: MutableStateFlow<Set<String>> = _achievements
 
+    private val _levelUpEvents = MutableSharedFlow<Int>(extraBufferCapacity = 8)
+    val levelUpEvents: SharedFlow<Int> = _levelUpEvents.asSharedFlow()
+
+    private val statsLock = Any()
+
     init {
-        loadFromPrefs()
+        load()
+        instance = this
     }
 
-    private fun loadFromPrefs() {
-        // TODO: Load from DataStore/SharedPreferences
+    // ---- Persistence -------------------------------------------------------------
+
+    private fun load() {
+        val snapshot = runCatching { store.load() }.getOrElse {
+            Log.e(TAG, "Failed to load points", it)
+            PointsSnapshot()
+        }
+        _points.value = snapshot.points
+        _xp.value = snapshot.xp
+        _level.value = levelFromXp(snapshot.xp)
+        _xpProgress.value = progressInLevel(snapshot.xp, _level.value)
+        _totalGamesPlayed.value = snapshot.totalGamesPlayed
+        _totalWins.value = snapshot.totalWins
+        _achievements.value = snapshot.achievements.toSet()
+        _gameStats.value = snapshot.stats.mapNotNull { stored ->
+            val type = runCatching { Game.GameType.valueOf(stored.gameType) }.getOrNull()
+                ?: return@mapNotNull null
+            type to GameStats(
+                gameType = type,
+                gamesPlayed = stored.gamesPlayed,
+                wins = stored.wins,
+                totalPoints = stored.totalPoints,
+                bestScore = stored.bestScore
+            )
+        }.toMap()
     }
 
-    private fun saveToPrefs() {
-        // TODO: Save to DataStore/SharedPreferences
+    private fun persist() {
+        runCatching {
+            store.save(
+                PointsSnapshot(
+                    points = _points.value,
+                    xp = _xp.value,
+                    level = _level.value,
+                    totalGamesPlayed = _totalGamesPlayed.value,
+                    totalWins = _totalWins.value,
+                    stats = synchronized(statsLock) {
+                        _gameStats.value.map { (type, s) ->
+                            StoredGameStat(type.name, s.gamesPlayed, s.wins, s.totalPoints, s.bestScore)
+                        }
+                    },
+                    achievements = _achievements.value.toList()
+                )
+            )
+        }.onFailure { Log.e(TAG, "Failed to persist points", it) }
     }
+
+    // ---- Earning / spending ------------------------------------------------------
 
     fun awardPoints(basePoints: Int, gameType: Game.GameType, won: Boolean) {
-        val multiplier = when {
-            won -> 1.5
-            else -> 0.5
-        }
+        val multiplier = if (won) 1.5 else 0.5
         val difficultyBonus = when (gameType) {
             Game.GameType.CHESS -> 2.0
             Game.GameType.CONNECT_FOUR -> 1.5
@@ -58,75 +121,102 @@ class PointsManager @Inject constructor() {
             else -> 1.0
         }
 
-        val earned = (basePoints * multiplier * difficultyBonus).toLong()
-        val newTotal = _points.value + earned
-        _points.value = newTotal
+        val earned = maxOf(1L, (basePoints * multiplier * difficultyBonus).toLong())
+
+        _points.value += earned
+        _xp.value += earned
 
         _totalGamesPlayed.value++
         if (won) _totalWins.value++
 
-        // Update game stats
-        val currentStats = _gameStats.value[gameType] ?: GameStats(gameType = gameType)
-        val updatedStats = currentStats.copy(
-            gamesPlayed = currentStats.gamesPlayed + 1,
-            wins = currentStats.wins + if (won) 1 else 0,
-            totalPoints = currentStats.totalPoints + earned,
-            bestScore = maxOf(currentStats.bestScore, earned.toInt())
-        )
-        _gameStats.value = _gameStats.value + (gameType to updatedStats)
+        synchronized(statsLock) {
+            val current = _gameStats.value[gameType] ?: GameStats(gameType = gameType)
+            _gameStats.value = _gameStats.value + (gameType to current.copy(
+                gamesPlayed = current.gamesPlayed + 1,
+                wins = current.wins + if (won) 1 else 0,
+                totalPoints = current.totalPoints + earned,
+                bestScore = maxOf(current.bestScore, earned.toInt())
+            ))
+        }
 
-        // Check level up
-        checkLevelUp()
-
-        // Check achievements
-        checkAchievements(gameType, won, earned)
-
-        saveToPrefs()
+        recomputeLevel()
+        checkAchievements(gameType, won)
+        persist()
     }
 
-    private fun checkLevelUp() {
-        val currentLevel = _level.value
-        val requiredXp = getXpForLevel(currentLevel + 1)
-        if (_points.value >= requiredXp) {
-            _level.value = currentLevel + 1
-            _xpProgress.value = 0f
-            // Trigger level up reaction
-        } else {
-            val currentXp = getXpForLevel(currentLevel)
-            val nextXp = getXpForLevel(currentLevel + 1)
-            _xpProgress.value = (_points.value - currentXp).toFloat() / (nextXp - currentXp).toFloat()
+    /**
+     * Spend coins. Returns false (and changes nothing) when the balance is too low,
+     * so callers can hard-gate features like Marin's demands.
+     */
+    fun spendPoints(amount: Long): Boolean {
+        if (amount <= 0L) return true
+        synchronized(statsLock) {
+            if (_points.value < amount) return false
+            _points.value -= amount
+        }
+        persist()
+        return true
+    }
+
+    fun addCoins(amount: Long) {
+        if (amount <= 0L) return
+        _points.value += amount
+        persist()
+    }
+
+    // ---- Levels ------------------------------------------------------------------
+
+    private fun recomputeLevel() {
+        val xp = _xp.value
+        val previous = _level.value
+        val current = levelFromXp(xp)
+        _level.value = current
+        _xpProgress.value = progressInLevel(xp, current)
+        if (current > previous) {
+            for (lvl in (previous + 1)..current) _levelUpEvents.tryEmit(lvl)
         }
     }
 
+    /** XP needed to *reach* [level] (level 1 costs 0). */
     private fun getXpForLevel(level: Int): Long {
-        // Exponential curve: 100, 250, 500, 1000, 2000, 4000...
-        return (100.0 * Math.pow(1.5, (level - 1).toDouble())).toLong()
+        if (level <= 1) return 0L
+        var total = 0L
+        var need = BASE_XP
+        for (l in 2..level) {
+            total += need
+            need = (need * GROWTH).toLong()
+        }
+        return total
     }
 
-    private fun checkAchievements(gameType: Game.GameType, won: Boolean, points: Long) {
-        val newAchievements = mutableSetOf<String>()
-        newAchievements.addAll(_achievements.value)
+    private fun levelFromXp(xp: Long): Int {
+        var level = 1
+        while (level < MAX_LEVEL && xp >= getXpForLevel(level + 1)) level++
+        return level
+    }
 
-        // First win
-        if (won && _totalWins.value == 1) {
-            newAchievements.add("first_win")
-        }
+    private fun progressInLevel(xp: Long, level: Int): Float {
+        val floor = getXpForLevel(level)
+        val ceiling = getXpForLevel(level + 1)
+        val span = (ceiling - floor).coerceAtLeast(1L)
+        return ((xp - floor).toFloat() / span.toFloat()).coerceIn(0f, 1f)
+    }
 
-        // Streak achievements
+    private fun checkAchievements(gameType: Game.GameType, won: Boolean) {
+        val newAchievements = _achievements.value.toMutableSet()
+
+        if (won && _totalWins.value == 1) newAchievements.add("first_win")
+
         if (won) {
-            val stats = _gameStats.value[gameType]
-            if (stats != null) {
-                when (stats.wins) {
-                    5 -> newAchievements.add("${gameType.name.toLowerCase()}_novice")
-                    10 -> newAchievements.add("${gameType.name.toLowerCase()}_expert")
-                    25 -> newAchievements.add("${gameType.name.toLowerCase()}_master")
-                    50 -> newAchievements.add("${gameType.name.toLowerCase()}_grandmaster")
-                    100 -> newAchievements.add("${gameType.name.toLowerCase()}_legend")
-                }
+            when (_gameStats.value[gameType]?.wins) {
+                5 -> newAchievements.add("${gameType.name.lowercase()}_novice")
+                10 -> newAchievements.add("${gameType.name.lowercase()}_expert")
+                25 -> newAchievements.add("${gameType.name.lowercase()}_master")
+                50 -> newAchievements.add("${gameType.name.lowercase()}_grandmaster")
+                100 -> newAchievements.add("${gameType.name.lowercase()}_legend")
             }
         }
 
-        // Total games
         when (_totalGamesPlayed.value) {
             10 -> newAchievements.add("casual_player")
             50 -> newAchievements.add("regular_player")
@@ -135,33 +225,31 @@ class PointsManager @Inject constructor() {
             1000 -> newAchievements.add("legendary_player")
         }
 
-        // Points milestones
-        when (_points.value) {
-            in 1000..9999 -> newAchievements.add("point_collector")
-            in 10000..99999 -> newAchievements.add("point_hoarder")
-            in 100000..999999 -> newAchievements.add("point_millionaire")
+        // Milestones keyed off lifetime XP so spending coins can't re-trigger them.
+        when (_xp.value) {
+            in 1_000..9_999 -> newAchievements.add("point_collector")
+            in 10_000..99_999 -> newAchievements.add("point_hoarder")
+            in 100_000..999_999 -> newAchievements.add("point_millionaire")
         }
 
-        // Perfect game achievements (won without losing)
         val stats = _gameStats.value[gameType]
         if (won && stats != null && stats.wins == stats.gamesPlayed && stats.gamesPlayed >= 5) {
-            newAchievements.add("${gameType.name.toLowerCase()}_perfect")
+            newAchievements.add("${gameType.name.lowercase()}_perfect")
         }
 
-        // Try all games
-        if (_gameStats.value.size >= 10) {
-            newAchievements.add("polymath")
-        }
+        if (_gameStats.value.size >= 10) newAchievements.add("polymath")
 
         if (newAchievements != _achievements.value) {
             _achievements.value = newAchievements
         }
     }
 
+    /** XP accrued inside the current level and the XP span of that level. */
     fun getLevelProgress(): Pair<Long, Long> {
-        val currentXp = getXpForLevel(_level.value)
-        val nextXp = getXpForLevel(_level.value + 1)
-        return Pair(_points.value - currentXp, nextXp - currentXp)
+        val level = _level.value
+        val floor = getXpForLevel(level)
+        val ceiling = getXpForLevel(level + 1)
+        return Pair((_xp.value - floor).coerceAtLeast(0L), (ceiling - floor).coerceAtLeast(1L))
     }
 
     fun getWinRate(gameType: Game.GameType): Double {
@@ -176,4 +264,31 @@ class PointsManager @Inject constructor() {
         var totalPoints: Long = 0,
         var bestScore: Int = 0
     )
+
+    companion object {
+        private const val TAG = "PointsManager"
+        private const val BASE_XP = 100L
+        private const val GROWTH = 1.5
+        private const val MAX_LEVEL = 99
+
+        @Volatile
+        private var instance: PointsManager? = null
+
+        /** Process-wide instance for non-Hilt callers (e.g. notification receivers). */
+        fun get(): PointsManager? = instance
+
+        /**
+         * Spends coins even from a cold start (notification tap before any screen
+         * injected the manager). Routes through the live instance when available so
+         * in-memory state stays in sync.
+         */
+        fun spendPersisted(context: android.content.Context, amount: Long): Boolean {
+            instance?.let { return it.spendPoints(amount) }
+            val store = SharedPrefsPointsStore(context)
+            val snapshot = store.load()
+            if (snapshot.points < amount) return false
+            store.save(snapshot.copy(points = snapshot.points - amount))
+            return true
+        }
+    }
 }

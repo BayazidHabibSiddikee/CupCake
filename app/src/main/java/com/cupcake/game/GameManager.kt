@@ -76,7 +76,8 @@ class GameManager(
         Game.GameType.REACTION_TIME,
         Game.GameType.TIC_TAC_TOE,
         Game.GameType.TIC_TAC_TOE_4X4,
-        Game.GameType.PING_PONG
+        Game.GameType.PING_PONG,
+        Game.GameType.CHESS
     )
 
     // ML Models for different games
@@ -1260,6 +1261,106 @@ class GameManager(
         onGameStateChanged?.invoke(currentGame)
     }
 
+    // ---- Chess -------------------------------------------------------------------
+
+    /**
+     * Human chess move, given from/to squares (0..63) and an optional promotion
+     * piece ('Q'/'R'/'B'/'N'). Legality is enforced by [ChessEngine]; the running
+     * game state, win/draw detection, points and reactions flow through the same
+     * plumbing as every other game. Marin answers on a short delay.
+     */
+    fun chessHumanMove(from: Int, to: Int, promotion: Char = ' '): Result {
+        val game = currentGame ?: return Result(false, "No active game")
+        if (game.gameType != Game.GameType.CHESS) return Result(false, "Chess is not the active game")
+        if (game.status != Game.GameStatus.PLAYING) return Result(false, "Game over")
+        if (game.currentPlayer != Game.Player.HUMAN) return Result(false, "Not your turn")
+        val board = game.board as? ChessBoard ?: return Result(false, "Invalid board")
+
+        val candidates = ChessEngine.legalMoves(board.position).filter { it.from == from && it.to == to }
+        if (candidates.isEmpty()) return Result(false, "Illegal move")
+        val move = if (promotion == ' ') candidates.first()
+        else candidates.firstOrNull { it.promotion.equals(promotion, ignoreCase = true) } ?: candidates.first()
+
+        return applyChessMove(game, board, move, Game.Player.HUMAN)
+    }
+
+    private fun makeBotMoveChess() {
+        val game = currentGame ?: return
+        if (game.gameType != Game.GameType.CHESS) return
+        if (game.status != Game.GameStatus.PLAYING) return
+        val board = game.board as? ChessBoard ?: return
+
+        val move = ChessEngine.bestMove(board.position, jealousyTracker.getAdaptiveDifficulty(difficulty))
+            ?: run {
+                finishChess(game, board, winner = null, reason = "Stalemate")
+                return
+            }
+        applyChessMove(game, board, move, Game.Player.BOT)
+    }
+
+    private fun applyChessMove(
+        game: Game.State,
+        board: ChessBoard,
+        move: ChessEngine.ChessMove,
+        mover: Game.Player
+    ): Result {
+        board.applyPosition(ChessEngine.makeMove(board.position, move))
+        val encoded = move.from * 64 + move.to
+        val newHistory = game.moveHistory + Game.Move(mover, encoded)
+
+        return when (ChessEngine.status(board.position)) {
+            ChessEngine.ChessStatus.CHECKMATE -> {
+                val humanWon = mover == Game.Player.HUMAN
+                finishChess(game, board, winner = if (humanWon) Game.Player.HUMAN else Game.Player.BOT,
+                    reason = if (humanWon) "You checkmated Marin!" else "Marin checkmated you!")
+            }
+            ChessEngine.ChessStatus.STALEMATE -> finishChess(game, board, winner = null, reason = "Stalemate")
+            ChessEngine.ChessStatus.DRAW -> finishChess(game, board, winner = null, reason = "Draw")
+            else -> {
+                // Hand the turn to the opponent.
+                val next = if (mover == Game.Player.HUMAN) Game.Player.BOT else Game.Player.HUMAN
+                currentGame = game.copy(board = board, currentPlayer = next, moveHistory = newHistory)
+                onGameStateChanged?.invoke(currentGame)
+
+                if (next == Game.Player.BOT) {
+                    CoroutineScope(Dispatchers.IO).launch {
+                        try {
+                            kotlinx.coroutines.delay(600)
+                            makeBotMoveChess()
+                        } catch (e: Exception) {
+                            android.util.Log.e("GameManager", "Chess bot move failed", e)
+                        }
+                    }
+                } else {
+                    // Marin just replied: one LLM reaction per full round, like Tic-Tac-Toe.
+                    currentGame?.let { notifyLLMMove(Game.GameType.CHESS, "bot", encoded, it) }
+                }
+                Result(true, "Move played", currentGame)
+            }
+        }
+    }
+
+    private fun finishChess(game: Game.State, board: ChessBoard, winner: Game.Player?, reason: String): Result {
+        board.gameOver = true
+        board.result = reason
+        val status = when (winner) {
+            Game.Player.HUMAN -> Game.GameStatus.HUMAN_WON
+            Game.Player.BOT -> Game.GameStatus.BOT_WON
+            else -> Game.GameStatus.DRAW
+        }
+        currentGame = game.copy(
+            board = board,
+            currentPlayer = Game.Player.HUMAN,
+            status = status,
+            winner = winner
+        )
+        triggerReaction(winner == Game.Player.HUMAN, isDraw = winner == null)
+        awardGamePoints(Game.GameType.CHESS, winner == Game.Player.HUMAN, if (winner == Game.Player.HUMAN) 500 else 60)
+        jealousyTracker.recordGameResult(winner == Game.Player.HUMAN, Game.GameType.CHESS)
+        onGameStateChanged?.invoke(currentGame)
+        return Result(true, reason, currentGame)
+    }
+
     // ---- Escalating-anger readouts for the game UI banner -------------------------
 
     /** 0.0 .. 1.0 — drives the "Marin is RAGING" banner. */
@@ -1306,7 +1407,8 @@ internal fun describeMove(
         "placed ${if (player == "bot") "O" else "X"} at cell ${position + 1}"
     Game.GameType.TIC_TAC_TOE_4X4 ->
         "placed ${if (player == "bot") "O" else "X"} at cell ${position + 1} of the 4x4 board"
-    Game.GameType.CHESS -> "made chess move $position"
+    Game.GameType.CHESS ->
+        "moved ${ChessEngine.squareName(position / 64)} to ${ChessEngine.squareName(position % 64)}"
     Game.GameType.ROCK_PAPER_SCISSORS ->
         "chose ${when (position) { 0 -> "Rock"; 1 -> "Paper"; 2 -> "Scissors"; else -> "Unknown" }}"
     Game.GameType.GUESS_NUMBER -> "guessed ${position + 1}"
@@ -1356,5 +1458,7 @@ internal fun describeBoard(gameState: Game.State): String = when (val board = ga
         "human=${board.humanChoice ?: "-"} bot=${board.botChoice ?: "-"}"
     is Game.ClickerBoard ->
         "score=${board.score}"
+    is ChessBoard ->
+        board.currentFen
     else -> ""
 }

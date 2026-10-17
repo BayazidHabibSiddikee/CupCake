@@ -249,6 +249,7 @@ fun GameScreen(
                     )
                     com.cupcake.game.Game.GameType.CHESS -> ChessBoardUI(
                         state = boardState,
+                        onMove = { from, to, promo -> viewModel.chessMove(from, to, promo) },
                         onRestart = { viewModel.restartGame() }
                     )
                     com.cupcake.game.Game.GameType.TIC_TAC_TOE_4X4 -> TicTacToe4x4BoardUI(
@@ -851,45 +852,6 @@ fun MathQuizBoardUI(
                 Text("Correct: ${board.correctAnswers} | Wrong: ${board.wrongAnswers}", fontSize = 16.sp)
                 Button(onClick = onRestart) { Text("Play Again") }
             }
-        }
-    }
-}
-
-@Composable
-fun ChessBoardUI(
-    state: com.cupcake.game.Game.State,
-    onRestart: () -> Unit
-) {
-    val board = state.board as? ChessBoard ?: return
-    
-    Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        androidx.compose.material3.Icon(
-            imageVector = androidx.compose.material.icons.Icons.Filled.SportsEsports,
-            contentDescription = "Chess",
-            modifier = Modifier.size(64.dp),
-            tint = androidx.compose.material3.MaterialTheme.colorScheme.primary
-        )
-        
-        Text(
-            text = "Chess",
-            fontSize = 28.sp,
-            fontWeight = FontWeight.Bold
-        )
-        
-        Text(
-            text = "Chess engine integration coming soon!\nCurrently shows FEN: ${board.currentFen.take(50)}...",
-            fontSize = 16.sp,
-            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-            modifier = Modifier.fillMaxWidth().padding(16.dp)
-        )
-        
-        if (state.status != com.cupcake.game.Game.GameStatus.PLAYING) {
-            Button(onClick = onRestart) { Text("Restart") }
         }
     }
 }
