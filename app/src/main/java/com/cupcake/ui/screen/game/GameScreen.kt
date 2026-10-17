@@ -102,18 +102,6 @@ fun GameScreen(
                     }
                 },
                 actions = {
-                    // Coins at the top-right: the currency that gates every game.
-                    Surface(
-                        color = androidx.compose.material3.MaterialTheme.colorScheme.primaryContainer,
-                        shape = RoundedCornerShape(50)
-                    ) {
-                        Text(
-                            text = "🪙 $points",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                        )
-                    }
                     if (gameState != null) {
                         IconButton(onClick = { viewModel.endGame() }) {
                             Icon(imageVector = androidx.compose.material.icons.Icons.Filled.Close, contentDescription = "End game")
