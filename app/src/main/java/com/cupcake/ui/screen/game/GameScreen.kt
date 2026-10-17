@@ -94,14 +94,7 @@ fun GameScreen(
         Column(Modifier.fillMaxSize()) {
             TopAppBar(
                 title = {
-                    Column {
-                        Text("Games", fontWeight = FontWeight.Bold)
-                        Text(
-                            text = "Lv $level · ${adaptiveDifficultyName.uppercase()}",
-                            fontSize = 11.sp,
-                            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    Text("Games", fontWeight = FontWeight.Bold)
                 },
                 navigationIcon = {
                     androidx.compose.material3.IconButton(onClick = onClose) {
@@ -134,6 +127,17 @@ fun GameScreen(
                 colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
                     containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerLow
                 )
+            )
+
+            // Always-visible status strip: currency, level, and (in-game) difficulty
+            // and how close you are to winning. Keeps the player oriented at a glance.
+            GameStatusStrip(
+                points = points,
+                level = level,
+                difficultyName = adaptiveDifficultyName,
+                threatLevel = threatLevel,
+                closenessLabel = closenessLabel,
+                showThreat = gameState != null
             )
 
             // Not enough coins to start a game — offer the rewarded-video top-up.
@@ -221,44 +225,6 @@ fun GameScreen(
                 }
             }
 
-            // Threat "map": how close you are to winning, and the difficulty she is
-            // matching it with. Deterministic — it only moves when your position improves.
-            if (activeGame != null) {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                    colors = androidx.compose.material3.CardDefaults.cardColors(
-                        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant
-                    ),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Threat: $closenessLabel",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(
-                                text = "${(threatLevel * 100).toInt()}%",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = androidx.compose.material3.MaterialTheme.colorScheme.error
-                            )
-                        }
-                        androidx.compose.material3.LinearProgressIndicator(
-                            progress = { threatLevel.toFloat() },
-                            modifier = Modifier.fillMaxWidth().padding(top = 6.dp)
-                        )
-                    }
-                }
-            }
-
             val activeGameState = gameState
             if (activeGameState == null && unsupportedGameId != null) {
                 UnsupportedGameCard(
@@ -266,31 +232,58 @@ fun GameScreen(
                     onBack = { unsupportedGameId = null }
                 )
             } else if (activeGameState == null) {
-                // Game selection screen
+                // Game selection / lobby
                 Column(
-                    modifier = Modifier.fillMaxSize().padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    Text("Choose a Game", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                    Text("Play with your bot companion!", color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)
-                    
-                    // Difficulty selector
-                    androidx.compose.material3.Card(
-                        modifier = Modifier.fillMaxWidth()
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
-                        Column(Modifier.padding(16.dp)) {
-                            Text("Difficulty", fontWeight = FontWeight.Medium, fontSize = 16.sp)
+                        Text("Choose a Game", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            "Play with Marin — win to earn coins",
+                            fontSize = 13.sp,
+                            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            "Entry: ${com.cupcake.game.PointsManager.GAME_ENTRY_COST} 🪙 · win-only payout",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = androidx.compose.material3.MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    // Difficulty selector
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = androidx.compose.material3.CardDefaults.cardColors(
+                            containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerHigh
+                        )
+                    ) {
+                        Column(Modifier.padding(14.dp)) {
+                            Text("Difficulty", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                             @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
                             androidx.compose.foundation.layout.FlowRow(
                                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 com.cupcake.game.TicTacToeEngine.Difficulty.entries.forEach { diff ->
                                     FilterChip(
                                         selected = (selectedDifficulty == diff),
                                         onClick = { viewModel.selectedDifficulty.value = diff },
-                                        label = { Text(diff.name) }
+                                        label = {
+                                            Text(
+                                                "${difficultyEmoji(diff)} " +
+                                                    diff.name.lowercase().replaceFirstChar { it.uppercase() }
+                                            )
+                                        }
                                     )
                                 }
                             }
@@ -300,8 +293,9 @@ fun GameScreen(
                     // Games Grid
                     androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
                         columns = androidx.compose.foundation.lazy.grid.GridCells.Fixed(2),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 16.dp),
                         modifier = Modifier.fillMaxWidth().weight(1f)
                     ) {
                         items(availableGames) { game ->
@@ -506,7 +500,7 @@ fun GameOptionCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(175.dp),
+            .height(178.dp),
         shape = RoundedCornerShape(20.dp),
         colors = androidx.compose.material3.CardDefaults.cardColors(
             containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerLow
@@ -522,12 +516,12 @@ fun GameOptionCard(
             verticalArrangement = Arrangement.SpaceBetween
         ) {
             Surface(
-                modifier = Modifier.size(52.dp),
+                modifier = Modifier.size(46.dp),
                 shape = CircleShape,
                 color = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerHigh
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Text(text = game.icon, fontSize = 28.sp)
+                    Text(text = game.icon, fontSize = 24.sp)
                 }
             }
             Column(
@@ -537,14 +531,16 @@ fun GameOptionCard(
                 Text(
                     text = game.name,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp,
+                    fontSize = 14.sp,
                     maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                     textAlign = TextAlign.Center
                 )
                 Text(
                     text = game.description,
                     fontSize = 11.sp,
                     maxLines = 2,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                     color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center
                 )
@@ -558,10 +554,89 @@ fun GameOptionCard(
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                     color = androidx.compose.material3.MaterialTheme.colorScheme.primary
                 )
             }
         }
+    }
+}
+
+private fun difficultyEmoji(difficulty: com.cupcake.game.TicTacToeEngine.Difficulty): String =
+    when (difficulty) {
+        com.cupcake.game.TicTacToeEngine.Difficulty.EASY -> "😌"
+        com.cupcake.game.TicTacToeEngine.Difficulty.NORMAL -> "🙂"
+        com.cupcake.game.TicTacToeEngine.Difficulty.HARD -> "😏"
+        com.cupcake.game.TicTacToeEngine.Difficulty.CHEATING -> "💀"
+    }
+
+/**
+ * A single horizontal strip of status pills shown above the board or lobby: currency,
+ * level, and — while a game is live — the difficulty Marin is matching and a compact
+ * threat meter showing how close the player is to winning.
+ */
+@Composable
+private fun GameStatusStrip(
+    points: Long,
+    level: Int,
+    difficultyName: String,
+    threatLevel: Double,
+    closenessLabel: String,
+    showThreat: Boolean
+) {
+    androidx.compose.foundation.layout.Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        StatPill("🪙", points.toString(), androidx.compose.material3.MaterialTheme.colorScheme.primaryContainer)
+        StatPill("⭐", "Lv $level", androidx.compose.material3.MaterialTheme.colorScheme.secondaryContainer)
+        if (showThreat) {
+            StatPill(
+                emoji = "🎯",
+                text = difficultyName.uppercase(),
+                color = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerHigh
+            )
+            androidx.compose.foundation.layout.Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                androidx.compose.foundation.layout.Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Threat: $closenessLabel", fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                    Text(
+                        "${(threatLevel * 100).toInt()}%",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = androidx.compose.material3.MaterialTheme.colorScheme.error
+                    )
+                }
+                androidx.compose.material3.LinearProgressIndicator(
+                    progress = { threatLevel.toFloat() },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        } else {
+            androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun StatPill(emoji: String, text: String, color: Color) {
+    Surface(color = color, shape = RoundedCornerShape(50)) {
+        Text(
+            text = "$emoji $text",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+        )
     }
 }
 

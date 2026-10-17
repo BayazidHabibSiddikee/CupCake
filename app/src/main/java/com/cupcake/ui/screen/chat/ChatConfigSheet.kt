@@ -2,14 +2,17 @@ package com.cupcake.ui.screen.chat
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
@@ -26,9 +29,12 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.cupcake.data.model.ApiProvider
 import com.cupcake.data.model.ModelConfig
 import com.cupcake.data.model.SystemPrompt
@@ -39,7 +45,7 @@ import kotlin.math.roundToInt
  * system prompt for the current conversation. Purely presentational: it reports the
  * chosen values through [onApply] and never talks to the repository itself.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ChatConfigSheet(
     config: ModelConfig,
@@ -74,39 +80,75 @@ fun ChatConfigSheet(
                 .padding(horizontal = 20.dp)
                 .padding(bottom = 24.dp)
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text(
-                text = "Chat settings",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = "Chat settings",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = "Pick the engine, tune the replies, and shape the personality.",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
 
-            SectionLabel("Engine")
-            Row(
+            // ---- Engine -----------------------------------------------------
+            SheetHeader("🔧", "Engine")
+            FlowRow(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 FilterChip(
                     selected = selectedProviderId == null,
                     onClick = { selectedProviderId = null },
-                    label = { Text("On-device") }
+                    label = { Text("📱 On-device") }
                 )
                 providers.forEach { provider ->
                     FilterChip(
                         selected = selectedProviderId == provider.id,
                         onClick = { selectedProviderId = provider.id },
-                        label = { Text(provider.name) }
+                        label = {
+                            Text(
+                                provider.name,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     )
                 }
             }
 
-            if (isCustom && selectedProvider != null) {
-                Text(
-                    text = "${selectedProvider.baseUrl} · ${selectedProvider.providerType.value}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
                 )
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text(
+                        text = if (isCustom && selectedProvider != null) selectedProvider.name else "On-device model",
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 14.sp
+                    )
+                    Text(
+                        text = if (isCustom && selectedProvider != null) {
+                            "${selectedProvider.providerType.value} · ${selectedProvider.baseUrl}"
+                        } else {
+                            "Runs offline on this device"
+                        },
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
 
             OutlinedTextField(
@@ -114,41 +156,89 @@ fun ChatConfigSheet(
                 onValueChange = { modelName = it },
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text("Model") },
+                placeholder = {
+                    Text(selectedProvider?.models?.firstOrNull() ?: "liltii-v0.2-v3-q4_0.gguf")
+                },
                 singleLine = true
             )
 
-            SectionLabel("Temperature ${"%.2f".format(temperature)}")
-            Slider(
-                value = temperature,
-                onValueChange = { temperature = it },
-                valueRange = 0f..1.5f
-            )
+            // ---- Response tuning -------------------------------------------
+            SheetHeader("🎚️", "Response tuning")
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Temperature", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                        Text(
+                            "%.2f".format(temperature),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Slider(
+                        value = temperature,
+                        onValueChange = { temperature = it },
+                        valueRange = 0f..1.5f
+                    )
+                    Text(
+                        "Lower = focused and consistent · Higher = creative and unpredictable",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
 
-            SectionLabel("Max reply length: $maxTokens tokens")
-            Slider(
-                value = maxTokens.toFloat(),
-                onValueChange = { maxTokens = (it / 32f).roundToInt() * 32 },
-                valueRange = 128f..1024f
-            )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Max reply length", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                        Text(
+                            "$maxTokens tokens",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Slider(
+                        value = maxTokens.toFloat(),
+                        onValueChange = { maxTokens = (it / 32f).roundToInt() * 32 },
+                        valueRange = 128f..1024f
+                    )
+                }
+            }
 
-            SectionLabel("System prompt")
+            // ---- System prompt ---------------------------------------------
+            SheetHeader("✍️", "System prompt")
             OutlinedTextField(
                 value = promptText,
                 onValueChange = { promptText = it },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(140.dp),
+                    .height(150.dp),
                 placeholder = { Text("Leave blank to use the character's default prompt") },
                 label = { Text("Personality / instructions") }
             )
 
-            Spacer(Modifier.height(4.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 TextButton(onClick = onDismiss) { Text("Cancel") }
-                Spacer(Modifier.height(0.dp))
                 Button(
                     onClick = {
                         val newConfig = if (selectedProvider == null) {
@@ -181,10 +271,11 @@ fun ChatConfigSheet(
 }
 
 @Composable
-private fun SectionLabel(text: String) {
+private fun SheetHeader(emoji: String, text: String) {
     Text(
-        text = text,
-        style = MaterialTheme.typography.labelLarge,
+        text = "$emoji $text",
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.Bold,
         color = MaterialTheme.colorScheme.primary
     )
 }

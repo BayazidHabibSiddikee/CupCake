@@ -3,22 +3,49 @@ package com.cupcake.ui.screen.settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -27,10 +54,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -38,25 +64,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cupcake.data.model.ApiProvider
 import com.cupcake.data.model.ModelConfig
 import com.cupcake.ui.theme.CupCakeTheme
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.CloudOff
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Wifi
 
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.foundation.BorderStroke
+private val SectionSpacing = 16.dp
 
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     onClose: () -> Unit,
@@ -84,175 +95,118 @@ fun SettingsScreen(
     val activeLocalModel by viewModel.modelDownloadManager.activeModel.collectAsStateWithLifecycle()
     val downloadProgressMap by viewModel.modelDownloadManager.downloadProgress.collectAsStateWithLifecycle()
     val isLocalActive = providers.none { it.isEnabled }
+    val activeProvider = providers.firstOrNull { it.isEnabled }
 
     CupCakeTheme {
-        Column(
-            modifier = Modifier.fillMaxSize()
-        ) {
-            // Header
-            androidx.compose.material3.TopAppBar(
-                title = { Text("Settings & Models") },
-                navigationIcon = { IconButton(onClick = onClose) { Icon(imageVector = androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } },
-                colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
-                    containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerLow
+        Column(modifier = Modifier.fillMaxSize()) {
+            TopAppBar(
+                title = { Text("Settings") },
+                navigationIcon = {
+                    IconButton(onClick = onClose) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                 )
             )
 
-            // Status message feedback
             statusMessage?.let { msg ->
-                androidx.compose.material3.Surface(
-                    color = androidx.compose.material3.MaterialTheme.colorScheme.primaryContainer,
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+                Surface(
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    shape = MaterialTheme.shapes.medium,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                        .padding(horizontal = 16.dp, vertical = 6.dp)
                 ) {
                     Row(
-                        modifier = Modifier.padding(12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.padding(start = 14.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
                             text = msg,
                             fontSize = 13.sp,
-                            color = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
                             modifier = Modifier.weight(1f)
                         )
-                        IconButton(
-                            onClick = { viewModel.clearStatusMessage() },
-                            modifier = Modifier.size(24.dp)
-                        ) {
-                            Icon(
-                                imageVector = androidx.compose.material.icons.Icons.Filled.Close,
-                                contentDescription = "Dismiss",
-                                modifier = Modifier.size(16.dp)
-                            )
+                        IconButton(onClick = { viewModel.clearStatusMessage() }, modifier = Modifier.size(32.dp)) {
+                            Icon(Icons.Filled.Close, contentDescription = "Dismiss", modifier = Modifier.size(16.dp))
                         }
                     }
                 }
             }
 
-            // Scrollable Content
             LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 12.dp)
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(SectionSpacing)
             ) {
-                // Section: About You — the companion uses this to know who it's talking to
+                // ---- Active engine summary -------------------------------------
                 item {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("About You", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                        Text(
-                            "Tell your companion who you are. It uses these details to address you and tailor its replies.",
-                            fontSize = 12.sp,
-                            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        androidx.compose.material3.OutlinedTextField(
-                            value = userName,
-                            onValueChange = { viewModel.userName.value = it },
-                            label = { Text("Your name") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        androidx.compose.material3.OutlinedTextField(
-                            value = userAge,
-                            onValueChange = { viewModel.userAge.value = it },
-                            label = { Text("Age") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        androidx.compose.material3.OutlinedTextField(
-                            value = userGender,
-                            onValueChange = { viewModel.userGender.value = it },
-                            label = { Text("Gender / pronouns") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        androidx.compose.material3.OutlinedTextField(
-                            value = userRelationship,
-                            onValueChange = { viewModel.userRelationship.value = it },
-                            label = { Text("Who are you to them? (friend, owner…)") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        androidx.compose.material3.OutlinedTextField(
-                            value = userLikes,
-                            onValueChange = { viewModel.userLikes.value = it },
-                            label = { Text("Likes") },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        androidx.compose.material3.OutlinedTextField(
-                            value = userDislikes,
-                            onValueChange = { viewModel.userDislikes.value = it },
-                            label = { Text("Dislikes") },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        androidx.compose.material3.OutlinedTextField(
-                            value = userNotes,
-                            onValueChange = { viewModel.userNotes.value = it },
-                            label = { Text("Anything else to remember") },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        androidx.compose.material3.Button(
-                            onClick = { viewModel.saveUserProfile() },
-                            modifier = Modifier.align(Alignment.End)
-                        ) {
-                            Text("Save")
-                        }
-                    }
+                    ActiveEngineCard(
+                        isLocal = isLocalActive,
+                        modelName = activeLocalModel,
+                        provider = activeProvider
+                    )
                 }
 
-                // Section: Companion Device (BLE WiFi provisioning)
-                if (onNavigateToWifiSetup != null) {
-                    item {
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text("Companion Device", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                            Text(
-                                "Connect to the ESP32 over Bluetooth and set up its WiFi.",
-                                fontSize = 12.sp,
-                                color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(Modifier.size(4.dp))
+                // ---- About you -------------------------------------------------
+                item {
+                    SectionHeader("🙋", "About You", "Your companion uses these details to address you and tailor replies.")
+                }
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            LabeledField("Your name", userName) { viewModel.userName.value = it }
+                            LabeledField("Age", userAge) { viewModel.userAge.value = it }
+                            LabeledField("Gender / pronouns", userGender) { viewModel.userGender.value = it }
+                            LabeledField("Who are you to them? (friend, owner…)", userRelationship) { viewModel.userRelationship.value = it }
+                            LabeledField("Likes", userLikes, singleLine = false) { viewModel.userLikes.value = it }
+                            LabeledField("Dislikes", userDislikes, singleLine = false) { viewModel.userDislikes.value = it }
+                            LabeledField("Anything else to remember", userNotes, singleLine = false) { viewModel.userNotes.value = it }
                             Button(
-                                onClick = { onNavigateToWifiSetup.invoke() },
-                                modifier = Modifier.fillMaxWidth()
+                                onClick = { viewModel.saveUserProfile() },
+                                modifier = Modifier.align(Alignment.End)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Wifi,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(Modifier.size(8.dp))
-                                Text("Connect a device")
+                                Text("Save")
                             }
                         }
                     }
                 }
 
-                // Section: On-Device Models
-                item {
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("On-Device GGUF Models", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                        Text(
-                            "Offline AI running directly on your phone CPU. Switch models anytime without losing chat history.",
-                            fontSize = 12.sp,
-                            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                // ---- Companion device -----------------------------------------
+                if (onNavigateToWifiSetup != null) {
+                    item {
+                        SectionHeader("📡", "Companion Device", "Connect to the ESP32 over Bluetooth and set up its WiFi.")
+                    }
+                    item {
+                        OutlinedButton(
+                            onClick = { onNavigateToWifiSetup.invoke() },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Filled.Wifi, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.size(8.dp))
+                            Text("Connect a device")
+                        }
                     }
                 }
 
-                items(com.cupcake.ai.ModelDownloadManager.CATALOG) { model ->
-                    val isInstalled = viewModel.modelDownloadManager.isModelInstalled(model.fileName)
-                    val isCurrentActive = isLocalActive && activeLocalModel == model.fileName
-                    val progress = downloadProgressMap[model.fileName]
-
+                // ---- On-device models -----------------------------------------
+                item {
+                    SectionHeader("🧠", "On-Device Models", "Offline AI running on your phone's CPU. Switch anytime without losing chat history.")
+                }
+                items(com.cupcake.ai.ModelDownloadManager.CATALOG, key = { it.fileName }) { model ->
                     OnDeviceModelCard(
                         model = model,
-                        isInstalled = isInstalled,
-                        isActive = isCurrentActive,
-                        downloadProgress = progress,
+                        isInstalled = viewModel.modelDownloadManager.isModelInstalled(model.fileName),
+                        isActive = isLocalActive && activeLocalModel == model.fileName,
+                        downloadProgress = downloadProgressMap[model.fileName],
                         onSelect = { viewModel.selectOnDeviceModel(model.fileName) },
                         onDownload = { viewModel.downloadModel(model) },
                         onCancelDownload = { viewModel.cancelModelDownload(model.fileName) },
@@ -260,26 +214,15 @@ fun SettingsScreen(
                     )
                 }
 
-                // Section: External / Custom API Providers
+                // ---- External providers ---------------------------------------
                 item {
-                    androidx.compose.foundation.layout.Spacer(Modifier.size(8.dp))
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("External API Providers", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                        Text(
-                            "Connect to local Ollama on Termux/PC or OpenAI-compatible servers.",
-                            fontSize = 12.sp,
-                            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    SectionHeader("🔌", "External API Providers", "Connect to a local server or any OpenAI-compatible endpoint.")
                 }
-
                 if (providers.isEmpty()) {
                     item {
                         Card(
                             modifier = Modifier.fillMaxWidth(),
-                            colors = androidx.compose.material3.CardDefaults.cardColors(
-                                containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerLow
-                            )
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
                         ) {
                             Column(
                                 modifier = Modifier
@@ -289,22 +232,21 @@ fun SettingsScreen(
                                 verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 Icon(
-                                    imageVector = androidx.compose.material.icons.Icons.Filled.CloudOff,
+                                    imageVector = Icons.Filled.CloudOff,
                                     contentDescription = null,
                                     modifier = Modifier.size(36.dp),
-                                    tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Text(
                                     "No custom providers added",
                                     fontSize = 14.sp,
-                                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
                     }
                 }
-
-                items(providers) { provider ->
+                items(providers, key = { it.id }) { provider ->
                     ProviderCard(
                         provider = provider,
                         onTest = { viewModel.testConnection(provider) },
@@ -313,31 +255,27 @@ fun SettingsScreen(
                         onSelect = { viewModel.selectProvider(provider) }
                     )
                 }
-
-                // Add provider button
                 item {
-                    androidx.compose.material3.OutlinedButton(
+                    OutlinedButton(
                         onClick = { viewModel.showAddProviderDialog.value = true },
-                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 16.dp)
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Icon(imageVector = androidx.compose.material.icons.Icons.Filled.Add, contentDescription = null)
-                        androidx.compose.foundation.layout.Spacer(Modifier.size(8.dp))
+                        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.size(8.dp))
                         Text("Add Custom Provider")
                     }
                 }
 
-                // Debug-only: LilTii eval entry point
                 if (com.cupcake.BuildConfig.DEBUG) {
                     item {
-                        androidx.compose.foundation.layout.Spacer(Modifier.size(4.dp))
-                        androidx.compose.material3.TextButton(
+                        TextButton(
                             onClick = { onNavigateToLilTiiEval?.invoke() },
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
                                 text = "LilTii Eval (debug)",
                                 fontSize = 12.sp,
-                                color = androidx.compose.material3.MaterialTheme.colorScheme.primary
+                                color = MaterialTheme.colorScheme.primary
                             )
                         }
                     }
@@ -346,7 +284,6 @@ fun SettingsScreen(
         }
     }
 
-    // Add provider dialog
     if (showAddProviderDialog) {
         AddProviderDialog(
             onDismiss = {
@@ -376,6 +313,75 @@ fun SettingsScreen(
 }
 
 @Composable
+private fun SectionHeader(emoji: String, title: String, subtitle: String) {
+    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text("$emoji $title", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+        Text(
+            subtitle,
+            fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun LabeledField(
+    label: String,
+    value: String,
+    singleLine: Boolean = true,
+    onValueChange: (String) -> Unit
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
+        singleLine = singleLine,
+        modifier = Modifier.fillMaxWidth()
+    )
+}
+
+@Composable
+private fun ActiveEngineCard(
+    isLocal: Boolean,
+    modelName: String?,
+    provider: ApiProvider?
+) {
+    val accent = MaterialTheme.colorScheme.primary
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = accent.copy(alpha = 0.14f)),
+        border = androidx.compose.foundation.BorderStroke(1.dp, accent.copy(alpha = 0.5f))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Text(if (isLocal) "📱" else "☁️", fontSize = 32.sp)
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("Active engine", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    text = if (isLocal) (modelName ?: "Bundled on-device model") else (provider?.name ?: "External provider"),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = if (isLocal) "Running offline on this device" else (provider?.baseUrl ?: ""),
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+@Composable
 fun OnDeviceModelCard(
     model: com.cupcake.ai.ModelDownloadManager.GgufModelInfo,
     isInstalled: Boolean,
@@ -388,14 +394,14 @@ fun OnDeviceModelCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = androidx.compose.material3.CardDefaults.cardColors(
+        colors = CardDefaults.cardColors(
             containerColor = if (isActive)
-                androidx.compose.material3.MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
             else
-                androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerHigh
+                MaterialTheme.colorScheme.surfaceContainerHigh
         ),
         border = if (isActive)
-            androidx.compose.foundation.BorderStroke(1.5.dp, androidx.compose.material3.MaterialTheme.colorScheme.primary)
+            androidx.compose.foundation.BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)
         else null
     ) {
         Column(
@@ -404,93 +410,75 @@ fun OnDeviceModelCard(
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = model.displayName,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 15.sp
-                        )
-                        androidx.compose.material3.Surface(
-                            color = if (model.isBundled) Color(0xFF2E7D32) else Color(0xFF1565C0),
-                            shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp)
-                        ) {
-                            Text(
-                                text = model.tag,
-                                fontSize = 10.sp,
-                                color = Color.White,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
-                        }
-                    }
-                    Text(
-                        text = model.description,
-                        fontSize = 12.sp,
-                        color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
+                Text(
+                    text = model.displayName,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 15.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                ModelTag(model.tag, model.isBundled)
                 if (!model.isBundled && isInstalled && !isActive) {
                     IconButton(onClick = onDelete, modifier = Modifier.size(28.dp)) {
                         Icon(
-                            imageVector = Icons.Default.Delete,
+                            imageVector = Icons.Filled.Delete,
                             contentDescription = "Delete model",
-                            tint = androidx.compose.material3.MaterialTheme.colorScheme.error,
+                            tint = MaterialTheme.colorScheme.error,
                             modifier = Modifier.size(18.dp)
                         )
                     }
                 }
             }
+            Text(
+                text = model.description,
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
 
-            // Download progress if active
             if (downloadProgress?.isDownloading == true) {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = "Downloading... ${downloadProgress.progressPct}%",
+                            text = "Downloading… ${downloadProgress.progressPct}%",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
-                            color = androidx.compose.material3.MaterialTheme.colorScheme.primary
+                            color = MaterialTheme.colorScheme.primary
                         )
                         val mbDownloaded = downloadProgress.downloadedBytes / (1024 * 1024)
                         val mbTotal = downloadProgress.totalBytes / (1024 * 1024)
                         Text(
-                            text = "$mbDownloaded MB / $mbTotal MB",
+                            text = "$mbDownloaded / $mbTotal MB",
                             fontSize = 12.sp,
-                            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    androidx.compose.material3.LinearProgressIndicator(
+                    LinearProgressIndicator(
                         progress = { downloadProgress.progressPct / 100f },
                         modifier = Modifier.fillMaxWidth()
                     )
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        androidx.compose.material3.TextButton(
-                            onClick = onCancelDownload,
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                        ) {
-                            Text("Cancel", fontSize = 12.sp, color = androidx.compose.material3.MaterialTheme.colorScheme.error)
-                        }
+                    TextButton(
+                        onClick = onCancelDownload,
+                        modifier = Modifier.align(Alignment.End),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                    ) {
+                        Text("Cancel", fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
                     }
                 }
             } else if (downloadProgress?.error != null) {
                 Text(
                     text = "Error: ${downloadProgress.error}",
                     fontSize = 12.sp,
-                    color = androidx.compose.material3.MaterialTheme.colorScheme.error
+                    color = MaterialTheme.colorScheme.error
                 )
             }
 
-            // Actions row
             if (downloadProgress?.isDownloading != true) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -499,47 +487,36 @@ fun OnDeviceModelCard(
                 ) {
                     val sizeMb = model.sizeBytes / (1024 * 1024)
                     Text(
-                        text = if (model.isBundled) "Bundled (~$sizeMb MB)" else "Size: ~$sizeMb MB",
+                        text = if (model.isBundled) "Bundled · ~$sizeMb MB" else "~$sizeMb MB",
                         fontSize = 12.sp,
-                        color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
-                    if (isActive) {
-                        Row(
+                    when {
+                        isActive -> Row(
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
-                                imageVector = Icons.Default.CheckCircle,
+                                imageVector = Icons.Filled.CheckCircle,
                                 contentDescription = null,
                                 tint = Color(0xFF2E7D32),
                                 modifier = Modifier.size(18.dp)
                             )
-                            Text(
-                                text = "Active",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF2E7D32)
-                            )
+                            Text("Active", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
                         }
-                    } else if (isInstalled) {
-                        Button(
+                        isInstalled -> Button(
                             onClick = onSelect,
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 4.dp)
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp)
                         ) {
-                            Text("Use Model", fontSize = 12.sp)
+                            Text("Use", fontSize = 12.sp)
                         }
-                    } else {
-                        androidx.compose.material3.FilledTonalButton(
+                        else -> FilledTonalButton(
                             onClick = onDownload,
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Download,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            androidx.compose.foundation.layout.Spacer(Modifier.size(4.dp))
+                            Icon(Icons.Filled.Download, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.size(4.dp))
                             Text("Download", fontSize = 12.sp)
                         }
                     }
@@ -550,31 +527,17 @@ fun OnDeviceModelCard(
 }
 
 @Composable
-fun ProviderSection(
-    title: String,
-    subtitle: String,
-    isEnabled: Boolean,
-    onClick: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        onClick = onClick
+private fun ModelTag(text: String, bundled: Boolean) {
+    Surface(
+        color = if (bundled) Color(0xFF2E7D32) else Color(0xFF1565C0),
+        shape = MaterialTheme.shapes.extraSmall
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column {
-                Text(title, fontWeight = FontWeight.Medium, fontSize = 16.sp)
-                Text(subtitle, fontSize = 14.sp, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            Icon(imageVector = androidx.compose.material.icons.Icons.Filled.ChevronRight, contentDescription = null)
-        }
+        Text(
+            text = text,
+            fontSize = 10.sp,
+            color = Color.White,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+        )
     }
 }
 
@@ -588,43 +551,73 @@ fun ProviderCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = androidx.compose.material3.CardDefaults.cardColors(
-            containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerHigh
-        )
+        colors = CardDefaults.cardColors(
+            containerColor = if (provider.isEnabled)
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+            else
+                MaterialTheme.colorScheme.surfaceContainerHigh
+        ),
+        border = if (provider.isEnabled)
+            androidx.compose.foundation.BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)
+        else null
     ) {
-        Column(Modifier.padding(16.dp)) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(provider.name, fontWeight = FontWeight.Medium, fontSize = 16.sp)
-                        ProviderTypeBadge(provider.providerType)
-                        if (provider.isEnabled) {
-                            androidx.compose.material3.Text(
-                                text = "✓ Enabled",
-                                fontSize = 12.sp,
-                                color = androidx.compose.material3.MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
-                    Text(provider.baseUrl, fontSize = 13.sp, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("${provider.models.size} models available", fontSize = 12.sp, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
+                Text(
+                    text = provider.name,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 16.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                ProviderTypeBadge(provider.providerType)
+                if (provider.isEnabled) {
+                    Icon(
+                        imageVector = Icons.Filled.CheckCircle,
+                        contentDescription = "Enabled",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    IconButton(onClick = onTest) {
-                        Icon(imageVector = androidx.compose.material.icons.Icons.Filled.Wifi, contentDescription = "Test connection")
-                    }
-                    IconButton(onClick = onEdit) {
-                        Icon(imageVector = androidx.compose.material.icons.Icons.Filled.Edit, contentDescription = "Edit")
-                    }
-                    IconButton(onClick = onSelect) {
-                        Icon(imageVector = androidx.compose.material.icons.Icons.Filled.CheckCircle, contentDescription = "Select", tint = androidx.compose.material3.MaterialTheme.colorScheme.primary)
-                    }
-                    IconButton(onClick = onDelete) {
-                        Icon(imageVector = androidx.compose.material.icons.Icons.Filled.Delete, contentDescription = "Delete", tint = androidx.compose.material3.MaterialTheme.colorScheme.error)
-                    }
+            }
+            Text(
+                text = provider.baseUrl,
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = "${provider.models.size} model(s) available",
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextButton(onClick = onTest) { Text("Test", fontSize = 13.sp) }
+                TextButton(onClick = onEdit) { Text("Edit", fontSize = 13.sp) }
+                TextButton(
+                    onClick = onSelect,
+                    enabled = !provider.isEnabled
+                ) { Text("Use", fontSize = 13.sp) }
+                IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
+                    Icon(
+                        imageVector = Icons.Filled.Delete,
+                        contentDescription = "Delete",
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
             }
         }
@@ -634,21 +627,20 @@ fun ProviderCard(
 @Composable
 fun ProviderTypeBadge(type: ModelConfig.ModelProvider) {
     val (text, color) = when (type) {
-        ModelConfig.ModelProvider.CUSTOM_OPENAI -> "OpenAI" to androidx.compose.material3.MaterialTheme.colorScheme.primary
+        ModelConfig.ModelProvider.CUSTOM_OPENAI -> "OpenAI" to MaterialTheme.colorScheme.primary
         ModelConfig.ModelProvider.CUSTOM_OLLAMA -> "Ollama" to Color(0xFF00A854)
         ModelConfig.ModelProvider.CUSTOM_VLLM -> "vLLM" to Color(0xFF6B46C1)
-        ModelConfig.ModelProvider.CUSTOM_OTHER -> "Custom" to androidx.compose.material3.MaterialTheme.colorScheme.secondary
-        else -> "Local" to androidx.compose.material3.MaterialTheme.colorScheme.tertiary
+        ModelConfig.ModelProvider.CUSTOM_OTHER -> "Custom" to MaterialTheme.colorScheme.secondary
+        else -> "Local" to MaterialTheme.colorScheme.tertiary
     }
-
-    androidx.compose.material3.Text(
-        text = text,
-        fontSize = 11.sp,
-        color = androidx.compose.material3.MaterialTheme.colorScheme.onPrimary,
-        modifier = Modifier
-            .padding(horizontal = 8.dp, vertical = 2.dp)
-            .background(color, androidx.compose.foundation.shape.RoundedCornerShape(4.dp))
-    )
+    Surface(color = color, shape = MaterialTheme.shapes.extraSmall) {
+        Text(
+            text = text,
+            fontSize = 11.sp,
+            color = Color.White,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+        )
+    }
 }
 
 @Composable
@@ -666,101 +658,94 @@ fun AddProviderDialog(
     model: String,
     onModelChange: (String) -> Unit
 ) {
+    var expanded by remember { mutableStateOf(false) }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
-            Button(onClick = { onConfirm(name, providerType, url, apiKey, model) }, enabled = name.isNotBlank() && url.isNotBlank()) {
+            Button(
+                onClick = { onConfirm(name, providerType, url, apiKey, model) },
+                enabled = name.isNotBlank() && url.isNotBlank()
+            ) {
                 Text("Save")
             }
         },
         dismissButton = {
-            Button(onClick = onDismiss) {
-                Text("Cancel")
-            }
+            TextButton(onClick = onDismiss) { Text("Cancel") }
         },
         title = { Text("Add / Edit Provider") },
         text = {
-            Column(Modifier.padding(16.dp).fillMaxWidth()) {
-                TextField(
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                OutlinedTextField(
                     value = name,
                     onValueChange = onNameChange,
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Provider Name") },
-                    placeholder = { Text("e.g., My Ollama, OpenAI") },
+                    label = { Text("Provider name") },
+                    placeholder = { Text("e.g. My Ollama") },
                     singleLine = true
                 )
 
-                androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(top = 16.dp))
-
-                // Provider type dropdown
-                Text("Provider Type", fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                
-                var expanded by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
-                androidx.compose.foundation.layout.Box(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
-                    androidx.compose.material3.OutlinedButton(
-                        onClick = { expanded = true },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(providerType.value)
-                        androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
-                        Icon(
-                            imageVector = androidx.compose.material.icons.Icons.Filled.ArrowDropDown,
-                            contentDescription = "Dropdown"
-                        )
-                    }
-                    androidx.compose.material3.DropdownMenu(
-                        expanded = expanded,
-                        onDismissRequest = { expanded = false },
-                        modifier = Modifier.fillMaxWidth(0.9f)
-                    ) {
-                        val types = listOf(
-                            ModelConfig.ModelProvider.CUSTOM_OLLAMA,
-                            ModelConfig.ModelProvider.CUSTOM_OPENAI
-                        )
-                        types.forEach { type ->
-                            androidx.compose.material3.DropdownMenuItem(
-                                text = { Text(type.value) },
-                                onClick = {
-                                    onProviderTypeChange(type)
-                                    expanded = false
-                                }
-                            )
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Provider type", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        OutlinedButton(
+                            onClick = { expanded = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(providerType.value)
+                            Spacer(Modifier.weight(1f))
+                            Icon(Icons.Filled.ArrowDropDown, contentDescription = "Dropdown")
+                        }
+                        DropdownMenu(
+                            expanded = expanded,
+                            onDismissRequest = { expanded = false },
+                            modifier = Modifier.fillMaxWidth(0.9f)
+                        ) {
+                            listOf(
+                                ModelConfig.ModelProvider.CUSTOM_OLLAMA,
+                                ModelConfig.ModelProvider.CUSTOM_OPENAI
+                            ).forEach { type ->
+                                DropdownMenuItem(
+                                    text = { Text(type.value) },
+                                    onClick = {
+                                        onProviderTypeChange(type)
+                                        expanded = false
+                                    }
+                                )
+                            }
                         }
                     }
                 }
 
-                androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(top = 16.dp))
-
-                TextField(
+                OutlinedTextField(
                     value = url,
                     onValueChange = onUrlChange,
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text("Base URL") },
-                    placeholder = { Text("http://192.168.1.X:11434") },
+                    placeholder = { Text("http://192.168.1.10:11434") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
                 )
-
-                androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(top = 16.dp))
-
-                TextField(
+                OutlinedTextField(
                     value = model,
                     onValueChange = onModelChange,
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Model Name (optional)") },
-                    placeholder = { Text("e.g., qwen2.5:0.5b or smollm:135m") },
+                    label = { Text("Model name (optional)") },
+                    placeholder = { Text("e.g. qwen2.5:0.5b") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
                 )
-
-                androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(top = 16.dp))
-
-                TextField(
+                OutlinedTextField(
                     value = apiKey,
                     onValueChange = onApiKeyChange,
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("API Key (optional)") },
-                    placeholder = { Text("sk-... or leave empty for local") },
+                    label = { Text("API key (optional)") },
+                    placeholder = { Text("sk-… or leave empty") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done)
                 )
