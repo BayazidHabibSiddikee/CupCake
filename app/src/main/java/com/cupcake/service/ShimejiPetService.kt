@@ -8,7 +8,6 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
-import android.graphics.Color
 import android.graphics.PixelFormat
 import android.net.Uri
 import android.os.Build
@@ -22,10 +21,6 @@ import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
-import android.webkit.WebChromeClient
-import android.webkit.WebSettings
-import android.webkit.WebView
-import android.webkit.WebViewClient
 import android.widget.ImageView
 import android.widget.TextView
 import coil.load
@@ -36,13 +31,12 @@ import kotlin.math.abs
 
 /**
  * Shimeji Desktop-Pet Floating Overlay Service.
- * Renders a draggable, animated desktop pet mascot on top of Android apps with 3D VRM support.
+ * Renders a draggable, animated desktop pet mascot on top of Android apps.
  */
 class ShimejiPetService : Service() {
 
     private var windowManager: WindowManager? = null
     private var floatView: View? = null
-    private var petVrmView: WebView? = null
     private var layoutParams: WindowManager.LayoutParams? = null
 
     private var initialX = 0
@@ -55,7 +49,6 @@ class ShimejiPetService : Service() {
     private var speechBubbleDismissRunnable: Runnable? = null
     private var faceRestoreRunnable: Runnable? = null
 
-    private var isVrmMode = false
     private var baseImageSource: String? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -132,56 +125,13 @@ class ShimejiPetService : Service() {
         val view = inflater.inflate(R.layout.overlay_shimeji_pet, null)
         floatView = view
 
-        val petImageView = view.findViewById<ImageView>(R.id.pet_image)
-        val petEmojiView = view.findViewById<TextView>(R.id.pet_emoji)
-        val speechBubble = view.findViewById<View>(R.id.speech_bubble)
-        val speechText = view.findViewById<TextView>(R.id.speech_text)
-
         val closeBtn = view.findViewById<View>(R.id.pet_close_btn)
         closeBtn?.setOnClickListener {
             Log.i(TAG, "Dismissing floating pet via close button")
             stopSelf()
         }
 
-        // Initialize 3D VRM Mascot WebView
-        petVrmView = view.findViewById<WebView>(R.id.pet_vrm_view)?.apply {
-            setBackgroundColor(Color.TRANSPARENT)
-            setLayerType(View.LAYER_TYPE_HARDWARE, null)
-            settings.apply {
-                javaScriptEnabled = true
-                domStorageEnabled = true
-                allowFileAccess = true
-                allowContentAccess = true
-                allowFileAccessFromFileURLs = true
-                allowUniversalAccessFromFileURLs = true
-                cacheMode = WebSettings.LOAD_NO_CACHE
-            }
-            webChromeClient = object : WebChromeClient() {
-                override fun onConsoleMessage(consoleMessage: android.webkit.ConsoleMessage?): Boolean {
-                    Log.i(
-                        "PetVrmConsole",
-                        "[${consoleMessage?.messageLevel()}] ${consoleMessage?.message()} (${consoleMessage?.sourceId()}:${consoleMessage?.lineNumber()})"
-                    )
-                    return true
-                }
-            }
-            webViewClient = object : WebViewClient() {
-                override fun shouldInterceptRequest(
-                    view: WebView?,
-                    request: android.webkit.WebResourceRequest?
-                ): android.webkit.WebResourceResponse? {
-                    val url = request?.url?.toString() ?: return null
-                    return com.cupcake.ui.component.handleVrmAsset(this@ShimejiPetService, url) ?: super.shouldInterceptRequest(view, request)
-                }
-            }
-            loadUrl("https://cupcake.local/assets/vrm/vrm_viewer.html")
-        }
-
         updatePetVisual(avatar, customGif)
-
-        // VRM expression cycle on tap
-        val vrmExpressions = listOf("happy", "flirty", "excited", "pout", "surprised", "relaxed")
-        var emotionIndex = 0
 
         // Drag & Click Logic
         view.setOnTouchListener(object : View.OnTouchListener {
@@ -206,8 +156,6 @@ class ShimejiPetService : Service() {
                         if (abs(dx) > 10 || abs(dy) > 10) {
                             if (!isDragging) {
                                 isDragging = true
-                                // Trigger VRM walking motion when moving around screen
-                                petVrmView?.evaluateJavascript("window.setWalking && window.setWalking(true);", null)
                             }
                         }
 
@@ -219,8 +167,6 @@ class ShimejiPetService : Service() {
                         return true
                     }
                     MotionEvent.ACTION_UP -> {
-                        petVrmView?.evaluateJavascript("window.setWalking && window.setWalking(false);", null)
-
                         if (isDragging) {
                             val displayMetrics = resources.displayMetrics
                             val screenHeight = displayMetrics.heightPixels
@@ -236,19 +182,7 @@ class ShimejiPetService : Service() {
                                 // Double Click -> Open App
                                 openApp()
                             } else {
-                                // Single Click -> Emotion reaction + Cute Quote
-                                val exp = vrmExpressions[emotionIndex % vrmExpressions.size]
-                                petVrmView?.evaluateJavascript("window.setExpression && window.setExpression('$exp', 1.0);", null)
-
-                                if (exp == "excited" || exp == "flirty") {
-                                    petVrmView?.evaluateJavascript("window.setDancing && window.setDancing(true);", null)
-                                    handler.postDelayed({
-                                        petVrmView?.evaluateJavascript("window.setDancing && window.setDancing(false);", null)
-                                    }, 4000)
-                                }
-
-                                emotionIndex++
-
+                                // Single Click -> Cute Quote
                                 val cuteQuotes = listOf(
                                     "✨ Kyaa! I'm right here on your screen!",
                                     "💖 Don't ignore me! Let's play or chat!",
@@ -281,16 +215,6 @@ class ShimejiPetService : Service() {
         val petImageView = view.findViewById<ImageView>(R.id.pet_image) ?: return
         val petEmojiView = view.findViewById<TextView>(R.id.pet_emoji) ?: return
 
-        val isVrm = avatar?.contains("marin") == true || avatar?.endsWith(".vrm") == true
-        isVrmMode = isVrm
-        if (isVrm) {
-            petVrmView?.visibility = View.VISIBLE
-            petImageView.visibility = View.GONE
-            petEmojiView.visibility = View.GONE
-            return
-        }
-
-        petVrmView?.visibility = View.GONE
         val imageSource = customGif?.takeIf { it.isNotBlank() } ?: avatar?.takeIf { it.isNotBlank() }
         baseImageSource = imageSource
 
@@ -316,7 +240,6 @@ class ShimejiPetService : Service() {
      */
     private fun setEmotionFace(asset: String) {
         val view = floatView ?: return
-        if (isVrmMode) return
         if (baseImageSource == null) return
         val petImageView = view.findViewById<ImageView>(R.id.pet_image) ?: return
 
@@ -349,7 +272,7 @@ class ShimejiPetService : Service() {
 
         // Swap the 2D pet face to the spoken emotion, then restore the base look.
         val petImageView = view.findViewById<ImageView>(R.id.pet_image)
-        if (!isVrmMode && emotionAsset != null && petImageView != null) {
+        if (emotionAsset != null && petImageView != null) {
             petImageView.visibility = View.VISIBLE
             petImageView.load(emotionAsset) {
                 crossfade(true)
@@ -358,13 +281,9 @@ class ShimejiPetService : Service() {
             }
         }
 
-        // Trigger VRM talking animation
-        petVrmView?.evaluateJavascript("window.setTalking && window.setTalking(true);", null)
-
         speechBubbleDismissRunnable = Runnable {
             speechBubble.visibility = View.GONE
-            petVrmView?.evaluateJavascript("window.setTalking && window.setTalking(false);", null)
-            if (!isVrmMode && emotionAsset != null && petImageView != null) {
+            if (emotionAsset != null && petImageView != null) {
                 val restore = baseImageSource
                 if (restore != null) {
                     petImageView.load(restore) { crossfade(true) }
@@ -431,8 +350,6 @@ class ShimejiPetService : Service() {
             }
             floatView = null
         }
-        petVrmView?.destroy()
-        petVrmView = null
         speechBubbleDismissRunnable?.let { handler.removeCallbacks(it) }
         faceRestoreRunnable?.let { handler.removeCallbacks(it) }
         isRunning = false

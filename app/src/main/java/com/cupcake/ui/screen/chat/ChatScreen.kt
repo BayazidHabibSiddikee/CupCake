@@ -67,7 +67,7 @@ fun ChatScreen(
 
     var scrollToBottom by remember { mutableStateOf(false) }
     var showCharacterPicker by remember { mutableStateOf(false) }
-    var showVrm3dView by remember { mutableStateOf(false) }
+    var showFace by remember { mutableStateOf(false) }
     var showConfigSheet by remember { mutableStateOf(false) }
 
     CupCakeTheme {
@@ -79,16 +79,15 @@ fun ChatScreen(
             CharacterHeader(
                 characterName = currentCharacter?.name ?: "Companion",
                 characterAvatar = currentCharacter?.avatar ?: "🤖",
-                isVrmActive = showVrm3dView,
-                onToggleVrm = { showVrm3dView = !showVrm3dView },
+                isFaceActive = showFace,
+                onToggleFace = { showFace = !showFace },
                 onConfigClick = { showConfigSheet = true },
                 onSwitchClick = { showCharacterPicker = true },
                 onBackClick = onBack
             )
 
-            // 3D VRM Model Viewport (Toggled directly from header)
-            if (showVrm3dView) {
-                var isWalkingMode by remember { mutableStateOf(false) }
+            // Emotion sticker panel (toggled from the header)
+            if (showFace) {
                 val detectedEmotion = remember(currentResponse, messages.size) {
                     val companionText = if (currentResponse.isNotBlank()) {
                         currentResponse
@@ -99,6 +98,7 @@ fun ChatScreen(
                     }
                     com.cupcake.ai.EmotionClassifier.detectEmotion(companionText)
                 }
+                val stem = com.cupcake.ai.EmotionAssets.stemForEmotion(detectedEmotion)
 
                 Surface(
                     modifier = Modifier
@@ -107,41 +107,27 @@ fun ChatScreen(
                     color = androidx.compose.ui.graphics.Color.Transparent,
                     tonalElevation = 0.dp
                 ) {
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        com.cupcake.ui.component.VrmViewer(
-                            modifier = Modifier.fillMaxSize(),
-                            isGenerating = isGenerating,
-                            emotion = detectedEmotion.vrmExpression,
-                            isWalking = isWalkingMode,
-                            audioBeat = if (isGenerating) 0.5f else 0.0f
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        coil.compose.AsyncImage(
+                            model = com.cupcake.ai.EmotionAssets.assetForStem(stem),
+                            contentDescription = "Marin looks ${detectedEmotion.name.lowercase()}",
+                            modifier = Modifier.fillMaxSize().padding(8.dp),
+                            contentScale = androidx.compose.ui.layout.ContentScale.Fit
                         )
 
-                        // 3D Motion Toolbar Overlay (Walk / Roam / Emotion badge)
-                        Row(
+                        Surface(
                             modifier = Modifier
                                 .align(Alignment.BottomEnd)
                                 .padding(8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
                         ) {
-                            Surface(
-                                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
-                                shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
-                            ) {
-                                Text(
-                                    text = "Emotion: ${detectedEmotion.name.lowercase().capitalize()}",
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
-                            }
-
-                            androidx.compose.material3.FilledTonalButton(
-                                onClick = { isWalkingMode = !isWalkingMode },
-                                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                                modifier = Modifier.height(28.dp)
-                            ) {
-                                Text(if (isWalkingMode) "Walk: ON 🐾" else "Walk: OFF 🛑", fontSize = 11.sp)
-                            }
+                            Text(
+                                text = "Emotion: ${detectedEmotion.name.lowercase().replaceFirstChar { it.uppercase() }}",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
                         }
                     }
                 }
@@ -267,8 +253,8 @@ fun ChatScreen(
 fun CharacterHeader(
     characterName: String,
     characterAvatar: String,
-    isVrmActive: Boolean = false,
-    onToggleVrm: () -> Unit = {},
+    isFaceActive: Boolean = false,
+    onToggleFace: () -> Unit = {},
     onConfigClick: () -> Unit = {},
     onSwitchClick: () -> Unit,
     onBackClick: () -> Unit
@@ -357,12 +343,12 @@ fun CharacterHeader(
                     )
                 }
 
-                // 3D VRM Model Viewport Toggle Button
+                // Emotion sticker panel toggle
                 androidx.compose.material3.IconButton(
-                    onClick = onToggleVrm,
+                    onClick = onToggleFace,
                     modifier = Modifier.size(36.dp)
                 ) {
-                    Text(if (isVrmActive) "👗" else "🧊", fontSize = 18.sp)
+                    Text(if (isFaceActive) "😊" else "🖼️", fontSize = 18.sp)
                 }
 
                 val context = androidx.compose.ui.platform.LocalContext.current

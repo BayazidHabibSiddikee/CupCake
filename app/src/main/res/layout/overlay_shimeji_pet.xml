@@ -41,12 +41,6 @@
             android:background="@drawable/bg_pet_circle"
             android:padding="2dp">
 
-            <WebView
-                android:id="@+id/pet_vrm_view"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:background="@android:color/transparent" />
-
             <ImageView
                 android:id="@+id/pet_image"
                 android:layout_width="match_parent"

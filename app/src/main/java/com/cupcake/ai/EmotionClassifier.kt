@@ -7,15 +7,15 @@ package com.cupcake.ai
  */
 object EmotionClassifier {
 
-    enum class Emotion(val vrmExpression: String) {
-        JOY("happy"),
-        SURPRISE("surprised"),
-        AFFECTION("lovely"),
-        JEALOUSY("pout"),
-        THINKING("relaxed"),
-        SADNESS("sad"),
-        ANGER("angry"),
-        NEUTRAL("neutral")
+    enum class Emotion {
+        JOY,
+        SURPRISE,
+        AFFECTION,
+        JEALOUSY,
+        THINKING,
+        SADNESS,
+        ANGER,
+        NEUTRAL
     }
 
     private val joyKeywords = setOf(
