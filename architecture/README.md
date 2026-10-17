@@ -1,71 +1,66 @@
 # CupCake Architecture
 
-## Overview
+> The current, authoritative system architecture lives in
+> **[../ARCHITECTURE.md](../ARCHITECTURE.md)** — layers, AI stack, game/points/demand
+> subsystems, data flow, DI, build and test strategy.
 
-This directory contains architecture diagrams, design documents, and technical specifications for the CupCake system.
+This directory holds supplementary, component-scoped design notes that go deeper on individual
+pieces than the top-level document.
 
 ## Contents
 
 ```
 architecture/
-├── README.md                    # This file
-├── system-overview.md           # High-level system architecture
-├── data-flow.md                 # Data flow diagrams
-├── component-design/
-│   ├── esp32-firmware.md        # ESP32 firmware design
-│   ├── android-app.md           # Android app architecture
-│   ├── ollama-inference.md      # Ollama HTTP API inference
-│   ├── api-gateway.md           # Custom API/Server integration
-│   └── system-prompt.md         # System prompt with image support
-├── api/
-│   ├── ble-protocol.md          # BLE communication protocol
-│   ├── rest-api.md              # REST API for custom servers
-│   └── websocket-api.md         # WebSocket for streaming
-├── models/
-│   ├── ollama-models.md         # Ollama model configuration
-│   ├── custom-model.md          # Custom model integration
-│   └── system-prompt.md         # System prompt schema
-└── security/
-    ├── threat-model.md          # Threat analysis
-    ├── data-protection.md       # Encryption, keys
-    └── api-security.md          # API authentication
+├── README.md                        # This file — index into the design notes
+└── component-design/
+    ├── api-gateway.md               # Custom API / server integration design
+    └── system-prompt.md             # System-prompt schema (with image/OCR support)
 ```
 
-## Key Architectural Decisions
+## Where to look
 
-### 1. Server-Based Inference Model
-- **Ollama server**: Local/remote HTTP API (smollm, qwen2:0.5b)
-- **Custom endpoints**: OpenAI-compatible APIs (vLLM, TGI, OpenAI, etc.)
-- **Routing**: ModelConfig selects provider type
+| Topic | Document |
+|-------|----------|
+| Whole-system architecture (current) | [../ARCHITECTURE.md](../ARCHITECTURE.md) |
+| Product features & usage | [../README.md](../README.md) |
+| On-device LLM, prompt, emotion, TTS, games, points, demands | [../ARCHITECTURE.md](../ARCHITECTURE.md) |
+| Custom API/server gateway | [component-design/api-gateway.md](component-design/api-gateway.md) |
+| System prompt schema | [component-design/system-prompt.md](component-design/system-prompt.md) |
+| Roadmap | [../docs/plan.md](../docs/plan.md) |
+| Gap analysis | [../docs/GAP_ANALYSIS.md](../docs/GAP_ANALYSIS.md) |
+| Model write-up | [../docs/blog/on-device-companion-models.md](../docs/blog/on-device-companion-models.md) |
 
-### 2. System Prompt with Images
-- Users upload images (diagrams, docs, screenshots)
-- OCR + vision model extracts text/context
-- Combined with text prompt for system instruction
-- Stored per-conversation, versioned
+## Key architectural decisions (current)
 
-### 3. Multi-Server Support
-- Default: Ollama at http://localhost:11434/v1
-- Configurable: Custom OpenAI-compatible endpoints
-- Auth: API keys, Bearer tokens
-- Connection pooling, timeout, retry
+1. **On-device inference is the default.** The bundled `liltii-v0.2-v3-q4_0.gguf` runs through
+   llama.cpp over JNI (`LlamaEngine`); the app is fully functional offline.
+2. **Remote providers are optional.** `ModelConfig.ModelProvider` supports OpenAI-compatible,
+   Ollama, vLLM, and custom endpoints for higher-quality replies — but **games always stay
+   on-device** (`GameLLMRouter`) so a misconfigured key can never make the bot silent.
+3. **One emotion vocabulary.** A `[tag]` at the head of every reply is the single source of truth
+   for on-screen art, voice language, and the ESP32 face/motor (`EmotionAssets`).
+4. **Two currencies.** `PointsManager` keeps spendable coins separate from lifetime XP/level, so
+   satisfying a demand can never cost a level.
+5. **Hardware is a pure contract.** The ESP face/motor payloads (`EspFace`, `ProtocolDecoder`) are
+   pure functions, unit-testable without a board.
 
-### 4. Data Flow
-```
-User Input → [System Prompt + Context] → ApiClient → [Ollama | OpenAI-compatible] → Stream Response
-                     ↑                         ↓
-               Image Upload              Config Store (Room)
-```
+## Historical note
 
-## Technology Stack
+`docs/architecture.md` is retained only as a pointer; its original content described the earlier
+Ollama-server-centric design (ESP32 as a sensor node with remote smollm/qwen2 inference), which
+has since been replaced by on-device llama.cpp inference.
+
+## Technology stack
 
 | Layer | Technology |
 |-------|------------|
-| Mobile UI | Jetpack Compose, Material3 |
-| Inference | OllamaEngine (OkHttp + NDJSON/SSE) |
-| Networking | OkHttp, Retrofit, WebSocket |
-| Database | Room (SQLCipher), DataStore |
+| Mobile UI | Jetpack Compose, Material 3, Navigation Compose |
+| Inference | llama.cpp via JNI (`LlamaEngine`); optional Ollama (NDJSON) / OpenAI-compatible (SSE) |
+| Networking | Ktor WebSocket (`EspWebSocketServer`), OkHttp, Retrofit |
+| BLE | AndroidX Bluetooth, Nordic UART Service |
+| Database | Room, SharedPreferences / DataStore stores |
+| Background | WorkManager (demands, proactive outreach), foreground services (BLE, Shimeji overlay) |
 | DI | Hilt |
-| BLE | AndroidX Bluetooth |
-| ESP32 | Arduino/ESP-IDF, NimBLE |
-| Serialization | Kotlinx Serialization (JSON), CBOR |
+| Images | Coil (static + animated GIF avatars) |
+| Serialization | kotlinx.serialization (JSON), binary `ProtocolDecoder` |
+| Firmware | ESP32-S3, PlatformIO (Arduino/ESP-IDF core) |

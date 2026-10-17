@@ -1,5 +1,6 @@
 package com.cupcake.ble
 
+import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
@@ -54,7 +55,12 @@ import java.util.concurrent.atomic.AtomicReference
  * - RX Characteristic (write): 6E400002-B5A3-F393-E0A9-E50E24DCCA9E
  * 
  * Uses ProtocolDecoder for binary protocol parsing.
+ *
+ * Permissions: the BLUETOOTH_SCAN/CONNECT checks live in the callers
+ * (DeviceSetupViewModel/WifiSetupScreen gate the UI on them), so lint's
+ * per-call-site requirement is suppressed here on purpose.
  */
+@SuppressLint("MissingPermission")
 class BleGattClient(private val context: Context) {
 
     companion object {

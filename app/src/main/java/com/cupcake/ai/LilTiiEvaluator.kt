@@ -132,18 +132,25 @@ class LilTiiEvaluator(
         rawOutput: String
     ): LilTiiEvalResult {
         val trimmed = rawOutput.trim()
-        val emotionTagRegex = Regex("""^\[(sleepy|confused|surprised|happy|angry|sad|thinking|lovely)\]\s*(.*)""", RegexOption.IGNORE_CASE)
-        val actionRegex = Regex("""^\*(.+?)\*\s*""")
-
-        val tagMatch = emotionTagRegex.find(trimmed)
-        val hasEmotionTag = tagMatch != null
-        val emotionTag = tagMatch?.groupValues?.getOrNull(1)?.lowercase()
-        val validEmotionTag = emotionTag in setOf(
+        // Find the tag anywhere so we can distinguish "absent" from "present but
+        // misplaced / not in the allowed set" — the two failure modes need different fixes.
+        val tagRegex = Regex("""\[([a-zA-Z]+)\]""")
+        val allowedTags = setOf(
             "sleepy", "confused", "surprised", "happy", "angry", "sad", "thinking", "lovely"
         )
-        val tagAtStart = trimmed.startsWith("[") && hasEmotionTag
+        val actionRegex = Regex("""^\*(.+?)\*\s*""")
 
-        val afterTag = tagMatch?.groupValues?.getOrNull(2) ?: trimmed
+        val tagMatch = tagRegex.find(trimmed)
+        val hasEmotionTag = tagMatch != null
+        val emotionTag = tagMatch?.groupValues?.getOrNull(1)?.lowercase()
+        val validEmotionTag = emotionTag != null && emotionTag in allowedTags
+        val tagAtStart = tagMatch?.range?.first == 0
+
+        val afterTag = if (tagAtStart && tagMatch != null) {
+            trimmed.substring(tagMatch.range.last + 1).trimStart()
+        } else {
+            trimmed
+        }
         val actionMatch = actionRegex.find(afterTag)
         val hasAction = actionMatch != null
         val action = actionMatch?.groupValues?.getOrNull(1)
