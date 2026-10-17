@@ -59,8 +59,26 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideEnergyManager(@dagger.hilt.android.qualifiers.ApplicationContext context: Context): EnergyManager {
-        return EnergyManager(context)
+    fun provideEnergyManager(
+        @dagger.hilt.android.qualifiers.ApplicationContext context: Context,
+        adManager: com.cupcake.ai.AdManager,
+        billingManager: com.cupcake.ai.BillingManager
+    ): EnergyManager {
+        return EnergyManager(context, adManager, billingManager)
+    }
+
+    @Provides
+    @Singleton
+    fun provideAdManager(): com.cupcake.ai.AdManager {
+        // Swap for a real AdMob-backed implementation when ad unit IDs are configured.
+        return com.cupcake.ai.FakeAdManager()
+    }
+
+    @Provides
+    @Singleton
+    fun provideBillingManager(): com.cupcake.ai.BillingManager {
+        // Swap for a BillingClient-backed implementation when Play products are configured.
+        return com.cupcake.ai.FakeBillingManager()
     }
 
     @Provides

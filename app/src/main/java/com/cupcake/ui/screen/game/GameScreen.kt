@@ -69,12 +69,18 @@ fun GameScreen(
     val angerLevel by viewModel.angerLevel.collectAsStateWithLifecycle()
     val adaptiveDifficultyName by viewModel.adaptiveDifficultyName.collectAsStateWithLifecycle()
 
+    // Set when navigation carries a game id we don't recognise (e.g. a deep link or a
+    // stale route), so the user gets an explicit message instead of a silent no-op.
+    var unsupportedGameId by remember { mutableStateOf<String?>(null) }
+
     // Auto-launch a specific game when arriving from the home screen
-    LaunchedEffect(startGameType) {
+    LaunchedEffect(startGameType, availableGames) {
         if (!startGameType.isNullOrBlank()) {
             val target = availableGames.firstOrNull { it.type.name == startGameType }
             if (target != null) {
                 viewModel.startGame(target, selectedDifficulty)
+            } else if (availableGames.isNotEmpty()) {
+                unsupportedGameId = startGameType
             }
         }
     }
@@ -165,7 +171,12 @@ fun GameScreen(
             }
 
             val activeGameState = gameState
-            if (activeGameState == null) {
+            if (activeGameState == null && unsupportedGameId != null) {
+                UnsupportedGameCard(
+                    name = unsupportedGameId!!,
+                    onBack = { unsupportedGameId = null }
+                )
+            } else if (activeGameState == null) {
                 // Game selection screen
                 Column(
                     modifier = Modifier.fillMaxSize().padding(16.dp),
@@ -303,15 +314,33 @@ fun GameScreen(
                         onPoint = { humanScored -> viewModel.pingPongPoint(humanScored) },
                         onRestart = { viewModel.restartGame() }
                     )
-                    else -> {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("${boardState.gameType.name} coming soon!", fontSize = 18.sp)
-                        }
-                    }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Honest terminal state for a game with no board renderer: says which game is unavailable
+ * and offers a way back, instead of a misleading "coming soon!" label.
+ */
+@Composable
+private fun UnsupportedGameCard(name: String, onBack: () -> Unit) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        androidx.compose.material3.Card(modifier = Modifier.padding(24.dp)) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text("🎮", fontSize = 40.sp)
+                Text("Game unavailable", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    text = "\"$name\" isn't supported in this version.",
+                    fontSize = 14.sp,
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                androidx.compose.material3.Button(onClick = onBack) { Text("Back to games") }
             }
         }
     }

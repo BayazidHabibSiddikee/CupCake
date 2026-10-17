@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.PeopleAlt
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -59,11 +60,15 @@ fun ChatScreen(
     val currentResponse by viewModel.currentResponse.collectAsStateWithLifecycle()
     val currentCharacter by viewModel.currentCharacter.collectAsStateWithLifecycle()
     val modelLoadState by viewModel.modelLoadState.collectAsStateWithLifecycle()
+    val modelConfig by viewModel.modelConfig.collectAsStateWithLifecycle()
+    val systemPrompt by viewModel.systemPrompt.collectAsStateWithLifecycle()
+    val providers by viewModel.providers.collectAsStateWithLifecycle()
     val isModelLoading = modelLoadState is ChatViewModel.ModelLoadState.Loading
 
     var scrollToBottom by remember { mutableStateOf(false) }
     var showCharacterPicker by remember { mutableStateOf(false) }
     var showVrm3dView by remember { mutableStateOf(false) }
+    var showConfigSheet by remember { mutableStateOf(false) }
 
     CupCakeTheme {
         Column(
@@ -76,6 +81,7 @@ fun ChatScreen(
                 characterAvatar = currentCharacter?.avatar ?: "🤖",
                 isVrmActive = showVrm3dView,
                 onToggleVrm = { showVrm3dView = !showVrm3dView },
+                onConfigClick = { showConfigSheet = true },
                 onSwitchClick = { showCharacterPicker = true },
                 onBackClick = onBack
             )
@@ -188,6 +194,20 @@ fun ChatScreen(
                 )
             }
 
+            if (showConfigSheet) {
+                ChatConfigSheet(
+                    config = modelConfig,
+                    systemPrompt = systemPrompt,
+                    providers = providers,
+                    onApply = { config, prompt ->
+                        viewModel.updateModelConfig(config)
+                        viewModel.updateSystemPrompt(prompt)
+                        showConfigSheet = false
+                    },
+                    onDismiss = { showConfigSheet = false }
+                )
+            }
+
             // Messages list
             LazyColumn(
                 modifier = Modifier
@@ -249,6 +269,7 @@ fun CharacterHeader(
     characterAvatar: String,
     isVrmActive: Boolean = false,
     onToggleVrm: () -> Unit = {},
+    onConfigClick: () -> Unit = {},
     onSwitchClick: () -> Unit,
     onBackClick: () -> Unit
 ) {
@@ -324,6 +345,18 @@ fun CharacterHeader(
             }
             
             Row(verticalAlignment = Alignment.CenterVertically) {
+                // Model / system-prompt settings
+                androidx.compose.material3.IconButton(
+                    onClick = onConfigClick,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    androidx.compose.material3.Icon(
+                        imageVector = androidx.compose.material.icons.Icons.Filled.Settings,
+                        contentDescription = "Chat settings",
+                        tint = com.cupcake.ui.component.MessengerBlue
+                    )
+                }
+
                 // 3D VRM Model Viewport Toggle Button
                 androidx.compose.material3.IconButton(
                     onClick = onToggleVrm,

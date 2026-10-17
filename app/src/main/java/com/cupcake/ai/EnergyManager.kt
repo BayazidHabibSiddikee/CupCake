@@ -12,7 +12,11 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.decodeFromString
 import java.io.File
 
-class EnergyManager(private val context: Context) {
+class EnergyManager(
+    private val context: Context,
+    private val adManager: AdManager = FakeAdManager(),
+    private val billingManager: BillingManager = FakeBillingManager()
+) {
 
     companion object {
         private const val TAG = "EnergyManager"
@@ -103,6 +107,23 @@ class EnergyManager(private val context: Context) {
         }
     }
 
+    /**
+     * Watch a rewarded ad through [AdManager] and grant energy only when the user actually
+     * earned the reward. A dismissed or failed ad leaves the balance untouched.
+     *
+     * @return true when energy was granted.
+     */
+    suspend fun watchRewardedAd(): Boolean {
+        if (!canWatchAd() || !adManager.isRewardedAdAvailable()) return false
+        return when (adManager.showRewardedAd()) {
+            AdResult.REWARDED -> {
+                rewardAdWatched()
+                true
+            }
+            AdResult.DISMISSED, AdResult.FAILED -> false
+        }
+    }
+
     fun setPro(pro: Boolean) {
         _isPro.value = pro
         if (pro) {
@@ -111,11 +132,15 @@ class EnergyManager(private val context: Context) {
         saveState()
     }
 
-    fun purchasePro(): Boolean {
-        // In real app, this would call Play Billing
-        // For now, simulate success
-        setPro(true)
-        return true
+    /**
+     * Run the Pro purchase flow through [BillingManager]. Pro is only granted when the
+     * purchase actually succeeds, so a cancelled or unavailable store never unlocks it.
+     */
+    suspend fun purchasePro(): Boolean {
+        if (!billingManager.isAvailable()) return false
+        val purchased = billingManager.purchasePro()
+        if (purchased) setPro(true)
+        return purchased
     }
 
     fun canWatchAd(): Boolean = _adAvailable.value && !_isPro.value
@@ -129,46 +154,4 @@ class EnergyManager(private val context: Context) {
         val energyRemaining: Long,
         val isPro: Boolean
     )
-}
-
-// Ad Manager (placeholder for Google AdMob integration)
-class AdManager(private val context: Context) {
-
-    companion object {
-        private const val TAG = "AdManager"
-    }
-
-    interface AdCallback {
-        fun onAdLoaded()
-        fun onAdFailedToLoad(error: String)
-        fun onAdShown()
-        fun onAdDismissed()
-        fun onUserEarnedReward()
-        fun onAdClicked()
-    }
-
-    // Rewarded ad for energy
-    fun loadRewardedAd(callback: AdCallback) {
-        Log.i(TAG, "Loading rewarded ad...")
-        // TODO: Implement Google AdMob rewarded ad
-        // MobileAds.initialize(context) { }
-        // RewardedAd.load(context, "REWARDED_AD_UNIT_ID", AdRequest.Builder().build(), object : RewardedAdLoadCallback() {
-        //     override fun onAdLoaded(ad: RewardedAd) { ... }
-        //     override fun onAdFailedToLoad(error: LoadAdError) { ... }
-        // })
-    }
-
-    fun showRewardedAd(callback: AdCallback) {
-        Log.i(TAG, "Showing rewarded ad...")
-        // TODO: Show loaded rewarded ad
-    }
-
-    // Interstitial ad
-    fun loadInterstitialAd(callback: AdCallback) {
-        // TODO: Implement
-    }
-
-    fun showInterstitialAd(callback: AdCallback) {
-        // TODO: Implement
-    }
 }

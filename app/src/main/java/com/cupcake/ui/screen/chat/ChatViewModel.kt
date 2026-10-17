@@ -23,6 +23,8 @@ import android.content.Context
 import androidx.lifecycle.SavedStateHandle
 import com.cupcake.chat.ChatSessionStore
 import com.cupcake.domain.usecase.GetApiProvidersUseCase
+import com.cupcake.domain.repository.ModelRepository
+import com.cupcake.domain.repository.SystemPromptRepository
 import com.cupcake.data.model.ApiProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Job
@@ -48,6 +50,8 @@ class ChatViewModel @Inject constructor(
     private val ttsManager: TtsManager,
     private val energyManager: EnergyManager,
     private val getApiProvidersUseCase: GetApiProvidersUseCase,
+    private val modelRepository: ModelRepository,
+    private val systemPromptRepository: SystemPromptRepository,
     private val modelDownloadManager: com.cupcake.ai.ModelDownloadManager,
     private val userProfileStore: UserProfileStore
 ) : ViewModel() {
@@ -92,6 +96,10 @@ class ChatViewModel @Inject constructor(
 
     private val _modelConfig = MutableStateFlow(ModelConfig.default())
     val modelConfig = _modelConfig.asStateFlow()
+
+    /** Configured remote providers, offered by the chat config sheet. */
+    private val _providers = MutableStateFlow<List<ApiProvider>>(emptyList())
+    val providers = _providers.asStateFlow()
 
     private val _systemPrompt = MutableStateFlow<SystemPrompt?>(null)
     val systemPrompt = _systemPrompt.asStateFlow()
@@ -259,6 +267,7 @@ class ChatViewModel @Inject constructor(
         }
         viewModelScope.launch {
             getApiProvidersUseCase().collect { providerList ->
+                _providers.value = providerList
                 val active = providerList.firstOrNull { it.isEnabled }
                 if (active != null) {
                     val fallback = if (active.providerType == ModelConfig.ModelProvider.CUSTOM_OLLAMA) "qwen2.5:0.5b" else "gpt-3.5-turbo"
@@ -612,20 +621,41 @@ class ChatViewModel @Inject constructor(
 
     fun onAdWatched() {
         _adRequested.value = false
-        energyManager.rewardAdWatched()
+        viewModelScope.launch { energyManager.watchRewardedAd() }
     }
 
     fun upgradeToPro() {
-        energyManager.purchasePro()
+        viewModelScope.launch { energyManager.purchasePro() }
     }
 
-    // Header actions (TODO: wire to config sheets)
-    fun onModelConfigClick() {
-        Log.d("ChatViewModel", "Model config clicked")
+    /** Applies a config chosen in the chat config sheet and persists it for this conversation. */
+    fun updateModelConfig(config: ModelConfig) {
+        _modelConfig.value = config
+        viewModelScope.launch {
+            runCatching { modelRepository.updateConfig(conversationId, config) }
+                .onFailure { Log.w("ChatViewModel", "Failed to persist model config", it) }
+        }
+        ensureModelLoaded()
     }
 
-    fun onSystemPromptClick() {
-        Log.d("ChatViewModel", "System prompt clicked")
+    /**
+     * Sets (or clears, when [text] is blank) the conversation's custom system prompt and
+     * persists it, so the next reply uses it instead of the character's default prompt.
+     */
+    fun updateSystemPrompt(text: String?) {
+        val trimmed = text?.trim().orEmpty()
+        if (trimmed.isEmpty()) {
+            _systemPrompt.value = null
+            return
+        }
+        val existing = _systemPrompt.value
+        val updated = existing?.copy(text = trimmed, version = existing.version + 1)
+            ?: SystemPrompt(id = "sys_$conversationId", name = "Chat prompt", text = trimmed)
+        _systemPrompt.value = updated
+        viewModelScope.launch {
+            runCatching { systemPromptRepository.savePrompt(updated) }
+                .onFailure { Log.w("ChatViewModel", "Failed to persist system prompt", it) }
+        }
     }
 
     // ESP32 controls
