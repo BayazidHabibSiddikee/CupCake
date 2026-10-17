@@ -32,7 +32,7 @@ points you earn by winning.
 
 ### On-device companionship
 - **Bundled LilTii LLM** (`models/liltii-v0.2-v3-q4_0.gguf`) loaded through `LlamaEngine` (JNI, CMake, NEON, OpenMP off) — see [ARCHITECTURE.md](ARCHITECTURE.md#ai-stack).
-- **`[emotion] *action* reply` contract.** Every reply starts with a bracketed mood and an action beat. `EmotionAssets` maps the tag to 2D art and to an ESP face; the same tag picks the TTS voice language.
+- **`[emotion] *action* reply` contract, enforced by a GBNF grammar.** A 0.6B model only emits a valid leading tag ~half the time when it is merely *asked* to; the sampler is constrained by `EmotionGrammar.TAG_ACTION`, so the format is deterministic. `EmotionAssets` maps the tag to 2D art and to an ESP face; the same tag picks the TTS voice language.
 - **Banglish personality** — replies mix English and casual Bangla; `BanglishTranslator` converts dry model output into in-character gyaru lines when needed.
 - **Voice** — `TtsManager` auto-detects Bangla vs. Latin text, streams PCM chunks (`speakStreaming`) to the ESP32 for audio playback while the phone speaks.
 - **Chat streaming** with per-conversation model config, system prompt, and token-by-token rendering.
@@ -259,7 +259,7 @@ Everything below runs on the JVM — **no device or emulator needed**.
 
 | Check | Result |
 |-------|--------|
-| `:app:testDebugUnitTest` | **149 tests, 24 classes, 0 failures, 0 errors** |
+| `:app:testDebugUnitTest` | **156 tests, 25 classes, 0 failures, 0 errors** |
 | `:app:lintDebug` | **0 errors**, 133 warnings (mostly `GradleDependency` update nags) |
 | `:app:assembleDebug` | builds `app-debug.apk` |
 
@@ -268,6 +268,7 @@ Test suites and what they lock down:
 | Suite | Covers |
 |-------|--------|
 | `ai.AnswerFormatTest` | the companion **answer contract**: prompt carries persona + few-shot, `CUTE_STYLE` is parseable, and the scorer gives full marks to a correct `[tag] *action* bangla` reply while flagging missing/invalid/misplaced tags |
+| `ai.EmotionGrammarTest` | the emotion vocabulary is single-sourced: the GBNF grammar's tag rule, the prompt, the scorer and the art map all match `EmotionTags.ALL` |
 | `ai.LilTiiEvaluatorTest` | 20-iteration grading harness against a stubbed engine |
 | `ai.CharacterManagerTest`, `ai.SillyTavernCardParserTest` | character store, card import/export |
 | `ai.EmotionAssetsTest`, `ai.ProactiveEngagementManagerTest`, `ai.ModelDownloadManagerTest` | tag→art→face mapping, outreach moods, catalog pruning |
@@ -324,7 +325,7 @@ CupCake/
 │   │       ├── service/                  # BLE foreground service, Shimeji overlay
 │   │       ├── tts/                      # TtsManager
 │   │       └── ui/                       # Compose screens, components, theme
-│   ├── src/test/                         # 149 JVM unit tests
+│   ├── src/test/                         # 156 JVM unit tests
 │   └── src/androidTest/                  # Espresso/Compose instrumented tests
 ├── architecture/                         # component-design notes + index
 ├── docs/                                 # architecture, plan, gap analysis, blog

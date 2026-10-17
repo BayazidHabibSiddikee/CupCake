@@ -36,6 +36,11 @@ struct SamplingParams {
 
 static SamplingParams g_sampling_params;
 
+// Optional GBNF grammar for constrained decoding (empty = unconstrained).
+// Set from Kotlin via LlamaEngine.setGrammar; copied into the sampler chain per generate().
+static std::string g_grammar;
+static const char* g_grammar_root = "root";
+
 // Callback for streaming tokens
 static JavaVM* g_jvm = nullptr;
 static jobject g_callback = nullptr;
@@ -52,6 +57,7 @@ Java_com_cupcake_ai_LlamaEngine_initModel(
     
     llama_backend_init();
     g_cache_tokens.clear();
+    g_grammar.clear();
     g_n_batch = n_batch > 0 ? n_batch : 512;
     
     llama_model_params model_params = llama_model_default_params();
@@ -114,6 +120,20 @@ Java_com_cupcake_ai_LlamaEngine_setSamplingParams(
     g_sampling_params.repeat_last_n = repeat_last_n;
     g_sampling_params.seed = seed;
     g_sampling_params.max_tokens = max_tokens > 0 ? max_tokens : 128;
+}
+
+// Constrain decoding to a GBNF grammar. Pass null/empty to clear (unconstrained).
+extern "C" JNIEXPORT void JNICALL
+Java_com_cupcake_ai_LlamaEngine_nativeSetGrammar(
+    JNIEnv* env, jobject thiz, jstring grammar
+) {
+    if (grammar == nullptr) {
+        g_grammar.clear();
+        return;
+    }
+    const char* str = env->GetStringUTFChars(grammar, nullptr);
+    g_grammar = str != nullptr ? str : "";
+    env->ReleaseStringUTFChars(grammar, str);
 }
 
 static bool is_valid_utf8(const std::string& str) {
@@ -228,8 +248,19 @@ Java_com_cupcake_ai_LlamaEngine_generate(
             return;
         }
 
-        // Build sampler chain (llama.cpp b4122 API): penalties -> top_k -> top_p -> temp -> dist
+        // Build sampler chain (llama.cpp b4122 API): grammar -> penalties -> top_k -> top_p -> temp -> dist
         llama_sampler* smpl = llama_sampler_chain_init(llama_sampler_chain_default_params());
+        // Grammar must come first so its logit mask is applied before any truncation
+        // (top_k/top_p) can hide an in-grammar token.
+        if (!g_grammar.empty()) {
+            llama_sampler* grammar_smpl =
+                llama_sampler_init_grammar(g_model, g_grammar.c_str(), g_grammar_root);
+            if (grammar_smpl) {
+                llama_sampler_chain_add(smpl, grammar_smpl);
+            } else {
+                LOGE("Failed to initialize grammar; generating unconstrained");
+            }
+        }
         llama_sampler_chain_add(smpl,
             llama_sampler_init_penalties(
                 llama_n_vocab(g_model),

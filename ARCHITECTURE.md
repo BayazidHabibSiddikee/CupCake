@@ -115,6 +115,23 @@ The persona contract lives here:
   detection (`tagOf`, `stemForText`), maps to app art stems, an ESP face, and HTTP/asset paths.
   This is why the tag contract matters — it drives image, voice language, and hardware together.
 
+### `EmotionTags` + `EmotionGrammar` (constrained decoding)
+- **`EmotionTags`** is the single source of truth for the tag vocabulary — the seven tags the
+  bundled model was fine-tuned on (`happy, sleepy, surprised, sad, angry, thinking, confused`).
+  The prompt, the scorer, the art map, the grammar and (by convention) the training generators all
+  read from it. `EmotionAssets.tagToStem` keeps extra aliases as a *tolerant superset* so
+  off-script output still maps to art, but those aliases are never requested or enforced.
+- **`EmotionGrammar`** turns the tag contract into a GBNF grammar handed to llama.cpp via
+  `llama_sampler_init_grammar`. A 0.6B model asserts a valid leading tag only ~52% of the time
+  when merely prompted; with the grammar the sampler masks every token that would break
+  `[tag] *action* reply`, making it deterministic. `TAG_ACTION` requires the action beat;
+  `TAG_ONLY` makes it optional. The tag alternation is generated from `EmotionTags.ALL`, so the
+  grammar can never drift from the prompt.
+- **Plumbing.** `LlamaEngine.setGrammar()` is plain Kotlin state; the value is pushed to the
+  native sampler in `generateStream()` (and on `loadModel`), so tests and mockk never touch the
+  JNI. The grammar is applied in every local persona path: chat, `GameLLMRouter`, and the
+  `LilTiiEvaluator`/`LilTiiEvalScreen` grading harness.
+
 ### `ToneGuard`
 Every game line passes through `ToneGuard.sanitize()` after generation: collapse whitespace,
 replace hostile content with a playful line (whole-word `HOSTILE` regex so
@@ -378,7 +395,7 @@ Everything must be testable **offline and without hardware**, so the codebase pu
 dependencies to constructor parameters and keeps pure logic in `object`s / functions.
 
 ```bash
-./gradlew :app:testDebugUnitTest   # 149 tests, 24 classes, 0 failures
+./gradlew :app:testDebugUnitTest   # 156 tests, 25 classes, 0 failures
 ./gradlew :app:lintDebug           # 0 errors, 133 warnings
 ./gradlew :app:assembleDebug
 ```
@@ -386,7 +403,7 @@ dependencies to constructor parameters and keeps pure logic in `object`s / funct
 | Layer | How it's tested |
 |-------|-----------------|
 | Game engines | node-count / legality assertions (`ChessEngineTest` perft tables, TTT/ConnectFour/MathQuiz/GuessNumber) |
-| Answer contract | `AnswerFormatTest` — prompt carries persona/few-shot, `CUTE_STYLE` parseable, scorer gives full marks to a valid reply and flags missing/invalid/misplaced tags; `LilTiiEvaluatorTest` runs the 20-prompt harness against a stubbed engine |
+| Answer contract | `AnswerFormatTest` — prompt carries persona/few-shot, `CUTE_STYLE` parseable, scorer gives full marks to a valid reply and flags missing/invalid/misplaced tags; `LilTiiEvaluatorTest` runs the 20-prompt harness against a stubbed engine; `EmotionGrammarTest` locks the grammar/prompt/scorer/art map to `EmotionTags.ALL` |
 | Economy | `PointsManagerTest` — coins vs XP, spend gating, persistence round-trip, level curves, level-up events; `DemandManagerTest` — catalog invariants, no-repeat pick, affection floor |
 | Tone safety | `ToneGuardTest` — hostile replacement, whole-word false-positive guards, length clamp |
 | Hardware contracts | `EspFaceTest` (face payload), `WifiProvisioningTest` (provisioning payloads), `ProtocolDecoder` via protocol tests |

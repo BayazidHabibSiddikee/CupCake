@@ -410,6 +410,11 @@ class ChatViewModel @Inject constructor(
             try {
                 if (config.isLocal()) {
                     val prompt = buildPrompt()
+                    // buildPrompt always injects CUTE_STYLE, so constrain the sampler to the
+                    // same [tag] *action* reply shape: format compliance becomes deterministic
+                    // instead of ~50% on the 0.6B model.
+                    LlamaEngine.getInstance()
+                        .setGrammar(com.cupcake.ai.EmotionGrammar.TAG_ACTION)
                     val tokenChannel = LlamaEngine.getInstance().generateStream(prompt)
                     var tick = 0
                     for (token in tokenChannel) {

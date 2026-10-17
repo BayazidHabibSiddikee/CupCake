@@ -107,6 +107,8 @@ class LlamaEngine private constructor() {
         temp: Float, topP: Float, topK: Int,
         repeatPenalty: Float, repeatLastN: Int, seed: Int, maxTokens: Int
     )
+    private external fun nativeSetGrammar(grammar: String?)
+
     external fun generate(prompt: String): Int
     external fun cancel()
     external fun release()
@@ -130,12 +132,31 @@ class LlamaEngine private constructor() {
         val topK: Int = 40,
         val repeatPenalty: Float = 1.1f,
         val repeatLastN: Int = 64,
-        val seed: Int = -1
+        val seed: Int = -1,
+        val grammar: String? = null
     )
 
     private var _isModelLoaded = false
     @Volatile
     private var _loadedModelName: String? = null
+
+    /**
+     * GBNF grammar applied to subsequent generations, or null for unconstrained decoding.
+     * Kept as plain Kotlin state (not a native call itself) so tests and mocks never touch
+     * the JNI: the value is pushed into the sampler in [generateStream] and [loadModel].
+     */
+    @Volatile
+    var grammar: String? = null
+        private set
+
+    /**
+     * Constrain decoding to a GBNF grammar (see [EmotionGrammar]). This is what turns the
+     * companion's `[emotion] *action* reply` format from "usually" into "always": the
+     * sampler masks every token that would break the grammar. Pass `null` to clear.
+     */
+    fun setGrammar(grammar: String?) {
+        this.grammar = grammar
+    }
 
     fun getLoadedModelName(): String? = _loadedModelName
 
@@ -183,6 +204,8 @@ class LlamaEngine private constructor() {
                     config.seed,
                     config.maxTokens
                 )
+                setGrammar(config.grammar)
+                nativeSetGrammar(config.grammar)
                 Result.success(Unit)
             } else {
                 Log.e(TAG, "initModel returned $result for $targetName")
@@ -223,6 +246,9 @@ class LlamaEngine private constructor() {
                 }
 
                 setCallback(callback)
+                // Apply the current grammar right before decoding so callers can change it
+                // per generation without reloading the model.
+                nativeSetGrammar(grammar)
                 val result = generate(prompt)
                 if (result != 0) {
                     if (generateMutex.isLocked) generateMutex.unlock()

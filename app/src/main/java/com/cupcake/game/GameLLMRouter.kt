@@ -2,6 +2,7 @@ package com.cupcake.game
 
 import android.util.Log
 import com.cupcake.ai.CharacterManager
+import com.cupcake.ai.EmotionGrammar
 import com.cupcake.ai.LilTiiPromptTemplate
 import com.cupcake.ai.LlamaEngine
 import javax.inject.Inject
@@ -88,6 +89,8 @@ class GameLLMRouter @Inject constructor(
         }
 
         val builder = StringBuilder()
+        // Constrain the little model to the Persona's [tag] *action* reply shape.
+        llamaEngine.setGrammar(EmotionGrammar.TAG_ACTION)
         for (token in llamaEngine.generateStream(prompt)) {
             builder.append(token)
         }

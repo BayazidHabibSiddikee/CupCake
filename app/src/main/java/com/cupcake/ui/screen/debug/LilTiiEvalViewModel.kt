@@ -108,6 +108,7 @@ class LilTiiEvalViewModel @Inject constructor(
 
                     val result = try {
                         withTimeout(60_000) {
+                            llamaEngine.setGrammar(com.cupcake.ai.EmotionGrammar.TAG_ACTION)
                             val channel = llamaEngine.generateStream(prompt)
                             val sb = StringBuilder()
                             for (chunk in channel) {
@@ -115,11 +116,11 @@ class LilTiiEvalViewModel @Inject constructor(
                             }
                             val raw = sb.toString()
                             val trimmed = raw.trim()
-                            val emotionTagRegex = Regex("""^\[(sleepy|confused|surprised|happy|angry|sad|thinking|lovely)\]\s*(.*)""", RegexOption.IGNORE_CASE)
+                            val emotionTagRegex = Regex("""^\[([a-zA-Z]+)\]\s*(.*)""", RegexOption.IGNORE_CASE)
                             val actionRegex = Regex("""^\*(.+?)\*\s*""")
                             val tagMatch = emotionTagRegex.find(trimmed)
                             val emotionTag = tagMatch?.groupValues?.getOrNull(1)?.lowercase()
-                            val validEmotionTag = emotionTag in setOf("sleepy", "confused", "surprised", "happy", "angry", "sad", "thinking", "lovely")
+                            val validEmotionTag = com.cupcake.ai.EmotionTags.isKnown(emotionTag)
                             val hasBangla = trimmed.any { it in 'ঀ'..'৿' }
                             var score = 0
                             val notes = mutableListOf<String>()

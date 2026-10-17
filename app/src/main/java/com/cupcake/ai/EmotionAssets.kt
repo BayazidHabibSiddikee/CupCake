@@ -8,6 +8,11 @@ package com.cupcake.ai
  *  - the floating overlay pet,
  *  - the ESP32 board, which can fetch the exact same PNG over HTTP at
  *    [httpPathForStem] and drive its own face from [espFaceForStem].
+ *
+ * The bracket tags accepted here are a tolerant superset: the canonical set lives in
+ * [EmotionTags] and is what the prompt, grammar and scorer enforce, while the extra
+ * aliases below keep older/off-script model output mapping to *some* art instead of
+ * falling through to neutral.
  */
 object EmotionAssets {
 

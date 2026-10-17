@@ -90,6 +90,8 @@ class LilTiiEvaluator(
     }
 
     private suspend fun collectLocalOutput(prompt: String): String {
+        // Grade the model in the same constrained shape the app uses at runtime.
+        llamaEngine.setGrammar(EmotionGrammar.TAG_ACTION)
         val channel = llamaEngine.generateStream(prompt)
         val sb = StringBuilder()
         for (chunk in channel) {
@@ -135,9 +137,7 @@ class LilTiiEvaluator(
         // Find the tag anywhere so we can distinguish "absent" from "present but
         // misplaced / not in the allowed set" — the two failure modes need different fixes.
         val tagRegex = Regex("""\[([a-zA-Z]+)\]""")
-        val allowedTags = setOf(
-            "sleepy", "confused", "surprised", "happy", "angry", "sad", "thinking", "lovely"
-        )
+        val allowedTags = EmotionTags.SET
         val actionRegex = Regex("""^\*(.+?)\*\s*""")
 
         val tagMatch = tagRegex.find(trimmed)
