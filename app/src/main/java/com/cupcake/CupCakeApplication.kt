@@ -52,6 +52,8 @@ class CupCakeApplication : Application(), ImageLoaderFactory {
                 android.util.Log.i("EspServer", "ESP32 $sessionId ${if (connected) "connected" else "disconnected"}")
             }
         )
+        // Advertise this phone's address over UDP so the ESP32 can find the server
+        com.cupcake.network.PhoneBeacon.start(this)
 
         // Initialize proactive companion outreach
         com.cupcake.ai.ProactiveEngagementManager.initialize(this)
