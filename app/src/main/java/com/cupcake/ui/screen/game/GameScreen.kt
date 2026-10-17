@@ -153,7 +153,7 @@ fun GameScreen(
                 )
             }
 
-            // Live bot commentary — Marin's reaction to your move / game-ending
+            // Live bot commentary — CupCake's reaction to your move / game-ending
             botComment?.let { comment ->
                 androidx.compose.material3.Card(
                     modifier = Modifier
@@ -183,7 +183,7 @@ fun GameScreen(
             }
 
 
-            // Escalating-anger banner: Marin visibly gets angrier (and raises the
+            // Escalating-anger banner: CupCake visibly gets angrier (and raises the
             // difficulty) each time you win a game against her.
             val activeGame = gameState
             if (activeGame != null && angerLevel > 0.12) {
@@ -203,7 +203,7 @@ fun GameScreen(
                     ) {
                         Text(text = if (angerLevel > 0.7) "💢" else "😤", fontSize = 18.sp)
                         Text(
-                            text = "Marin is $moodRank — difficulty raised to ${adaptiveDifficultyName.uppercase()}",
+                            text = "CupCake is $moodRank — difficulty raised to ${adaptiveDifficultyName.uppercase()}",
                             modifier = Modifier.weight(1f),
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Medium,
@@ -234,7 +234,7 @@ fun GameScreen(
                     ) {
                         Text("Choose a Game", fontSize = 24.sp, fontWeight = FontWeight.Bold)
                         Text(
-                            "Play with Marin — win to earn coins",
+                            "Play with CupCake — win to earn coins",
                             fontSize = 13.sp,
                             color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -561,7 +561,7 @@ private fun difficultyEmoji(difficulty: com.cupcake.game.TicTacToeEngine.Difficu
 
 /**
  * A single horizontal strip of status pills shown above the board or lobby: currency,
- * level, and — while a game is live — the difficulty Marin is matching and a compact
+ * level, and — while a game is live — the difficulty CupCake is matching and a compact
  * threat meter showing how close the player is to winning.
  */
 @Composable

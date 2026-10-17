@@ -57,7 +57,7 @@ class ChatViewModel @Inject constructor(
 ) : ViewModel() {
 
     val characterId: String =
-        savedStateHandle.get<String>("characterId") ?: "marin_kitagawa"
+        savedStateHandle.get<String>("characterId") ?: "cupcake_kitagawa"
 
     val conversationId: String = sessionStore.conversationIdFor(characterId)
 
@@ -500,7 +500,7 @@ class ChatViewModel @Inject constructor(
     }
 
     private fun buildPrompt(): String {
-        val charName = _currentCharacter.value?.name ?: "Marin Kitagawa"
+        val charName = _currentCharacter.value?.name ?: "CupCake Kitagawa"
         val customSys = _systemPrompt.value?.fullPrompt()
         val rawSystemPrompt = if (!customSys.isNullOrBlank()) {
             customSys

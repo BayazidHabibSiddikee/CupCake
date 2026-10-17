@@ -272,18 +272,18 @@ fun ProfileTab(
             )
         }
 
-        // Marin vs You
+        // CupCake vs You
         CuteCard {
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Text("💢 Marin vs You", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Text("💢 CupCake vs You", fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    Text("Marin: ${botStatus.botWins} wins", fontWeight = FontWeight.SemiBold)
+                    Text("CupCake: ${botStatus.botWins} wins", fontWeight = FontWeight.SemiBold)
                     Text("You: ${botStatus.playerWins} wins", fontWeight = FontWeight.SemiBold)
                 }
                 val headToHead = botStatus.botWins + botStatus.playerWins
@@ -293,7 +293,7 @@ fun ProfileTab(
                     else if (botStatus.playerWins > botStatus.botWins)
                         "You're ahead by ${botStatus.playerWins - botStatus.botWins}. She is NOT happy about it."
                     else if (botStatus.botWins > botStatus.playerWins)
-                        "Marin leads by ${botStatus.botWins - botStatus.playerWins}. Smug Marin noises."
+                        "CupCake leads by ${botStatus.botWins - botStatus.playerWins}. Smug CupCake noises."
                     else
                         "Dead even. She wants a rematch right now.",
                     fontSize = 13.sp,

@@ -71,10 +71,10 @@ fun ChessBoardUI(
 
     val statusText = when (state.status) {
         Game.GameStatus.HUMAN_WON -> board.result ?: "You won! 🎉"
-        Game.GameStatus.BOT_WON -> board.result ?: "Marin won! 👑"
+        Game.GameStatus.BOT_WON -> board.result ?: "CupCake won! 👑"
         Game.GameStatus.DRAW -> board.result ?: "Draw 🤝"
         else -> when {
-            state.currentPlayer == Game.Player.BOT -> "Marin is thinking…"
+            state.currentPlayer == Game.Player.BOT -> "CupCake is thinking…"
             checkSquare >= 0 -> "You're in check! 😬"
             else -> "Your move"
         }

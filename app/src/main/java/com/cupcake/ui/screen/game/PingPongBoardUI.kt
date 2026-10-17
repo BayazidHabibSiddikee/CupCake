@@ -41,7 +41,7 @@ import kotlin.math.abs
  * it works at any size); the *score* lives in the shared [Game.PingPongBoard] so
  * wins, points, reactions and adaptive difficulty flow through the normal plumbing.
  *
- * @param botSkill 0..1 — how fast/sharply Marin tracks the ball. Escalates in-game
+ * @param botSkill 0..1 — how fast/sharply CupCake tracks the ball. Escalates in-game
  *   as her anger rises, so a rematch after losing to you is genuinely harder.
  */
 @Composable
@@ -141,14 +141,14 @@ fun PingPongBoardUI(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text(
-            text = "You ${board.humanScore}   —   ${board.botScore} Marin",
+            text = "You ${board.humanScore}   —   ${board.botScore} CupCake",
             fontSize = 22.sp,
             fontWeight = FontWeight.Bold
         )
         Text(
             text = when {
                 state.status == Game.GameStatus.HUMAN_WON -> "You won the match! 🎉  — nerf incoming…"
-                state.status == Game.GameStatus.BOT_WON -> "Marin won! 👑"
+                state.status == Game.GameStatus.BOT_WON -> "CupCake won! 👑"
                 serving -> "Get ready… the ball drops in $countdown"
                 else -> "First to ${board.targetScore}. Drag left/right to move 🏓"
             },

@@ -24,7 +24,7 @@ import java.util.concurrent.TimeUnit
 import kotlin.random.Random
 
 /**
- * Manages proactive outreach from Marin Kitagawa based on history & emotions:
+ * Manages proactive outreach from CupCake Kitagawa based on history & emotions:
  * - Emotional states: ANGRY (pouting/accusing), LOVED (high affection), PLAYFUL, LONELY, NORMAL.
  * - If angry: high probability not to text (longer silence), or bursts of angry texts.
  * - If loved / high affection: texts more frequently and warmly.
@@ -37,8 +37,8 @@ object ProactiveEngagementManager {
     private const val KEY_LAST_USER_TIME = "last_user_time"
     private const val KEY_PROACTIVE_COUNT = "proactive_count"
     private const val KEY_CURRENT_MOOD = "current_mood"
-    private const val WORK_NAME = "marin_proactive_worker"
-    private const val CHANNEL_ID = "marin_companion_messages"
+    private const val WORK_NAME = "cupcake_proactive_worker"
+    private const val CHANNEL_ID = "cupcake_companion_messages"
     private const val NOTIFICATION_ID = 2001
 
     private const val MAX_PROACTIVE_LIMIT = 15 // At most 15 messages until user replies
@@ -123,12 +123,12 @@ object ProactiveEngagementManager {
     fun inferMoodFromHistory(context: Context): Mood {
         val recentText = try {
             val store = ChatSessionStore.get()
-            val msgs = store?.messages("marin_kitagawa")?.value ?: emptyList()
+            val msgs = store?.messages("cupcake_kitagawa")?.value ?: emptyList()
             if (msgs.isNotEmpty()) {
                 msgs.takeLast(10).joinToString(" ") { it.content.lowercase() }
             } else {
                 kotlinx.coroutines.runBlocking {
-                    val dbMsgs = AppDatabase.getInstance(context).chatMessageDao().getMessagesPaged("chat_marin_kitagawa", 10, 0)
+                    val dbMsgs = AppDatabase.getInstance(context).chatMessageDao().getMessagesPaged("chat_cupcake_kitagawa", 10, 0)
                     dbMsgs.joinToString(" ") { it.content.lowercase() }
                 }
             }
@@ -206,7 +206,7 @@ object ProactiveEngagementManager {
 
         // If Angry: high probability NOT to text (e.g. 50% silent treatment chance)
         if (mood == Mood.ANGRY && count > 0 && Random.nextFloat() < 0.50f) {
-            Log.d(TAG, "Marin is angry and giving the silent treatment. Skipping this cycle.")
+            Log.d(TAG, "CupCake is angry and giving the silent treatment. Skipping this cycle.")
             scheduleNext(context, replaceExisting = true)
             return
         }
@@ -243,12 +243,12 @@ object ProactiveEngagementManager {
     }
 
     private suspend fun deliverMessage(context: Context, text: String) {
-        val characterId = "marin_kitagawa"
+        val characterId = "cupcake_kitagawa"
         val conversationId = "chat_$characterId"
         val message = ChatMessage.assistant(
             content = text,
             conversationId = conversationId,
-            modelUsed = "marin_proactive"
+            modelUsed = "cupcake_proactive"
         )
 
         val store = ChatSessionStore.get()
@@ -278,7 +278,7 @@ object ProactiveEngagementManager {
 
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            putExtra("characterId", "marin_kitagawa")
+            putExtra("characterId", "cupcake_kitagawa")
         }
 
         val pendingIntent = PendingIntent.getActivity(
@@ -290,7 +290,7 @@ object ProactiveEngagementManager {
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle("Marin Kitagawa 💕")
+            .setContentTitle("CupCake Kitagawa 💕")
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -310,10 +310,10 @@ object ProactiveEngagementManager {
             if (notificationManager?.getNotificationChannel(CHANNEL_ID) == null) {
                 val channel = NotificationChannel(
                     CHANNEL_ID,
-                    "Marin's Messages",
+                    "CupCake's Messages",
                     NotificationManager.IMPORTANCE_HIGH
                 ).apply {
-                    description = "Interactive notifications from your AI companion Marin Kitagawa"
+                    description = "Interactive notifications from your AI companion CupCake Kitagawa"
                     enableVibration(true)
                     enableLights(true)
                     lockscreenVisibility = Notification.VISIBILITY_PUBLIC

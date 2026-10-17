@@ -26,8 +26,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import java.util.concurrent.TimeUnit
 import kotlin.random.Random
 
-/** Something Marin wants, what it costs to satisfy, and how she reacts either way. */
-data class MarinDemand(
+/** Something CupCake wants, what it costs to satisfy, and how she reacts either way. */
+data class CupCakeDemand(
     val id: String,
     val title: String,
     val message: String,
@@ -39,7 +39,7 @@ data class MarinDemand(
 )
 
 /**
- * Marin periodically pings the user with a small want ("I'm hungry!"). Satisfying it
+ * CupCake periodically pings the user with a small want ("I'm hungry!"). Satisfying it
  * spends spendable coins and raises affection; ignoring it makes her sulk a little.
  *
  * Kept as a process-wide object (like [ProactiveEngagementManager]) so both the UI and
@@ -48,20 +48,20 @@ data class MarinDemand(
  */
 object DemandManager {
     private const val TAG = "DemandManager"
-    internal const val PREFS = "cupcake_marin_demands"
+    internal const val PREFS = "cupcake_cupcake_demands"
     internal const val KEY_AFFECTION = "affection"
     internal const val KEY_LAST_ID = "last_demand_id"
     internal const val KEY_PENDING_ID = "pending_demand_id"
     internal const val KEY_PENDING_TIME = "pending_demand_time"
-    private const val WORK_NAME = "marin_demand_worker"
+    private const val WORK_NAME = "cupcake_demand_worker"
 
     /** A demand older than this is considered ignored and is silently dropped. */
     private const val STALE_AFTER_MS = 6 * 60 * 60 * 1000L
 
     private val CATALOG = listOf(
-        MarinDemand(
+        CupCakeDemand(
             id = "hungry",
-            title = "Marin is hungry 🍰",
+            title = "CupCake is hungry 🍰",
             message = "Gojo-kun, I'm starving over here! Buy me a strawberry shortcake? 🍰🥺",
             cost = 50,
             affection = 10,
@@ -69,9 +69,9 @@ object DemandManager {
             fulfilledLine = "Yaaay! Strawberry cake! You're the best, Gojo-kun~ 🍰💕",
             ignoredLine = "No cake...? Hmph. I'll remember that. 😤"
         ),
-        MarinDemand(
+        CupCakeDemand(
             id = "snack",
-            title = "Marin wants a snack 🍫",
+            title = "CupCake wants a snack 🍫",
             message = "I smell chocolate somewhere and now I can't stop thinking about it. Help?! 🍫😩",
             cost = 30,
             affection = 7,
@@ -79,9 +79,9 @@ object DemandManager {
             fulfilledLine = "Chocolate!! Okay okay, you're officially my favorite person today~ 🍫😋",
             ignoredLine = "Fine... I'll just go snack on my own feelings then. 😔"
         ),
-        MarinDemand(
+        CupCakeDemand(
             id = "attention",
-            title = "Marin wants attention 💕",
+            title = "CupCake wants attention 💕",
             message = "Hellooo? Earth to Gojo-kun? I'm right here and I'm BORED. Pay attention to me! 💕",
             cost = 20,
             affection = 6,
@@ -89,9 +89,9 @@ object DemandManager {
             fulfilledLine = "Hehe~ knew you couldn't resist me! Come here, tell me about your day! 💕",
             ignoredLine = "You're ignoring me again... do I really have to fight for your attention? 😾"
         ),
-        MarinDemand(
+        CupCakeDemand(
             id = "cosplay",
-            title = "Marin has a cosplay idea 👗",
+            title = "CupCake has a cosplay idea 👗",
             message = "I found the CUTEST fabric for a new cosplay! Sponsor me and I'll do a photoshoot just for you! 👗✨",
             cost = 80,
             affection = 15,
@@ -99,9 +99,9 @@ object DemandManager {
             fulfilledLine = "Yes!! I'm already sketching it! You won't BELIEVE how it'll turn out! 👗✨💖",
             ignoredLine = "My cosplay dream... crushed... by your empty wallet. 💔"
         ),
-        MarinDemand(
+        CupCakeDemand(
             id = "rematch",
-            title = "Marin demands a rematch 🎮",
+            title = "CupCake demands a rematch 🎮",
             message = "I KNOW I can beat you this time! Stamina restored, wallet ready — fight me! 🎮😤",
             cost = 40,
             affection = 9,
@@ -109,9 +109,9 @@ object DemandManager {
             fulfilledLine = "Yosh! Get ready to lose, Gojo-kun! 🎮✨",
             ignoredLine = "Scared to lose again, huh? Typical. 😏"
         ),
-        MarinDemand(
+        CupCakeDemand(
             id = "sleepy",
-            title = "Marin is sleepy 🌙",
+            title = "CupCake is sleepy 🌙",
             message = "It's wayyy past my bedtime... but I can't sleep without hearing from you first. 🌙🥺",
             cost = 15,
             affection = 5,
@@ -121,8 +121,8 @@ object DemandManager {
         )
     )
 
-    private val _currentDemand = MutableStateFlow<MarinDemand?>(null)
-    val currentDemand: StateFlow<MarinDemand?> = _currentDemand.asStateFlow()
+    private val _currentDemand = MutableStateFlow<CupCakeDemand?>(null)
+    val currentDemand: StateFlow<CupCakeDemand?> = _currentDemand.asStateFlow()
 
     private val _affection = MutableStateFlow(0)
     val affection: StateFlow<Int> = _affection.asStateFlow()
@@ -151,7 +151,7 @@ object DemandManager {
     // UI convenience wrappers using the context captured at initialize().
     fun fulfillFromUi(): Boolean = appContext?.let { fulfill(it) } ?: false
     fun dismissFromUi(): Unit = appContext?.let { dismiss(it) } ?: Unit
-    fun rollFromUi(): MarinDemand? = appContext?.let { rollDemand(it) }
+    fun rollFromUi(): CupCakeDemand? = appContext?.let { rollDemand(it) }
 
     /** Syncs in-memory affection from prefs (needed when a receiver runs cold). */
     private fun ensureLoaded(context: Context) {
@@ -176,7 +176,7 @@ object DemandManager {
     // ---- Demand flow -------------------------------------------------------------
 
     /** Picks a new demand (never repeating the previous one) and persists it. */
-    fun rollDemand(context: Context): MarinDemand {
+    fun rollDemand(context: Context): CupCakeDemand {
         ensureLoaded(context)
         val lastId = prefs(context).getString(KEY_LAST_ID, null)
         val demand = pickDemand(lastId)
@@ -189,13 +189,13 @@ object DemandManager {
         return demand
     }
 
-    fun byId(id: String): MarinDemand? = CATALOG.firstOrNull { it.id == id }
+    fun byId(id: String): CupCakeDemand? = CATALOG.firstOrNull { it.id == id }
 
     /** All demand definitions (exposed for tests / a future "demand log" screen). */
-    internal fun catalog(): List<MarinDemand> = CATALOG
+    internal fun catalog(): List<CupCakeDemand> = CATALOG
 
     /** Chooses a demand different from [excludeId] (pure, testable). */
-    internal fun pickDemand(excludeId: String?, rng: Random = Random): MarinDemand {
+    internal fun pickDemand(excludeId: String?, rng: Random = Random): CupCakeDemand {
         val pool = CATALOG.filter { it.id != excludeId }
         return (if (pool.isEmpty()) CATALOG else pool).random(rng)
     }
@@ -213,7 +213,7 @@ object DemandManager {
      * Pays for [demand] with coins. Returns false when the balance is too low,
      * leaving the demand pending so the user can earn more and come back.
      */
-    fun fulfill(context: Context, demand: MarinDemand): Boolean {
+    fun fulfill(context: Context, demand: CupCakeDemand): Boolean {
         ensureLoaded(context)
         val paid = PointsManager.get()?.spendPoints(demand.cost)
             ?: PointsManager.spendPersisted(context, demand.cost)
@@ -237,7 +237,7 @@ object DemandManager {
         dismiss(context, demand, penalize)
     }
 
-    fun dismiss(context: Context, demand: MarinDemand, penalize: Boolean = true) {
+    fun dismiss(context: Context, demand: CupCakeDemand, penalize: Boolean = true) {
         ensureLoaded(context)
         if (penalize) {
             _affection.value = affectionAfter(_affection.value, -demand.sulk)
@@ -275,7 +275,7 @@ object DemandManager {
 
     // ---- Internals ---------------------------------------------------------------
 
-    private fun pendingDemand(context: Context): MarinDemand? {
+    private fun pendingDemand(context: Context): CupCakeDemand? {
         val id = prefs(context).getString(KEY_PENDING_ID, null) ?: return null
         val age = System.currentTimeMillis() - prefs(context).getLong(KEY_PENDING_TIME, System.currentTimeMillis())
         if (age >= STALE_AFTER_MS) {
@@ -300,12 +300,12 @@ object DemandManager {
         try {
             val message = ChatMessage.assistant(
                 content = text,
-                conversationId = "chat_marin_kitagawa",
-                modelUsed = "marin_demand"
+                conversationId = "chat_cupcake_kitagawa",
+                modelUsed = "cupcake_demand"
             )
             val store = ChatSessionStore.get()
             if (store != null) {
-                store.addMessage("marin_kitagawa", message)
+                store.addMessage("cupcake_kitagawa", message)
             } else {
                 kotlinx.coroutines.runBlocking {
                     AppDatabase.getInstance(context).chatMessageDao().insert(message)
@@ -336,7 +336,7 @@ class DemandWorker(
 
 /** Notification channel + Fulfill/Ignore actions for a pending demand. */
 object DemandNotifier {
-    internal const val CHANNEL_ID = "marin_demands"
+    internal const val CHANNEL_ID = "cupcake_demands"
     internal const val NOTIFICATION_ID = 2002
     internal const val ACTION_FULFILL = "com.cupcake.action.FULFILL_DEMAND"
     internal const val ACTION_IGNORE = "com.cupcake.action.IGNORE_DEMAND"
@@ -349,10 +349,10 @@ object DemandNotifier {
                 nm.createNotificationChannel(
                     NotificationChannel(
                         CHANNEL_ID,
-                        "Marin's Demands",
+                        "CupCake's Demands",
                         NotificationManager.IMPORTANCE_HIGH
                     ).apply {
-                        description = "Marin asking for snacks, attention and rematches (spends points)"
+                        description = "CupCake asking for snacks, attention and rematches (spends points)"
                         enableVibration(true)
                         lockscreenVisibility = Notification.VISIBILITY_PUBLIC
                     }
@@ -361,14 +361,14 @@ object DemandNotifier {
         }
     }
 
-    fun notifyDemand(context: Context, demand: MarinDemand) {
+    fun notifyDemand(context: Context, demand: CupCakeDemand) {
         ensureChannel(context)
         val open = PendingIntent.getActivity(
             context,
             0,
             Intent(context, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                putExtra("characterId", "marin_kitagawa")
+                putExtra("characterId", "cupcake_kitagawa")
             },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
@@ -412,7 +412,7 @@ object DemandNotifier {
         ensureChannel(context)
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle("Marin 💕")
+            .setContentTitle("CupCake 💕")
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)

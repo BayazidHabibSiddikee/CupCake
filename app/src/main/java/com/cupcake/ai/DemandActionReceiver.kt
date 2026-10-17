@@ -6,7 +6,7 @@ import android.content.Intent
 import android.util.Log
 
 /**
- * Handles the "Fulfill" / "Ignore" actions on a Marin demand notification, including
+ * Handles the "Fulfill" / "Ignore" actions on a CupCake demand notification, including
  * when the app process was dead and only prefs are available.
  */
 class DemandActionReceiver : BroadcastReceiver() {
@@ -27,7 +27,7 @@ class DemandActionReceiver : BroadcastReceiver() {
                 } else {
                     DemandNotifier.notifyResult(
                         context,
-                        "Not enough points for ${demand.title.replace("Marin ", "my ")}! Win a game and come back~ 🥺"
+                        "Not enough points for ${demand.title.replace("CupCake ", "my ")}! Win a game and come back~ 🥺"
                     )
                 }
             }

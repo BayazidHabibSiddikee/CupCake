@@ -29,7 +29,7 @@ class HomeViewModel @Inject constructor(
     val energy = energyManager.energy
 
     val currentDemand = com.cupcake.ai.DemandManager.currentDemand
-    val marinAffection = com.cupcake.ai.DemandManager.affection
+    val cupcakeAffection = com.cupcake.ai.DemandManager.affection
     val demandEvent = com.cupcake.ai.DemandManager.lastEvent
 
     fun fulfillDemand() { com.cupcake.ai.DemandManager.fulfillFromUi() }
@@ -44,7 +44,7 @@ class HomeViewModel @Inject constructor(
 
     fun getLevelProgress(): Pair<Long, Long> = pointsManager.getLevelProgress()
 
-    fun interactWithMarin(action: String) {
+    fun interactWithCompanion(action: String) {
         viewModelScope.launch {
             when (action) {
                 "pat" -> {

@@ -1,7 +1,7 @@
 package com.cupcake.game
 
 /**
- * Marin's in-game trash talk, in Banglish.
+ * CupCake's in-game trash talk, in Banglish.
  *
  * Deliberately deterministic (not model-generated): the whole point is that a small
  * local model cannot be trusted to reliably produce the "she gets angrier every time

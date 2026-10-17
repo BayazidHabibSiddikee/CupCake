@@ -58,7 +58,7 @@ class CupCakeApplication : Application(), ImageLoaderFactory {
         // Initialize proactive companion outreach
         com.cupcake.ai.ProactiveEngagementManager.initialize(this)
 
-        // Initialize Marin's point-costing demands (snacks, attention, rematches...)
+        // Initialize CupCake's point-costing demands (snacks, attention, rematches...)
         com.cupcake.ai.DemandManager.initialize(this)
     }
 

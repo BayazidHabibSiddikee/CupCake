@@ -86,19 +86,19 @@ fun HomeScreen(
     val companionQuote by viewModel.companionQuote.collectAsStateWithLifecycle()
     val companionEmotion by viewModel.companionEmotion.collectAsStateWithLifecycle()
     val currentDemand by viewModel.currentDemand.collectAsStateWithLifecycle()
-    val marinAffection by viewModel.marinAffection.collectAsStateWithLifecycle()
+    val cupcakeAffection by viewModel.cupcakeAffection.collectAsStateWithLifecycle()
 
     val activeCompanion = characters.firstOrNull { it.isSelected }
-        ?: characters.firstOrNull { it.id == "marin_kitagawa" }
+        ?: characters.firstOrNull { it.id == "cupcake_kitagawa" }
         ?: characters.firstOrNull()
         ?: Character(
-            id = "marin_kitagawa",
-            name = "Marin Kitagawa",
+            id = "cupcake_kitagawa",
+            name = "CupCake Kitagawa",
             description = "Energetic anime & cosplay companion",
-            systemPrompt = "You are Marin Kitagawa!",
-            avatar = "file:///android_asset/marin/emotions/normal.png",
+            systemPrompt = "You are CupCake Kitagawa!",
+            avatar = "file:///android_asset/cupcake/emotions/normal.png",
             personality = "energetic",
-            customGif = "file:///android_asset/marin/marin_idle.gif"
+            customGif = "file:///android_asset/cupcake/cupcake_idle.gif"
         )
 
     val (currentXp, nextXp) = viewModel.getLevelProgress()
@@ -216,7 +216,7 @@ fun HomeScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // HERO CARD: Interactive Marin Companion Card
+                // HERO CARD: Interactive CupCake Companion Card
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -236,7 +236,7 @@ fun HomeScreen(
                             Box(
                                 contentAlignment = Alignment.BottomEnd,
                                 modifier = Modifier.clickable {
-                                    viewModel.interactWithMarin("pat")
+                                    viewModel.interactWithCompanion("pat")
                                 }
                             ) {
                                 CharacterAvatar(
@@ -304,7 +304,7 @@ fun HomeScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable {
-                                        viewModel.interactWithMarin("tease")
+                                        viewModel.interactWithCompanion("tease")
                                     }
                             ) {
                                 Text(
@@ -324,28 +324,28 @@ fun HomeScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 AssistChip(
-                                    onClick = { viewModel.interactWithMarin("pat") },
+                                    onClick = { viewModel.interactWithCompanion("pat") },
                                     label = { Text("Headpat 💕", fontSize = 11.5.sp) },
                                     colors = AssistChipDefaults.assistChipColors(
                                         containerColor = MaterialTheme.colorScheme.surface
                                     )
                                 )
                                 AssistChip(
-                                    onClick = { viewModel.interactWithMarin("snack") },
+                                    onClick = { viewModel.interactWithCompanion("snack") },
                                     label = { Text("Snack 🍰", fontSize = 11.5.sp) },
                                     colors = AssistChipDefaults.assistChipColors(
                                         containerColor = MaterialTheme.colorScheme.surface
                                     )
                                 )
                                 AssistChip(
-                                    onClick = { viewModel.interactWithMarin("dance") },
+                                    onClick = { viewModel.interactWithCompanion("dance") },
                                     label = { Text("Dance 💃", fontSize = 11.5.sp) },
                                     colors = AssistChipDefaults.assistChipColors(
                                         containerColor = MaterialTheme.colorScheme.surface
                                     )
                                 )
                                 AssistChip(
-                                    onClick = { viewModel.interactWithMarin("pout") },
+                                    onClick = { viewModel.interactWithCompanion("pout") },
                                     label = { Text("Tease 💢", fontSize = 11.5.sp) },
                                     colors = AssistChipDefaults.assistChipColors(
                                         containerColor = MaterialTheme.colorScheme.surface
@@ -466,7 +466,7 @@ fun HomeScreen(
                                     Text(demand.title, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                                     Spacer(Modifier.weight(1f))
                                     Text(
-                                        text = "💗 $marinAffection",
+                                        text = "💗 $cupcakeAffection",
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 14.sp
                                     )
@@ -511,7 +511,7 @@ fun HomeScreen(
                             )
                             Spacer(Modifier.width(8.dp))
                             Text(
-                                text = "Games with Marin",
+                                text = "Games with CupCake",
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 19.sp,
                                 color = MaterialTheme.colorScheme.onSurface
@@ -534,63 +534,63 @@ fun HomeScreen(
                         GameLaunchCard(
                             emoji = "❌⭕",
                             title = "Tic-Tac-Toe",
-                            description = "Play 3×3 against Marin. Watch out for her pouting when she loses!",
+                            description = "Play 3×3 against CupCake. Watch out for her pouting when she loses!",
                             xpReward = "+100 XP",
                             onClick = { onNavigateToGame("TIC_TAC_TOE") }
                         )
                         GameLaunchCard(
                             emoji = "⭕❌",
                             title = "Tic-Tac-Toe 4×4",
-                            description = "Bigger board, bigger brain battle. Can you keep up with Marin?",
+                            description = "Bigger board, bigger brain battle. Can you keep up with CupCake?",
                             xpReward = "+150 XP",
                             onClick = { onNavigateToGame("TIC_TAC_TOE_4X4") }
                         )
                         GameLaunchCard(
                             emoji = "🔴🟡",
                             title = "Connect Four",
-                            description = "Drop discs and outsmart Marin's sneaky combos!",
+                            description = "Drop discs and outsmart CupCake's sneaky combos!",
                             xpReward = "+150 XP",
                             onClick = { onNavigateToGame("CONNECT_FOUR") }
                         )
                         GameLaunchCard(
                             emoji = "🏓",
                             title = "Ping Pong",
-                            description = "Real-time rally! The more you win, the angrier (and faster) Marin gets.",
+                            description = "Real-time rally! The more you win, the angrier (and faster) CupCake gets.",
                             xpReward = "+150 XP",
                             onClick = { onNavigateToGame("PING_PONG") }
                         )
                         GameLaunchCard(
                             emoji = "♟️",
                             title = "Chess Challenge",
-                            description = "Tactical chess duel. Can you outsmart Marin's brain?",
+                            description = "Tactical chess duel. Can you outsmart CupCake's brain?",
                             xpReward = "+200 XP",
                             onClick = { onNavigateToGame("CHESS") }
                         )
                         GameLaunchCard(
                             emoji = "✊✋✌️",
                             title = "Rock Paper Scissors",
-                            description = "Fast hands battle! Test your intuition against Marin's strategy.",
+                            description = "Fast hands battle! Test your intuition against CupCake's strategy.",
                             xpReward = "+80 XP",
                             onClick = { onNavigateToGame("ROCK_PAPER_SCISSORS") }
                         )
                         GameLaunchCard(
                             emoji = "🔢",
                             title = "Guess the Number",
-                            description = "Marin picked a number. How quickly can you find it?",
+                            description = "CupCake picked a number. How quickly can you find it?",
                             xpReward = "+60 XP",
                             onClick = { onNavigateToGame("GUESS_NUMBER") }
                         )
                         GameLaunchCard(
                             emoji = "➕➖✖️➗",
                             title = "Math Quiz",
-                            description = "Race Marin through rapid-fire math. Smarter than you think?",
+                            description = "Race CupCake through rapid-fire math. Smarter than you think?",
                             xpReward = "+100 XP",
                             onClick = { onNavigateToGame("MATH_QUIZ") }
                         )
                         GameLaunchCard(
                             emoji = "💾",
                             title = "Number Base",
-                            description = "Binary, octal, hex — flex your geek muscles with Marin!",
+                            description = "Binary, octal, hex — flex your geek muscles with CupCake!",
                             xpReward = "+120 XP",
                             onClick = { onNavigateToGame("NUMBER_BASE") }
                         )
@@ -611,7 +611,7 @@ fun HomeScreen(
                         GameLaunchCard(
                             emoji = "🔤",
                             title = "Word Scramble",
-                            description = "Unscramble Marin's jumbled words as fast as you can!",
+                            description = "Unscramble CupCake's jumbled words as fast as you can!",
                             xpReward = "+90 XP",
                             onClick = { onNavigateToGame("WORD_SCRAMBLE") }
                         )
@@ -625,14 +625,14 @@ fun HomeScreen(
                         GameLaunchCard(
                             emoji = "⚡",
                             title = "Reaction Time",
-                            description = "Tap as fast as you can! Marin loves teasing slowpokes.",
+                            description = "Tap as fast as you can! CupCake loves teasing slowpokes.",
                             xpReward = "+70 XP",
                             onClick = { onNavigateToGame("REACTION_TIME") }
                         )
                         GameLaunchCard(
                             emoji = "🧁",
                             title = "Clicker",
-                            description = "Just tap! Simple, addictive, and Marin cheers every click.",
+                            description = "Just tap! Simple, addictive, and CupCake cheers every click.",
                             xpReward = "+50 XP",
                             onClick = { onNavigateToGame("CLICKER") }
                         )

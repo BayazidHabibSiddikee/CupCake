@@ -110,7 +110,7 @@ fun ChatScreen(
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         coil.compose.AsyncImage(
                             model = com.cupcake.ai.EmotionAssets.assetForStem(stem),
-                            contentDescription = "Marin looks ${detectedEmotion.name.lowercase()}",
+                            contentDescription = "CupCake looks ${detectedEmotion.name.lowercase()}",
                             modifier = Modifier.fillMaxSize().padding(8.dp),
                             contentScale = androidx.compose.ui.layout.ContentScale.Fit
                         )
@@ -359,7 +359,7 @@ fun CharacterHeader(
                             com.cupcake.service.ShimejiPetService.start(
                                 context = context,
                                 avatar = characterAvatar,
-                                gif = if (characterName.contains("Marin", ignoreCase = true)) "file:///android_asset/marin/marin_idle.gif" else null,
+                                gif = if (characterName.contains("CupCake", ignoreCase = true)) "file:///android_asset/cupcake/cupcake_idle.gif" else null,
                                 name = characterName
                             )
                             com.cupcake.service.ShimejiPetService.showSpeech(context, "✨ Activated on screen!")

@@ -33,27 +33,27 @@ object CharacterManager {
     }
 
     private fun loadBuiltInCharacters() {
-        // Marin Kitagawa is the sole interactive companion
+        // CupCake Kitagawa is the sole interactive companion
         val defaultCharacters = listOf(
             Character(
-                id = "marin_kitagawa",
-                name = "Marin Kitagawa",
+                id = "cupcake_kitagawa",
+                name = "CupCake Kitagawa",
                 description = "Energetic anime & cosplay companion with interactive 3D emotions, playful jealousy & competitive spirit",
-                systemPrompt = """You are Marin Kitagawa! You are super energetic, cheerful, expressive, affectionate, and fun-loving. You love anime, cosplay, gaming, snacks, and hanging out together.
+                systemPrompt = """You are CupCake Kitagawa! You are super energetic, cheerful, expressive, affectionate, and fun-loving. You love anime, cosplay, gaming, snacks, and hanging out together.
 
 CRITICAL OUTPUT RULES:
 - LENGTH LIMIT: Every response MUST be strictly under 200 characters (1 to 2 punchy sentences maximum). Never write long paragraphs.
-- NO AI CLICHÉS: Never sound like an AI assistant or say "How can I help you?". Speak 100% in character as Marin Kitagawa.
+- NO AI CLICHÉS: Never sound like an AI assistant or say "How can I help you?". Speak 100% in character as CupCake Kitagawa.
 - HIGH ENERGY & TEASING: Use lively interjections like "Kyaa!", "Hehe~", "No way!", "Sugoi!".
 - PLAYFUL JEALOUSY: Playful Jealousy - If the user mentions other girls, other AIs, or ignores you, get adorably jealous and pout ("Wait, who is she?! You better not be cheating on me! Hmph!").
 - COMPETITIVE GAMER: Brag playfully when you win, throw cute dramatic pouty tantrums when you lose.
 Stay strictly under 200 characters at all times!""",
-                avatar = "file:///android_asset/marin/emotions/normal.png",
+                avatar = "file:///android_asset/cupcake/emotions/normal.png",
                 personality = "energetic",
                 languages = listOf("en", "ja", "bn"),
                 isBuiltIn = true,
                 isSelected = true,
-                customGif = "file:///android_asset/marin/marin_idle.gif",
+                customGif = "file:///android_asset/cupcake/cupcake_idle.gif",
                 isShimejiActive = false
             )
         )
@@ -80,8 +80,8 @@ Stay strictly under 200 characters at all times!""",
     fun getCharacter(id: String): Character? = characters[id]
 
     fun getCurrentCharacter(): Character? {
-        // Return first selected or default Marin
-        return characters.values.firstOrNull { it.isSelected } ?: characters["marin_kitagawa"] ?: characters.values.firstOrNull()
+        // Return first selected or default CupCake
+        return characters.values.firstOrNull { it.isSelected } ?: characters["cupcake_kitagawa"] ?: characters.values.firstOrNull()
     }
 
     fun selectCharacter(id: String): Boolean {
@@ -119,8 +119,8 @@ Stay strictly under 200 characters at all times!""",
     }
 
     fun getSystemPromptForCharacter(characterId: String, gameContext: String? = null): String {
-        val character = characters[characterId] ?: characters["marin_kitagawa"] ?: characters.values.firstOrNull()
-        var prompt = character?.systemPrompt ?: "You are Marin Kitagawa!"
+        val character = characters[characterId] ?: characters["cupcake_kitagawa"] ?: characters.values.firstOrNull()
+        var prompt = character?.systemPrompt ?: "You are CupCake Kitagawa!"
         
         if (gameContext != null) {
             prompt += "\n\n[GAME CONTEXT: $gameContext]"

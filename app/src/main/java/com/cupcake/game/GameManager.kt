@@ -57,7 +57,7 @@ class GameManager(
 
     private fun persistBotUtterance(text: String) {
         if (text.isBlank()) return
-        val characterId = characterManager.getCurrentCharacter()?.id ?: "marin_kitagawa"
+        val characterId = characterManager.getCurrentCharacter()?.id ?: "cupcake_kitagawa"
         sessionStore.addMessage(
             characterId,
             com.cupcake.data.model.ChatMessage.assistant(
@@ -223,7 +223,7 @@ class GameManager(
         val result = applyHumanMove(position)
 
         // Re-score how close the human is to winning; this deterministically drives
-        // Marin's anger and the adaptive difficulty from here on.
+        // CupCake's anger and the adaptive difficulty from here on.
         if (result.success) refreshThreat()
 
         // Send the move to the bot AFTER the board has been updated, so the
@@ -1054,7 +1054,7 @@ class GameManager(
     private fun triggerClickerReaction(score: Int) {
         val character = characterManager.getCurrentCharacter()
         val personality = character?.personality ?: "friendly"
-        val characterId = character?.id ?: "marin_kitagawa"
+        val characterId = character?.id ?: "cupcake_kitagawa"
 
         val prompt = "The human has mindlessly tapped the screen $score times. Tease them playfully about wasting time — stay kind, no insults. Under 15 words in $personality style."
 
@@ -1081,7 +1081,7 @@ class GameManager(
         detail: String? = null
     ) {
         val character = characterManager.getCurrentCharacter()
-        val characterName = character?.name ?: "Marin"
+        val characterName = character?.name ?: "CupCake"
         val personality = character?.personality ?: "friendly"
         val mood = jealousyTracker.getBotMood()
         val jealousy = jealousyTracker.getJealousyLevel()
@@ -1091,7 +1091,7 @@ class GameManager(
         val boardDesc = describeBoard(gameState)
 
         val prompt = if (player == "bot") {
-            // Marin is announcing HER OWN move — first-person, playful
+            // CupCake is announcing HER OWN move — first-person, playful
             """
                 Game: ${gameType.name}
                 You ($characterName) just played: $moveDesc
@@ -1114,7 +1114,7 @@ class GameManager(
             """.trimIndent()
         }
 
-        val characterId = character?.id ?: "marin_kitagawa"
+        val characterId = character?.id ?: "cupcake_kitagawa"
         CoroutineScope(Dispatchers.IO).launch {
             val raw = llmRouter.generate(
                 characterId = characterId,
@@ -1194,7 +1194,7 @@ class GameManager(
             "You beat the human at ${gameType?.name?.lowercase()}. You feel ${mood.name.lowercase()}. React in character — smug but friendly. Under 15 words."
         }
 
-        val characterId = character?.id ?: "marin_kitagawa"
+        val characterId = character?.id ?: "cupcake_kitagawa"
         CoroutineScope(Dispatchers.IO).launch {
             val raw = llmRouter.generate(
                 characterId = characterId,
@@ -1225,7 +1225,7 @@ class GameManager(
     private fun triggerGameReaction(message: String) {
         val character = characterManager.getCurrentCharacter()
         val personality = character?.personality ?: "friendly"
-        val characterId = character?.id ?: "marin_kitagawa"
+        val characterId = character?.id ?: "cupcake_kitagawa"
 
         CoroutineScope(Dispatchers.IO).launch {
             val raw = llmRouter.generate(
@@ -1307,7 +1307,7 @@ class GameManager(
      * Human chess move, given from/to squares (0..63) and an optional promotion
      * piece ('Q'/'R'/'B'/'N'). Legality is enforced by [ChessEngine]; the running
      * game state, win/draw detection, points and reactions flow through the same
-     * plumbing as every other game. Marin answers on a short delay.
+     * plumbing as every other game. CupCake answers on a short delay.
      */
     fun chessHumanMove(from: Int, to: Int, promotion: Char = ' '): Result {
         val game = currentGame ?: return Result(false, "No active game")
@@ -1353,7 +1353,7 @@ class GameManager(
             ChessEngine.ChessStatus.CHECKMATE -> {
                 val humanWon = mover == Game.Player.HUMAN
                 finishChess(game, board, winner = if (humanWon) Game.Player.HUMAN else Game.Player.BOT,
-                    reason = if (humanWon) "You checkmated Marin!" else "Marin checkmated you!")
+                    reason = if (humanWon) "You checkmated CupCake!" else "CupCake checkmated you!")
             }
             ChessEngine.ChessStatus.STALEMATE -> finishChess(game, board, winner = null, reason = "Stalemate")
             ChessEngine.ChessStatus.DRAW -> finishChess(game, board, winner = null, reason = "Draw")
@@ -1373,7 +1373,7 @@ class GameManager(
                         }
                     }
                 } else {
-                    // Marin just replied: one LLM reaction per full round, like Tic-Tac-Toe.
+                    // CupCake just replied: one LLM reaction per full round, like Tic-Tac-Toe.
                     currentGame?.let { notifyLLMMove(Game.GameType.CHESS, "bot", encoded, it) }
                 }
                 Result(true, "Move played", currentGame)
@@ -1404,7 +1404,7 @@ class GameManager(
 
     // ---- Escalating-anger readouts for the game UI banner -------------------------
 
-    /** 0.0 .. 1.0 — drives the "Marin is RAGING" banner. */
+    /** 0.0 .. 1.0 — drives the "CupCake is RAGING" banner. */
     fun getAngerLevel(): Double = jealousyTracker.getAngerLevel()
 
     /** How close the human is to winning right now, 0..1 (the "threat map" value). */
@@ -1555,7 +1555,7 @@ internal fun describeMove(
     Game.GameType.CONNECT_FOUR -> "dropped a disc in column ${position % 7 + 1}"
     Game.GameType.MASTERMIND -> "guessed ${detail ?: position}"
     Game.GameType.PING_PONG ->
-        "rallied (score You ${(gameState.board as? Game.PingPongBoard)?.humanScore} - ${(gameState.board as? Game.PingPongBoard)?.botScore} Marin)"
+        "rallied (score You ${(gameState.board as? Game.PingPongBoard)?.humanScore} - ${(gameState.board as? Game.PingPongBoard)?.botScore} CupCake)"
 }
 
 /**

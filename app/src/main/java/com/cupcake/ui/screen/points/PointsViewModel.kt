@@ -24,7 +24,7 @@ class PointsViewModel @Inject constructor(
     val gameStats = pointsManager.gameStats
     val achievements = pointsManager.achievements
 
-    /** Marin's cravings / affection, surfaced alongside the head-to-head record. */
+    /** CupCake's cravings / affection, surfaced alongside the head-to-head record. */
     val affection = com.cupcake.ai.DemandManager.affection
     val currentDemand = com.cupcake.ai.DemandManager.currentDemand
 
@@ -32,6 +32,6 @@ class PointsViewModel @Inject constructor(
 
     fun botStatus(): GameManager.BotStatus = gameManager.getBotStatus()
 
-    /** Pays for Marin's currently pending craving with coins, when affordable. */
+    /** Pays for CupCake's currently pending craving with coins, when affordable. */
     fun fulfillDemand() { com.cupcake.ai.DemandManager.fulfillFromUi() }
 }

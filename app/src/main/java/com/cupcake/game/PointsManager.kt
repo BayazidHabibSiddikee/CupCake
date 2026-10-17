@@ -10,7 +10,7 @@ import javax.inject.Singleton
 
 /**
  * Owns the two economies:
- *  - [points] are **spendable coins** (stake for Marin's demands),
+ *  - [points] are **spendable coins** (stake for CupCake's demands),
  *  - [xp] is a **lifetime** score that only ever grows and drives [level].
  *
  * Keeping them separate means fulfilling a demand never knocks you back a level.
@@ -155,7 +155,7 @@ class PointsManager @Inject constructor(
 
     /**
      * Spend coins. Returns false (and changes nothing) when the balance is too low,
-     * so callers can hard-gate features like Marin's demands.
+     * so callers can hard-gate features like CupCake's demands.
      */
     fun spendPoints(amount: Long): Boolean {
         if (amount <= 0L) return true

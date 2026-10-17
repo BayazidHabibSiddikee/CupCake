@@ -17,7 +17,7 @@ import kotlin.random.Random
  *
  * The AI is negamax with alpha-beta pruning, MVV-LVA move ordering and a
  * material + piece-square-table evaluation. Difficulty maps to search depth and a
- * little randomness, so Marin gets genuinely sharper as her anger escalates.
+ * little randomness, so CupCake gets genuinely sharper as her anger escalates.
  */
 object ChessEngine {
 
