@@ -29,7 +29,19 @@ class GameManager(
     /** Game-ending / milestone reactions: outcome flags drive TTS + ESP32 expressions. */
     val gameReactions = kotlinx.coroutines.flow.MutableSharedFlow<GameReaction>(extraBufferCapacity = 32)
 
-    data class GameReaction(val text: String, val humanWon: Boolean, val isDraw: Boolean)
+    data class GameReaction(
+        val text: String,
+        val humanWon: Boolean,
+        val isDraw: Boolean,
+        val mood: ReactionMood = ReactionMood.NEUTRAL
+    )
+
+    /**
+     * Emotional colour of a reaction, so the UI/TTS/ESP32 can pick the matching
+     * face instead of guessing from [GameReaction.humanWon] alone. The companion
+     * escalates HAPPY -> ANGRY -> SAD as the human keeps winning.
+     */
+    enum class ReactionMood { NEUTRAL, HAPPY, ANGRY, SAD, GLOATING }
 
     init {
         // Persist everything the bot says about the game into the character's
@@ -63,7 +75,8 @@ class GameManager(
         Game.GameType.CLICKER,
         Game.GameType.REACTION_TIME,
         Game.GameType.TIC_TAC_TOE,
-        Game.GameType.TIC_TAC_TOE_4X4
+        Game.GameType.TIC_TAC_TOE_4X4,
+        Game.GameType.PING_PONG
     )
 
     // ML Models for different games
@@ -172,6 +185,12 @@ class GameManager(
                 currentPlayer = Game.Player.HUMAN,
                 status = Game.GameStatus.PLAYING
             )
+            Game.GameType.PING_PONG -> Game.State(
+                gameType = type,
+                board = Game.PingPongBoard(),
+                currentPlayer = Game.Player.HUMAN,
+                status = Game.GameStatus.PLAYING
+            )
             Game.GameType.TIC_TAC_TOE_4X4 -> Game.State(
                 gameType = type,
                 board = Game.TicTacToe4x4Board(),
@@ -183,6 +202,11 @@ class GameManager(
                 board = Game.TicTacToeBoard(), // fallback
                 currentPlayer = Game.Player.HUMAN,
                 status = Game.GameStatus.PLAYING
+            )
+        }
+        if (type == Game.GameType.PING_PONG) {
+            gameComments.tryEmit(
+                BotTrashTalk.welcomeLine(jealousyTracker.getAdaptiveDifficulty(diff).name.lowercase())
             )
         }
         return currentGame!!
@@ -855,8 +879,10 @@ class GameManager(
             anger = jealousyTracker.getAngerLevel()
         )
 
-        // Use ML model with adaptive difficulty based on jealousy
-        val adaptiveDifficulty = ticTacToeML.getAdaptiveDifficulty(difficulty)
+        // Adaptive difficulty: as the human keeps winning, the shared jealousy/anger
+        // tracker promotes the bot from EASY up to CHEATING. That is the "she gets
+        // angry and raises the level" behaviour.
+        val adaptiveDifficulty = jealousyTracker.getAdaptiveDifficulty(difficulty)
         val availableMoves = (0..8).filter { board.get(it) == null }
         if (availableMoves.isEmpty()) return
 
@@ -927,7 +953,7 @@ class GameManager(
         
         val move = when {
             mlCheat != null -> mlCheat
-            availableMoves.isNotEmpty() -> TicTacToe4x4Engine.getBestMove(board, difficulty)
+            availableMoves.isNotEmpty() -> TicTacToe4x4Engine.getBestMove(board, jealousyTracker.getAdaptiveDifficulty(difficulty))
             else -> -1
         }
 
@@ -969,7 +995,7 @@ class GameManager(
         if (board.isFull() || ConnectFourEngine.checkWinner(board) != null) return
 
         // The engine returns a drop position (row * 7 + col).
-        val move = ConnectFourEngine.getBestMove(board, difficulty)
+        val move = ConnectFourEngine.getBestMove(board, jealousyTracker.getAdaptiveDifficulty(difficulty))
         if (move < 0 || !board.set(move, Game.Player.BOT)) return
 
         val newMove = Game.Move(Game.Player.BOT, move)
@@ -1122,10 +1148,33 @@ class GameManager(
         val anger = jealousyTracker.getAngerLevel()
         val mood = jealousyTracker.getBotMood()
 
-        val prompt = when {
-            isDraw -> "The game ended in a draw. React in character, playfully. Under 20 words. Stay kind — no insults or threats."
-            humanWon -> "The human beat you at ${gameType?.name?.lowercase()}. You feel ${mood.name.lowercase()} (Jealousy: ${(jealousy * 100).toInt()}%, Anger: ${(anger * 100).toInt()}%). React in a ${personality} way — pouting or competitive is fine, but stay kind and never threaten, insult or swear. Under 20 words."
-            else -> "You beat the human at ${gameType?.name?.lowercase()}. You feel ${mood.name.lowercase()}. React in character — smug but friendly. Under 15 words."
+        // The tracker is updated *after* this call for ending moves, so count the
+        // in-flight human win when working out how angry she should be.
+        val winStreak = jealousyTracker.consecutivePlayerWins + if (humanWon) 1 else 0
+
+        // Human wins use a curated, escalating Banglish taunt. A 0.5B on-device model
+        // cannot be trusted to reliably produce the "angrier every time you win" arc,
+        // and these lines are spoken by TTS, so they must be clean and on-message.
+        if (humanWon) {
+            val sad = anger > 0.75 && winStreak >= 4
+            val text = ToneGuard.sanitize(
+                if (sad) BotTrashTalk.sadLine(winStreak) else BotTrashTalk.angryLine(winStreak)
+            )
+            gameReactions.tryEmit(
+                GameReaction(
+                    text = text,
+                    humanWon = true,
+                    isDraw = false,
+                    mood = if (sad) ReactionMood.SAD else ReactionMood.ANGRY
+                )
+            )
+            return
+        }
+
+        val prompt = if (isDraw) {
+            "The game ended in a draw. React in character, playfully. Under 20 words. Stay kind — no insults or threats."
+        } else {
+            "You beat the human at ${gameType?.name?.lowercase()}. You feel ${mood.name.lowercase()}. React in character — smug but friendly. Under 15 words."
         }
 
         val characterId = character?.id ?: "marin_kitagawa"
@@ -1138,8 +1187,15 @@ class GameManager(
                 maxTokens = 96
             )
             val text = ToneGuard.sanitize(BanglishTranslator.translate(raw, personality))
-                .ifBlank { fallbackGameOverComment(humanWon, isDraw, jealousy) }
-            gameReactions.tryEmit(GameReaction(text, humanWon, isDraw))
+                .ifBlank { if (isDraw) "A draw?! Fine~ next round I win! ✨" else BotTrashTalk.gloatLine() }
+            gameReactions.tryEmit(
+                GameReaction(
+                    text = text,
+                    humanWon = false,
+                    isDraw = isDraw,
+                    mood = if (isDraw) ReactionMood.NEUTRAL else ReactionMood.GLOATING
+                )
+            )
         }
     }
 
@@ -1172,6 +1228,53 @@ class GameManager(
     private fun awardGamePoints(gameType: Game.GameType, won: Boolean, basePoints: Int) {
         pointsManager.awardPoints(basePoints, gameType, won)
     }
+
+    /**
+     * Called by the Ping Pong UI each time a point is won. Keeps the authoritative
+     * score in the shared game state so wins/points/reactions/adaptive difficulty all
+     * behave exactly like the board games.
+     */
+    fun pingPongPoint(humanScored: Boolean) {
+        val game = currentGame ?: return
+        if (game.gameType != Game.GameType.PING_PONG) return
+        if (game.status != Game.GameStatus.PLAYING) return
+        val board = game.board as? Game.PingPongBoard ?: return
+
+        if (humanScored) board.humanScore++ else board.botScore++
+
+        val winner = board.winner
+        if (winner != null) {
+            currentGame = game.copy(
+                board = board,
+                currentPlayer = Game.Player.HUMAN,
+                status = if (winner == Game.Player.HUMAN) Game.GameStatus.HUMAN_WON else Game.GameStatus.BOT_WON,
+                winner = winner
+            )
+            triggerReaction(winner == Game.Player.HUMAN)
+            awardGamePoints(Game.GameType.PING_PONG, winner == Game.Player.HUMAN, if (winner == Game.Player.HUMAN) 250 else 40)
+            jealousyTracker.recordGameResult(winner == Game.Player.HUMAN, Game.GameType.PING_PONG)
+        } else {
+            currentGame = game.copy(board = board)
+            gameComments.tryEmit(BotTrashTalk.rallyLine(board.humanScore, board.botScore, humanScored))
+        }
+        onGameStateChanged?.invoke(currentGame)
+    }
+
+    // ---- Escalating-anger readouts for the game UI banner -------------------------
+
+    /** 0.0 .. 1.0 — drives the "Marin is RAGING" banner. */
+    fun getAngerLevel(): Double = jealousyTracker.getAngerLevel()
+
+    fun getHumanWinStreak(): Int = jealousyTracker.consecutivePlayerWins
+
+    /** "CALM" .. "FURIOUS". */
+    fun getMoodRank(): String = BotTrashTalk.rankLabel(jealousyTracker.getAngerLevel())
+
+    /** The difficulty the bot is *actually* playing at right now (post-escalation). */
+    fun getAdaptiveDifficultyName(): String =
+        jealousyTracker.getAdaptiveDifficulty(difficulty).name.lowercase()
+
+    fun isCheatingMindActive(): Boolean = jealousyTracker.isCheatingEnabled()
 
     // Callback for state changes that happen off the calling thread (bot moves)
     var onGameStateChanged: ((Game.State?) -> Unit)? = null
@@ -1216,6 +1319,8 @@ internal fun describeMove(
     Game.GameType.REACTION_TIME -> "tapped (reaction round)"
     Game.GameType.CONNECT_FOUR -> "dropped a disc in column ${position % 7 + 1}"
     Game.GameType.MASTERMIND -> "guessed ${detail ?: position}"
+    Game.GameType.PING_PONG ->
+        "rallied (score You ${(gameState.board as? Game.PingPongBoard)?.humanScore} - ${(gameState.board as? Game.PingPongBoard)?.botScore} Marin)"
 }
 
 /**

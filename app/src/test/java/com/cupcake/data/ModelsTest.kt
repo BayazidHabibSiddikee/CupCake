@@ -25,7 +25,7 @@ class ModelsTest {
     fun `default model config is the bundled local model`() {
         val config = ModelConfig.default()
         assertThat(config.provider).isEqualTo(ModelConfig.ModelProvider.LOCAL_LLAMA)
-        assertThat(config.modelName).isEqualTo("liltii-v0.2-small-q2_k.gguf")
+        assertThat(config.modelName).isEqualTo("liltii-v0.2-v3-q4_0.gguf")
         assertThat(config.isLocal()).isTrue()
         assertThat(config.isCustom()).isFalse()
     }

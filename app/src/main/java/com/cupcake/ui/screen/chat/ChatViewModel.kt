@@ -500,20 +500,18 @@ class ChatViewModel @Inject constructor(
         val cleanSystemPrompt = SillyTavernCardParser.replaceTemplateMacros(rawSystemPrompt, charName, userName())
         // Nudge the small on-device model into the cute [emotion] *action* reply format
         val profile = userProfileBlock()
-        val styledSystemPrompt = buildString {
+        // The style line must always survive the length budget below, otherwise the
+        // model silently loses the mood-tag + emoji instructions on long characters.
+        val style = com.cupcake.ai.LilTiiPromptTemplate.CUTE_STYLE
+        val body = buildString {
             append(cleanSystemPrompt)
             if (profile.isNotBlank()) {
                 append("\n")
                 append(profile)
             }
-            append("\n")
-            append(com.cupcake.ai.LilTiiPromptTemplate.CUTE_STYLE)
         }
-        val systemPrompt = if (styledSystemPrompt.length > 1400) {
-            styledSystemPrompt.take(1400)
-        } else {
-            styledSystemPrompt
-        }
+        val bodyBudget = (1400 - style.length - 1).coerceAtLeast(200)
+        val systemPrompt = "$style\n" + if (body.length > bodyBudget) body.take(bodyBudget) else body
         
         val builder = StringBuilder()
         builder.append("<|im_start|>system\n")

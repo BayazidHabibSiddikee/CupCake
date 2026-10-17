@@ -22,7 +22,7 @@ sealed interface Game {
     enum class GameType { 
         TIC_TAC_TOE, CHESS, ROCK_PAPER_SCISSORS, GUESS_NUMBER, MATH_QUIZ, CLICKER,
         MEMORY_MATCH, HANGMAN, WORD_SCRAMBLE, NUMBER_BASE, REACTION_TIME, 
-        TIC_TAC_TOE_4X4, CONNECT_FOUR, MASTERMIND
+        TIC_TAC_TOE_4X4, CONNECT_FOUR, MASTERMIND, PING_PONG
     }
 
     enum class Player(val id: Int, val symbol: String) {
@@ -54,6 +54,31 @@ sealed interface Game {
             return true
         }
         override fun isFull(): Boolean = false
+    }
+
+    // Ping Pong Board. The ball/paddles are simulated live in the UI; this board is
+    // only the authoritative score so the rest of the game plumbing (wins, points,
+    // reactions, adaptive difficulty) works like every other game.
+    data class PingPongBoard(
+        override val size: Int = 2,
+        var humanScore: Int = 0,
+        var botScore: Int = 0,
+        val targetScore: Int = 5
+    ) : Board {
+        override fun get(position: Int): Player? =
+            when (position) { 0 -> if (humanScore > botScore) Player.HUMAN else null
+                              1 -> if (botScore > humanScore) Player.BOT else null
+                              else -> null }
+        override fun set(position: Int, player: Player): Boolean {
+            when (player) { Player.HUMAN -> humanScore++; Player.BOT -> botScore++ }
+            return true
+        }
+        override fun isFull(): Boolean = humanScore >= targetScore || botScore >= targetScore
+        val winner: Player? get() = when {
+            humanScore >= targetScore -> Player.HUMAN
+            botScore >= targetScore -> Player.BOT
+            else -> null
+        }
     }
 
     // Tic Tac Toe Board

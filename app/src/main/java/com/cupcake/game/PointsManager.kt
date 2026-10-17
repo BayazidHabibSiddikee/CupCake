@@ -54,6 +54,7 @@ class PointsManager @Inject constructor() {
             Game.GameType.MATH_QUIZ -> 1.2
             Game.GameType.NUMBER_BASE -> 1.2
             Game.GameType.MEMORY_MATCH -> 1.1
+            Game.GameType.PING_PONG -> 1.3
             else -> 1.0
         }
 

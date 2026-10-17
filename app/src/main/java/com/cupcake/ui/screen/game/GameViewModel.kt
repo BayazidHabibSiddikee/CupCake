@@ -56,14 +56,29 @@ class GameViewModel @Inject constructor(
             gameManager.gameReactions.collect { reaction ->
                 _botComment.value = reaction.text
 
-                val expression = if (reaction.humanWon) EspWebSocketServer.FaceExpression.RAGE
-                else if (reaction.isDraw) EspWebSocketServer.FaceExpression.THINKING
-                else EspWebSocketServer.FaceExpression.HAPPY
+                val expression = when (reaction.mood) {
+                    GameManager.ReactionMood.ANGRY -> EspWebSocketServer.FaceExpression.RAGE
+                    GameManager.ReactionMood.SAD -> EspWebSocketServer.FaceExpression.SAD
+                    GameManager.ReactionMood.GLOATING -> EspWebSocketServer.FaceExpression.WINK
+                    GameManager.ReactionMood.HAPPY -> EspWebSocketServer.FaceExpression.HAPPY
+                    GameManager.ReactionMood.NEUTRAL -> when {
+                        reaction.humanWon -> EspWebSocketServer.FaceExpression.RAGE
+                        reaction.isDraw -> EspWebSocketServer.FaceExpression.THINKING
+                        else -> EspWebSocketServer.FaceExpression.HAPPY
+                    }
+                }
                 espServer.sendFaceExpression(expression, 3000)
 
-                val motorAction = if (reaction.humanWon) EspWebSocketServer.MotorAction.TANTUM
-                else EspWebSocketServer.MotorAction.DANCE
+                val motorAction = when (reaction.mood) {
+                    GameManager.ReactionMood.ANGRY -> EspWebSocketServer.MotorAction.TANTUM
+                    GameManager.ReactionMood.SAD -> EspWebSocketServer.MotorAction.SHAKE
+                    GameManager.ReactionMood.GLOATING -> EspWebSocketServer.MotorAction.DANCE
+                    else -> if (reaction.humanWon) EspWebSocketServer.MotorAction.TANTUM
+                            else EspWebSocketServer.MotorAction.DANCE
+                }
                 espServer.sendMotorAction(motorAction)
+
+                refreshEscalation()
 
                 viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
                     ttsManager.speakStreaming(reaction.text) { audioChunk ->
@@ -72,6 +87,22 @@ class GameViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    // Escalating-anger readouts for the UI banner (she gets angrier each win).
+    private val _angerLevel = MutableStateFlow(0.0)
+    val angerLevel = _angerLevel.asStateFlow()
+
+    private val _moodRank = MutableStateFlow("CALM")
+    val moodRank = _moodRank.asStateFlow()
+
+    private val _adaptiveDifficultyName = MutableStateFlow("normal")
+    val adaptiveDifficultyName = _adaptiveDifficultyName.asStateFlow()
+
+    private fun refreshEscalation() {
+        _angerLevel.value = gameManager.getAngerLevel()
+        _moodRank.value = gameManager.getMoodRank()
+        _adaptiveDifficultyName.value = gameManager.getAdaptiveDifficultyName()
     }
 
     fun clearBotComment() {
@@ -100,6 +131,16 @@ class GameViewModel @Inject constructor(
         _gameState.value = gameManager.getCurrentState()?.let {
             com.cupcake.game.GameManager.Result(true, "Move made", it)
         }
+        refreshEscalation()
+    }
+
+    /** Ping Pong UI reports a point (ball left the human/bot side). */
+    fun pingPongPoint(humanScored: Boolean) {
+        gameManager.pingPongPoint(humanScored)
+        _gameState.value = gameManager.getCurrentState()?.let {
+            com.cupcake.game.GameManager.Result(true, "Point", it)
+        }
+        refreshEscalation()
     }
 
     fun submitTextAnswer(answer: String) {
@@ -230,6 +271,14 @@ class GameViewModel @Inject constructor(
                 icon = "🔐",
                 personality = "detective",
                 category = "Logic"
+            ),
+            GameOption(
+                type = com.cupcake.game.Game.GameType.PING_PONG,
+                name = "Ping Pong",
+                description = "Real-time rally — she gets angrier as you win",
+                icon = "🏓",
+                personality = "rage_gamer",
+                category = "Reflex"
             ),
             GameOption(
                 type = com.cupcake.game.Game.GameType.REACTION_TIME,

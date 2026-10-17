@@ -481,7 +481,7 @@ fun HomeScreen(
                     }
                 }
 
-                // Quick Play Game Grid — all 14 games
+                // Quick Play Game Grid — all 15 games
                 item {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         GameLaunchCard(
@@ -504,6 +504,13 @@ fun HomeScreen(
                             description = "Drop discs and outsmart Marin's sneaky combos!",
                             xpReward = "+150 XP",
                             onClick = { onNavigateToGame("CONNECT_FOUR") }
+                        )
+                        GameLaunchCard(
+                            emoji = "🏓",
+                            title = "Ping Pong",
+                            description = "Real-time rally! The more you win, the angrier (and faster) Marin gets.",
+                            xpReward = "+150 XP",
+                            onClick = { onNavigateToGame("PING_PONG") }
                         )
                         GameLaunchCard(
                             emoji = "♟️",

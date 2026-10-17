@@ -508,6 +508,7 @@ fun GameStatCard(
         com.cupcake.game.Game.GameType.MASTERMIND -> "🔐" to MaterialTheme.colorScheme.tertiary
         com.cupcake.game.Game.GameType.REACTION_TIME -> "⚡" to MaterialTheme.colorScheme.error
         com.cupcake.game.Game.GameType.CLICKER -> "🧁" to MaterialTheme.colorScheme.primary
+        com.cupcake.game.Game.GameType.PING_PONG -> "🏓" to MaterialTheme.colorScheme.secondary
     }
 
     CuteCard {

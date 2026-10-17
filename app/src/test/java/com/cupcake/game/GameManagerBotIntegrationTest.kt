@@ -136,7 +136,10 @@ class GameManagerBotIntegrationTest {
             while (sessionStore.messages(characterId).value.size <= before) delay(50)
         }
         val messages = sessionStore.messages(characterId).value
-        assertThat(messages.last().content).isEqualTo("Rematch right now!")
+        // A human win is a curated Banglish taunt (not the model's reply), and it
+        // must still be persisted to the character's chat session.
+        assertThat(messages.last().content).isNotEmpty()
+        assertThat(messages.last().role).isEqualTo(ChatMessage.MessageRole.ASSISTANT)
     }
 
     @Test
@@ -151,9 +154,11 @@ class GameManagerBotIntegrationTest {
         gameManager.submitTextAnswer(board.originalWord)
 
         val reaction = reactionDeferred.await()
-        assertThat(reaction.text).isEqualTo("You got me!")
+        // Losing to the human makes her angry: curated EscalatingBanglish taunt, ANGRY mood.
+        assertThat(reaction.text).isNotEmpty()
         assertThat(reaction.humanWon).isTrue()
         assertThat(reaction.isDraw).isFalse()
+        assertThat(reaction.mood).isEqualTo(GameManager.ReactionMood.ANGRY)
     }
 
     // ------------------------------------------

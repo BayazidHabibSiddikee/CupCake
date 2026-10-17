@@ -39,6 +39,9 @@ object ModelPreloader {
             try {
                 LlamaEngine.initialize(appContext)
 
+                // Reclaim space from model files left behind by older builds.
+                ModelDownloadManager.pruneStaleModels(appContext)
+
                 val activeModel = ModelDownloadManager.resolveStoredActiveModel(
                     appContext
                         .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)

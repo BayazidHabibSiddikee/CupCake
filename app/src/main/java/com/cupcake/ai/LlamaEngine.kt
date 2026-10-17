@@ -120,7 +120,7 @@ class LlamaEngine private constructor() {
     }
 
     data class Config(
-        val modelFileName: String = "models/liltii-v0.2-small-q2_k.gguf",
+        val modelFileName: String = "models/liltii-v0.2-v3-q4_0.gguf",
         val nCtx: Int = 2048,
         val nThreads: Int = recommendedThreadCount(),
         val nBatch: Int = 512,

@@ -65,6 +65,9 @@ fun GameScreen(
     val availableGames by viewModel.availableGames.collectAsStateWithLifecycle()
     val selectedDifficulty by viewModel.selectedDifficulty.collectAsStateWithLifecycle()
     val botComment by viewModel.botComment.collectAsStateWithLifecycle()
+    val moodRank by viewModel.moodRank.collectAsStateWithLifecycle()
+    val angerLevel by viewModel.angerLevel.collectAsStateWithLifecycle()
+    val adaptiveDifficultyName by viewModel.adaptiveDifficultyName.collectAsStateWithLifecycle()
 
     // Auto-launch a specific game when arriving from the home screen
     LaunchedEffect(startGameType) {
@@ -130,6 +133,36 @@ fun GameScreen(
                 }
             }
 
+
+            // Escalating-anger banner: Marin visibly gets angrier (and raises the
+            // difficulty) each time you win a game against her.
+            val activeGame = gameState
+            if (activeGame != null && angerLevel > 0.12) {
+                androidx.compose.material3.Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    colors = androidx.compose.material3.CardDefaults.cardColors(
+                        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.errorContainer
+                    ),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(text = if (angerLevel > 0.7) "💢" else "😤", fontSize = 18.sp)
+                        Text(
+                            text = "Marin is $moodRank — difficulty raised to ${adaptiveDifficultyName.uppercase()}",
+                            modifier = Modifier.weight(1f),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = androidx.compose.material3.MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                }
+            }
 
             val activeGameState = gameState
             if (activeGameState == null) {
@@ -256,6 +289,17 @@ fun GameScreen(
                     com.cupcake.game.Game.GameType.MASTERMIND -> MastermindBoardUI(
                         state = boardState,
                         onSubmit = { guess -> viewModel.submitMastermindGuess(guess) },
+                        onRestart = { viewModel.restartGame() }
+                    )
+                    com.cupcake.game.Game.GameType.PING_PONG -> PingPongBoardUI(
+                        state = boardState,
+                        botSkill = when (adaptiveDifficultyName) {
+                            "easy" -> 0.35f
+                            "normal" -> 0.5f
+                            "hard" -> 0.72f
+                            else -> 0.95f
+                        },
+                        onPoint = { humanScored -> viewModel.pingPongPoint(humanScored) },
                         onRestart = { viewModel.restartGame() }
                     )
                     else -> {

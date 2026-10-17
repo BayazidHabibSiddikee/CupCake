@@ -47,15 +47,15 @@ class ModelDownloadManager @Inject constructor(
         private const val TAG = "ModelDownloadManager"
         private const val PREFS_NAME = "cupcake_model_prefs"
         private const val KEY_ACTIVE_MODEL = "active_local_model"
-        const val DEFAULT_MODEL = "liltii-v0.2-small-q2_k.gguf"
+        const val DEFAULT_MODEL = "liltii-v0.2-v3-q4_0.gguf"
 
         val CATALOG = listOf(
             GgufModelInfo(
-                fileName = "liltii-v0.2-small-q2_k.gguf",
-                displayName = "LilTii v0.2 (Qwen 0.5B)",
+                fileName = "liltii-v0.2-v3-q4_0.gguf",
+                displayName = "LilTii v0.2 (Qwen 0.5B, Q4_0)",
                 tag = "Custom • Banglish + Emotions",
                 description = "Fine-tuned on Banglish emotion-tagged data. Emits [emotion] *action* responses.",
-                sizeBytes = 338_000_000L,
+                sizeBytes = 284_087_232L,
                 downloadUrl = null,
                 isBundled = true
             )
@@ -68,6 +68,24 @@ class ModelDownloadManager @Inject constructor(
          */
         fun resolveStoredActiveModel(stored: String?): String =
             if (stored != null && CATALOG.any { it.fileName == stored }) stored else DEFAULT_MODEL
+
+        /**
+         * Deletes bundled-model copies left behind by an older build (e.g. a renamed
+         * asset) so they do not permanently waste space in the app's private storage.
+         * Safe to call at every app start; catalog models are never touched.
+         */
+        fun pruneStaleModels(context: Context) {
+            runCatching {
+                val dir = File(context.filesDir, "models")
+                if (!dir.isDirectory) return
+                dir.listFiles { file ->
+                    file.isFile && file.name.endsWith(".gguf") && CATALOG.none { it.fileName == file.name }
+                }?.forEach { stale ->
+                    val freed = stale.length()
+                    if (stale.delete()) Log.i(TAG, "Removed stale model ${stale.name} ($freed bytes)")
+                }
+            }.onFailure { Log.w(TAG, "Stale model cleanup skipped: ${it.message}") }
+        }
     }
 
     private val prefs: SharedPreferences =
