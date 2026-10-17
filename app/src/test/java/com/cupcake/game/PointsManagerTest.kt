@@ -60,8 +60,30 @@ class PointsManagerTest {
     }
 
     @Test
-    fun `spendPoints is gated and never goes negative`() {
+    fun `losing a game awards no coins and no xp`() {
         val manager = manager()
+        manager.awardPoints(100, Game.GameType.CHESS, won = false)
+
+        assertEquals(0L, manager.points.value)
+        assertEquals(0L, manager.xp.value)
+        assertEquals(1, manager.totalGamesPlayed.value)
+        assertEquals(0, manager.totalWins.value)
+        assertEquals(1, manager.gameStats.value[Game.GameType.CHESS]?.gamesPlayed)
+        assertEquals(0, manager.gameStats.value[Game.GameType.CHESS]?.wins)
+    }
+
+    @Test
+    fun `a win pays back more than the entry cost so the loop is sustainable`() {
+        val manager = manager()
+        manager.awardPoints(100, Game.GameType.CHESS, won = true)
+        assertTrue(
+            "win payout ${manager.points.value} should exceed entry cost ${PointsManager.GAME_ENTRY_COST}",
+            manager.points.value > PointsManager.GAME_ENTRY_COST
+        )
+    }
+
+    @Test
+    fun `spendPoints is gated and never goes negative`() {        val manager = manager()
         manager.awardPoints(20, Game.GameType.CLICKER, won = true)
         val balance = manager.points.value
         assertTrue(balance > 0)

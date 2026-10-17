@@ -45,7 +45,13 @@ sealed interface Game {
     }
 
     data class ClickerBoard(
-        var score: Int = 0
+        var score: Int = 0,
+        /** Taps needed to win the round. */
+        val target: Int = 40,
+        /** Round length; the UI counts this down and then calls finishClicker(). */
+        val durationMs: Long = 20_000L,
+        val startedAt: Long = System.currentTimeMillis(),
+        var finished: Boolean = false
     ) : Board {
         override val size: Int = 1
         override fun get(position: Int): Player? = null
@@ -53,7 +59,7 @@ sealed interface Game {
             score++
             return true
         }
-        override fun isFull(): Boolean = false
+        override fun isFull(): Boolean = finished || score >= target
     }
 
     // Ping Pong Board. The ball/paddles are simulated live in the UI; this board is
@@ -163,7 +169,10 @@ sealed interface Game {
         var cards: List<MemoryCard> = emptyList(),
         var flippedIndices: MutableList<Int> = mutableListOf(),
         var matchedPairs: MutableSet<Int> = mutableSetOf(),
-        var moves: Int = 0
+        var moves: Int = 0,
+        /** Cards are briefly revealed at the start so the player can memorise them. */
+        val previewMillis: Long = 8_000L,
+        val startedAt: Long = System.currentTimeMillis()
     ) : Board {
         override fun get(position: Int): Player? = null
         override fun set(position: Int, player: Player): Boolean = false

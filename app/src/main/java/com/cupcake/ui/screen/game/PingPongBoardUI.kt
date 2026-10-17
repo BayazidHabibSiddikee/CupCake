@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
@@ -32,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cupcake.game.Game
+import kotlinx.coroutines.delay
 import kotlin.math.abs
 
 /**
@@ -60,6 +62,10 @@ fun PingPongBoardUI(
     var humanPaddleX by remember { mutableFloatStateOf(0.5f) }
     var botPaddleX by remember { mutableFloatStateOf(0.5f) }
 
+    // 3‑2‑1 ready countdown before a fresh match starts.
+    var countdown by remember { mutableIntStateOf(0) }
+    val serving = countdown > 0
+
     val paddleHalfWidth = 0.15f
     val humanY = 0.92f
     val botY = 0.08f
@@ -71,8 +77,16 @@ fun PingPongBoardUI(
         ballVY = if (humanScored) -0.7f else 0.7f
     }
 
-    LaunchedEffect(state.status) {
+    LaunchedEffect(state.status, board.humanScore, board.botScore) {
         if (!playing) return@LaunchedEffect
+        // Only the opening of a match gets the countdown; later points serve straight away.
+        if (board.humanScore == 0 && board.botScore == 0) {
+            for (s in 3 downTo 1) {
+                countdown = s
+                delay(1000)
+            }
+        }
+        countdown = 0
         resetToServe(humanScored = false)
         // Adaptive bot: harder as she gets angrier.
         val botMaxSpeed = 0.35f + botSkill * 1.35f
@@ -132,9 +146,10 @@ fun PingPongBoardUI(
             fontWeight = FontWeight.Bold
         )
         Text(
-            text = when (state.status) {
-                Game.GameStatus.HUMAN_WON -> "You won the match! 🎉  — nerf incoming…"
-                Game.GameStatus.BOT_WON -> "Marin won! 👑"
+            text = when {
+                state.status == Game.GameStatus.HUMAN_WON -> "You won the match! 🎉  — nerf incoming…"
+                state.status == Game.GameStatus.BOT_WON -> "Marin won! 👑"
+                serving -> "Get ready… the ball drops in $countdown"
                 else -> "First to ${board.targetScore}. Drag left/right to move 🏓"
             },
             fontSize = 14.sp,
@@ -146,8 +161,8 @@ fun PingPongBoardUI(
                 .fillMaxWidth()
                 .weight(1f)
                 .background(surface, RoundedCornerShape(20.dp))
-                .pointerInput(playing) {
-                    if (!playing) return@pointerInput
+                .pointerInput(playing, serving) {
+                    if (!playing || serving) return@pointerInput
                     detectDragGestures(
                         onDragStart = { humanPaddleX = (it.x / size.width).coerceIn(paddleHalfWidth, 1f - paddleHalfWidth) }
                     ) { change, _ ->
@@ -184,6 +199,20 @@ fun PingPongBoardUI(
 
                 // Ball
                 drawCircle(ballColor, radius = 0.022f * w, center = Offset(ballX * w, ballY * h))
+            }
+
+            if (serving) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = if (countdown > 0) countdown.toString() else "GO!",
+                        fontSize = 96.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = ballColor.copy(alpha = 0.85f)
+                    )
+                }
             }
 
             if (!playing) {

@@ -220,15 +220,29 @@ fun MemoryMatchBoardUI(
 ) {
     val board = state.board as? com.cupcake.game.Game.MemoryMatchBoard ?: return
 
+    // Tick while the cards are face-up at the start of the round.
+    var now by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(board.startedAt) {
+        while (true) {
+            now = System.currentTimeMillis()
+            if (now >= board.startedAt + board.previewMillis) break
+            delay(200)
+        }
+    }
+    val previewLeftMs = (board.startedAt + board.previewMillis - now).coerceAtLeast(0L)
+    val previewing = previewLeftMs > 0L &&
+        state.status == com.cupcake.game.Game.GameStatus.PLAYING
+
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            text = when (state.status) {
-                com.cupcake.game.Game.GameStatus.PLAYING -> "Find all the pairs! 🃏"
-                com.cupcake.game.Game.GameStatus.HUMAN_WON -> "You found them all! 🎉"
+            text = when {
+                previewing -> "Memorise! ${(previewLeftMs / 1000.0).let { "%.0f".format(it) }}s 🧠"
+                state.status == com.cupcake.game.Game.GameStatus.PLAYING -> "Find all the pairs! 🃏"
+                state.status == com.cupcake.game.Game.GameStatus.HUMAN_WON -> "You found them all! 🎉"
                 else -> "Game Over"
             },
             fontSize = 20.sp,
@@ -251,10 +265,12 @@ fun MemoryMatchBoardUI(
                     for (col in 0..3) {
                         val index = row * 4 + col
                         val card = board.cards.getOrNull(index)
-                        val revealed = card != null && (card.isFlipped || card.isMatched)
+                        val revealed = previewing || (card != null && (card.isFlipped || card.isMatched))
                         androidx.compose.material3.Surface(
                             onClick = {
-                                if (state.status == com.cupcake.game.Game.GameStatus.PLAYING && !revealed) {
+                                if (state.status == com.cupcake.game.Game.GameStatus.PLAYING &&
+                                    !previewing && !revealed
+                                ) {
                                     onCardClick(index)
                                 }
                             },
@@ -262,6 +278,7 @@ fun MemoryMatchBoardUI(
                             color = when {
                                 card == null -> androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerHigh
                                 card.isMatched -> androidx.compose.material3.MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.6f)
+                                previewing -> androidx.compose.material3.MaterialTheme.colorScheme.primaryContainer
                                 revealed -> androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerHigh
                                 else -> androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerHighest
                             },
@@ -595,7 +612,8 @@ fun ReactionTimeBoardUI(
     ) {
         Text(
             text = when (state.status) {
-                com.cupcake.game.Game.GameStatus.PLAYING -> "Round ${board.currentRound + 1} / 5 ⚡"
+                com.cupcake.game.Game.GameStatus.PLAYING ->
+                    "Round ${(board.rounds.size + 1).coerceAtMost(5)} / 5 ⚡"
                 com.cupcake.game.Game.GameStatus.HUMAN_WON -> "Done! 🎉"
                 else -> "Game Over"
             },
@@ -657,7 +675,11 @@ fun ReactionTimeBoardUI(
 
         if (state.status == com.cupcake.game.Game.GameStatus.PLAYING) {
             Text(
-                text = if (waitingForSignal) "Don't tap yet — wait for the signal!" else "Tap the circle",
+                text = when {
+                    waitingForSignal -> "Don't tap yet — wait for the signal!"
+                    board.rounds.isEmpty() -> "Tap to start. Win 3 of 5 clean rounds."
+                    else -> "Tap the circle! Clean rounds: ${board.rounds.count { it.isValid }}/3"
+                },
                 fontSize = 14.sp,
                 color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
             )

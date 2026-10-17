@@ -2,11 +2,14 @@ package com.cupcake.ui.screen.game
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.cupcake.ai.AdManager
+import com.cupcake.ai.AdResult
 import com.cupcake.ai.EnergyManager
 import com.cupcake.game.GameManager
 import com.cupcake.game.PointsManager
 import com.cupcake.network.EspWebSocketServer
 import com.cupcake.tts.TtsManager
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -19,7 +22,8 @@ class GameViewModel @Inject constructor(
     private val energyManager: EnergyManager,
     private val pointsManager: PointsManager,
     private val ttsManager: TtsManager,
-    private val espServer: EspWebSocketServer
+    private val espServer: EspWebSocketServer,
+    private val adManager: AdManager
 ) : ViewModel() {
 
     private val _gameState = MutableStateFlow<GameManager.Result?>(null)
@@ -99,10 +103,23 @@ class GameViewModel @Inject constructor(
     private val _adaptiveDifficultyName = MutableStateFlow("normal")
     val adaptiveDifficultyName = _adaptiveDifficultyName.asStateFlow()
 
+    /** How close the human is to winning (0..1) and a short label for the "threat map". */
+    private val _threatLevel = MutableStateFlow(0.0)
+    val threatLevel = _threatLevel.asStateFlow()
+
+    private val _closenessLabel = MutableStateFlow("UNDER CONTROL")
+    val closenessLabel = _closenessLabel.asStateFlow()
+
+    /** True when the player tried to start a game without enough coins. */
+    private val _needsCoins = MutableStateFlow(false)
+    val needsCoins = _needsCoins.asStateFlow()
+
     private fun refreshEscalation() {
         _angerLevel.value = gameManager.getAngerLevel()
         _moodRank.value = gameManager.getMoodRank()
         _adaptiveDifficultyName.value = gameManager.getAdaptiveDifficultyName()
+        _threatLevel.value = gameManager.getThreatLevel()
+        _closenessLabel.value = gameManager.getClosenessLabel()
     }
 
     fun clearBotComment() {
@@ -116,20 +133,51 @@ class GameViewModel @Inject constructor(
     val selectedDifficulty = MutableStateFlow(com.cupcake.game.TicTacToeEngine.Difficulty.NORMAL)
 
     fun startGame(gameOption: GameOption, difficulty: com.cupcake.game.TicTacToeEngine.Difficulty) {
-        // Games are never blocked by energy: spend if available, but always start.
-        // (A hard gate here silently swallowed every tap once energy hit zero.)
+        // Games cost coins. No coins = no game; the player refills by watching a video.
+        if (!pointsManager.spendPoints(PointsManager.GAME_ENTRY_COST)) {
+            _needsCoins.value = true
+            return
+        }
+        _needsCoins.value = false
         energyManager.consumeEnergy(com.cupcake.ai.EnergyManager.ENERGY_PER_GAME)
 
         clearBotComment()
         val result = gameManager.startGame(gameOption.type, difficulty)
         _gameState.value = com.cupcake.game.GameManager.Result(true, "Game started", result)
         _showGameSelector.value = false
+        refreshEscalation()
+    }
+
+    fun dismissNeedsCoins() {
+        _needsCoins.value = false
+    }
+
+    /**
+     * Rewarded video → coins. Uses the [AdManager] seam so the earn loop is complete
+     * even before a real ad SDK is wired in.
+     */
+    fun watchRewardedAd() {
+        _needsCoins.value = false
+        viewModelScope.launch(Dispatchers.IO) {
+            if (adManager.showRewardedAd() == AdResult.REWARDED) {
+                pointsManager.addCoins(PointsManager.AD_REWARD_COINS)
+            }
+        }
     }
 
     fun makeMove(position: Int) {
         gameManager.makeHumanMove(position)
         _gameState.value = gameManager.getCurrentState()?.let {
             com.cupcake.game.GameManager.Result(true, "Move made", it)
+        }
+        refreshEscalation()
+    }
+
+    /** Clicker UI reports the round timer expired (or the target was reached). */
+    fun finishClicker() {
+        val result = gameManager.finishClicker()
+        _gameState.value = gameManager.getCurrentState()?.let {
+            com.cupcake.game.GameManager.Result(result.success, result.message, it)
         }
         refreshEscalation()
     }
@@ -175,8 +223,14 @@ class GameViewModel @Inject constructor(
 
     fun restartGame() {
         val currentType = _gameState.value?.state?.gameType ?: com.cupcake.game.Game.GameType.TIC_TAC_TOE
+        if (!pointsManager.spendPoints(PointsManager.GAME_ENTRY_COST)) {
+            _needsCoins.value = true
+            return
+        }
+        _needsCoins.value = false
         val result = gameManager.startGame(currentType, selectedDifficulty.value)
         _gameState.value = com.cupcake.game.GameManager.Result(true, "Game restarted", result)
+        refreshEscalation()
     }
 
     fun awardPoints(basePoints: Int, gameType: com.cupcake.game.Game.GameType, won: Boolean) {

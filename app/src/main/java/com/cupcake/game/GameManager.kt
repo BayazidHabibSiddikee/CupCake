@@ -98,6 +98,7 @@ class GameManager(
         difficulty = diff
         cheatMode = (diff == TicTacToeEngine.Difficulty.CHEATING)
         pendingMemoryUnflip = null
+        jealousyTracker.resetThreat()
 
         if (type == Game.GameType.ROCK_PAPER_SCISSORS) {
             RockPaperScissorsEngine.reset()
@@ -221,6 +222,10 @@ class GameManager(
         val gameType = game.gameType
         val result = applyHumanMove(position)
 
+        // Re-score how close the human is to winning; this deterministically drives
+        // Marin's anger and the adaptive difficulty from here on.
+        if (result.success) refreshThreat()
+
         // Send the move to the bot AFTER the board has been updated, so the
         // prompt contains the real position of every piece/card/disc.
         // Game-ending moves trigger triggerReaction() instead (one bot message per event).
@@ -240,16 +245,17 @@ class GameManager(
 
         if (game.gameType == Game.GameType.CLICKER) {
             val board = game.board as? Game.ClickerBoard ?: return Result(false, "Invalid board")
+            if (board.finished) return Result(false, "Round over")
+
             board.set(position, Game.Player.HUMAN)
-            
             currentGame = game.copy(board = board)
             onGameStateChanged?.invoke(currentGame)
-            
-            // Award points for milestones
-            if (board.score > 0 && board.score % 100 == 0) {
-                awardGamePoints(game.gameType, true, board.score / 10)
-                triggerClickerReaction(board.score)
-            }
+
+            // A comment every ten taps, not every tap.
+            if (board.score % 10 == 0) triggerClickerReaction(board.score)
+
+            // Hitting the target ends the round immediately; the UI timer ends it too.
+            if (board.score >= board.target) return finishClicker()
             return Result(true, "Tap counted", currentGame)
         }
 
@@ -515,12 +521,22 @@ class GameManager(
             val newHistory = game.moveHistory + Game.Move(Game.Player.HUMAN, position)
 
             val (newStatus, winner) = if (newBoard.isFull()) {
-                triggerReaction(true)
-                val validRounds = newBoard.rounds.filter { it.isValid }
-                val avgTime = if (validRounds.isNotEmpty()) validRounds.map { it.reactionTimeMs.toDouble() }.average() else 0.0
-                val points = maxOf(1, (5000.0 - avgTime).toInt())
-                awardGamePoints(game.gameType, true, points)
-                Game.GameStatus.HUMAN_WON to Game.Player.HUMAN
+                val validRounds = newBoard.rounds.count { it.isValid }
+                if (validRounds >= ReactionTimeEngine.REACTION_WIN_ROUNDS) {
+                    triggerReaction(true)
+                    val times = newBoard.rounds.filter { it.isValid }.map { it.reactionTimeMs.toDouble() }
+                    val avgTime = if (times.isNotEmpty()) times.average() else 0.0
+                    val points = maxOf(1, (5000.0 - avgTime).toInt())
+                    awardGamePoints(game.gameType, true, points)
+                    jealousyTracker.recordGameResult(true, game.gameType!!)
+                    Game.GameStatus.HUMAN_WON to Game.Player.HUMAN
+                } else {
+                    // Fewer than the required clean rounds: too many early taps.
+                    triggerReaction(false)
+                    awardGamePoints(game.gameType, false, 0)
+                    jealousyTracker.recordGameResult(false, game.gameType!!)
+                    Game.GameStatus.BOT_WON to Game.Player.BOT
+                }
             } else {
                 Game.GameStatus.PLAYING to null
             }
@@ -532,7 +548,7 @@ class GameManager(
                 moveHistory = newHistory
             )
             onGameStateChanged?.invoke(currentGame)
-            return Result(true, if (board.waitingForTap) "Reacted!" else "Wait for signal...", currentGame)
+            return Result(true, if (newBoard.waitingForTap) "Wait for signal..." else "Reacted!", currentGame)
         }
 
         if (game.gameType == Game.GameType.CONNECT_FOUR) {
@@ -1242,6 +1258,7 @@ class GameManager(
         val board = game.board as? Game.PingPongBoard ?: return
 
         if (humanScored) board.humanScore++ else board.botScore++
+        refreshThreat()
 
         val winner = board.winner
         if (winner != null) {
@@ -1261,8 +1278,31 @@ class GameManager(
         onGameStateChanged?.invoke(currentGame)
     }
 
-    // ---- Chess -------------------------------------------------------------------
+    /**
+     * Ends the clicker round — either the target was reached or the UI timer expired.
+     * One payout for the whole round: coins only when the target was met.
+     */
+    fun finishClicker(): Result {
+        val game = currentGame ?: return Result(false, "No active game")
+        if (game.gameType != Game.GameType.CLICKER) return Result(false, "Not a clicker game")
+        if (game.status != Game.GameStatus.PLAYING) return Result(false, "Game over")
+        val board = game.board as? Game.ClickerBoard ?: return Result(false, "Invalid board")
 
+        board.finished = true
+        val won = board.score >= board.target
+        currentGame = game.copy(
+            board = board,
+            status = if (won) Game.GameStatus.HUMAN_WON else Game.GameStatus.BOT_WON,
+            winner = if (won) Game.Player.HUMAN else Game.Player.BOT
+        )
+        triggerReaction(won)
+        awardGamePoints(Game.GameType.CLICKER, won, if (won) 120 else 0)
+        jealousyTracker.recordGameResult(won, Game.GameType.CLICKER)
+        onGameStateChanged?.invoke(currentGame)
+        return Result(true, if (won) "Target reached!" else "Time's up!", currentGame)
+    }
+
+    // ---- Chess -------------------------------------------------------------------
     /**
      * Human chess move, given from/to squares (0..63) and an optional promotion
      * piece ('Q'/'R'/'B'/'N'). Legality is enforced by [ChessEngine]; the running
@@ -1305,6 +1345,7 @@ class GameManager(
         mover: Game.Player
     ): Result {
         board.applyPosition(ChessEngine.makeMove(board.position, move))
+        if (mover == Game.Player.HUMAN) refreshThreat()
         val encoded = move.from * 64 + move.to
         val newHistory = game.moveHistory + Game.Move(mover, encoded)
 
@@ -1365,6 +1406,74 @@ class GameManager(
 
     /** 0.0 .. 1.0 — drives the "Marin is RAGING" banner. */
     fun getAngerLevel(): Double = jealousyTracker.getAngerLevel()
+
+    /** How close the human is to winning right now, 0..1 (the "threat map" value). */
+    fun getThreatLevel(): Double = jealousyTracker.getThreatLevel()
+
+    /** Human-readable threat label, e.g. "ONE MOVE FROM WINNING". */
+    fun getClosenessLabel(): String = jealousyTracker.getClosenessLabel()
+
+    /** Recomputes the live board threat and feeds it to the bot's mood model. */
+    private fun refreshThreat() {
+        jealousyTracker.reportBoardThreat(boardThreat())
+    }
+
+    /**
+     * Estimates how close the human is to winning on the current board, in 0..1.
+     * Deterministic: the same board always yields the same value. Only board games with a
+     * spatial win condition (plus the progress-based mini-games) contribute.
+     */
+    private fun boardThreat(): Double {
+        val board = currentGame?.board ?: return 0.0
+        return when (board) {
+            is Game.TicTacToeBoard -> gridThreat(board.size, rows = 3, cols = 3, run = 3) { board.get(it) }
+            is Game.TicTacToe4x4Board -> gridThreat(board.size, rows = 4, cols = 4, run = 4) { board.get(it) }
+            is Game.ConnectFourBoard -> gridThreat(board.size, rows = 6, cols = 7, run = 4) { board.get(it) }
+            is Game.PingPongBoard -> board.humanScore.toDouble() / board.targetScore.coerceAtLeast(1)
+            is Game.MemoryMatchBoard -> board.matchedPairs.size.toDouble() / board.pairs.coerceAtLeast(1)
+            is Game.MathQuizBoard -> board.correctAnswers.toDouble() / 10.0
+            is Game.NumberBaseBoard -> board.correctAnswers.toDouble() / 10.0
+            is Game.GuessNumberBoard ->
+                if (board.lastResult == Game.GuessNumberBoard.GuessResult.CORRECT) 1.0 else 0.0
+            else -> 0.0
+        }.coerceIn(0.0, 1.0)
+    }
+
+    /**
+     * Biggest count of human pieces in any uncontested window of [run] cells, divided by
+     * [run]. A window containing a bot piece is ignored (it can never become a human win).
+     */
+    private fun gridThreat(
+        size: Int,
+        rows: Int,
+        cols: Int,
+        run: Int,
+        cell: (Int) -> Game.Player?
+    ): Double {
+        if (rows * cols != size || run < 2) return 0.0
+        var best = 0
+        fun score(window: List<Int>) {
+            var human = 0
+            var bot = 0
+            for (i in window) {
+                when (cell(i)) {
+                    Game.Player.HUMAN -> human++
+                    Game.Player.BOT -> bot++
+                    null -> Unit
+                }
+            }
+            if (bot == 0) best = maxOf(best, human)
+        }
+        // Rows
+        for (r in 0 until rows) for (c in 0..cols - run) score((0 until run).map { r * cols + c + it })
+        // Columns
+        for (c in 0 until cols) for (r in 0..rows - run) score((0 until run).map { (r + it) * cols + c })
+        // Diagonals ↘
+        for (r in 0..rows - run) for (c in 0..cols - run) score((0 until run).map { (r + it) * cols + c + it })
+        // Diagonals ↙
+        for (r in 0..rows - run) for (c in run - 1 until cols) score((0 until run).map { (r + it) * cols + c - it })
+        return (best.toDouble() / run).coerceIn(0.0, 1.0)
+    }
 
     fun getHumanWinStreak(): Int = jealousyTracker.consecutivePlayerWins
 

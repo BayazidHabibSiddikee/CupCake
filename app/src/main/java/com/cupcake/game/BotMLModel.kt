@@ -12,6 +12,15 @@ class BotMLModel {
 
     private var jealousyLevel = 0.0
     private var angerLevel = 0.0
+
+    /**
+     * How close the human currently is to winning the *live* board, in 0..1. This is the
+     * deterministic "map" signal: it is recomputed from the board after every move, so the
+     * bot's anger and difficulty rise exactly as the human approaches a win — never at
+     * random.
+     */
+    private var threatLevel = 0.0
+
     internal var playerWins = 0
     internal var botWins = 0
     internal var totalGames = 0
@@ -44,7 +53,9 @@ class BotMLModel {
     }
 
     fun getAdaptiveDifficulty(baseDifficulty: TicTacToeEngine.Difficulty): TicTacToeEngine.Difficulty {
-        val effectiveLevel = (jealousyLevel + angerLevel) / 2
+        // Difficulty follows the *stronger* of the historical grudge and the live board
+        // threat, so a human who is one move from winning always faces a harder bot.
+        val effectiveLevel = maxOf((jealousyLevel + angerLevel) / 2, threatLevel)
         return when {
             effectiveLevel > 0.8 -> TicTacToeEngine.Difficulty.CHEATING
             effectiveLevel > 0.6 -> TicTacToeEngine.Difficulty.HARD
@@ -55,6 +66,31 @@ class BotMLModel {
                 return baseDifficulty
             }
         }
+    }
+
+    /**
+     * Feeds the live board threat (0 = nowhere near a win, 1 = winning next move).
+     * Deterministic: identical boards always produce identical anger/difficulty.
+     */
+    fun reportBoardThreat(closeness: Double) {
+        threatLevel = closeness.coerceIn(0.0, 1.0)
+        angerLevel = maxOf(angerLevel, threatLevel * 0.9)
+        jealousyLevel = maxOf(jealousyLevel, threatLevel * 0.7)
+        if (threatLevel > 0.75 && !cheatingEnabled) {
+            cheatingEnabled = true
+            activateCheatingMind()
+        }
+    }
+
+    fun getThreatLevel(): Double = threatLevel
+
+    /** Short human-readable read-out of how much trouble the human is in for the bot. */
+    fun getClosenessLabel(): String = when {
+        threatLevel >= 0.95 -> "ONE MOVE FROM WINNING"
+        threatLevel >= 0.75 -> "DANGEROUSLY CLOSE"
+        threatLevel >= 0.5 -> "GAINING GROUND"
+        threatLevel >= 0.25 -> "WARMING UP"
+        else -> "UNDER CONTROL"
     }
 
     fun getBotMood(): BotMood = when {
@@ -82,7 +118,10 @@ class BotMLModel {
 
     fun chooseAction(board: Game.TicTacToeBoard, availableMoves: List<Int>): Int {
         val state = boardToString(board)
-        if (random.nextDouble() < explorationRate) return availableMoves.random()
+        // Exploitation rises with threat: the closer the human is to winning, the less
+        // the bot wanders. Still a Q-table choice (ML), just a more focused one.
+        val eps = explorationRate * (1.0 - threatLevel)
+        if (random.nextDouble() < eps) return availableMoves.random()
         val actions = qTable.getOrPut(state) { DoubleArray(9) { 0.0 } }
         return availableMoves.maxByOrNull { getQValue(state, it) } ?: availableMoves.random()
     }
@@ -141,10 +180,10 @@ class BotMLModel {
 
     fun shouldCheat(board: Game.TicTacToeBoard, availableMoves: List<Int>): Boolean {
         if (!cheatingEnabled || cheatCooldown > 0) { cheatCooldown = maxOf(0, cheatCooldown - 1); return false }
-        val cheatProbability = desperationLevel * 0.8
-        if (random.nextDouble() > cheatProbability) return false
-        if (cheatCount > 3 && random.nextDouble() < 0.5) { humanSuspectsCheating = true; return false }
-        return true
+        if (cheatCount >= MAX_CHEATS) return false
+        // Deterministic: no dice rolls. Once desperation (driven by how close the human is
+        // to winning) is high enough, the bot always resorts to a cheat.
+        return desperationLevel >= CHEAT_THRESHOLD || threatLevel >= 0.9
     }
 
     fun executeCheat(board: Game.TicTacToeBoard, availableMoves: List<Int>): Int? {
@@ -241,6 +280,18 @@ class BotMLModel {
     fun getCurrentCheatingStrategy(): CheatingStrategy = currentCheatingStrategy
     fun getCheatCount() = cheatCount
     fun getHumanSuspectsCheating() = humanSuspectsCheating
+
+    /** Clears the live board threat at the end of a game so the next one starts fair. */
+    fun resetThreat() { threatLevel = 0.0 }
+
     fun recordCheatDetected() { humanSuspectsCheating = true; desperationLevel = minOf(1.0, desperationLevel + 0.1) }
     fun getCheatingStatus() = if (!cheatingEnabled) "Playing fair" else "CHEATING MIND ACTIVE: ${currentCheatingStrategy.name} (Desperation: ${(desperationLevel * 100).toInt()}%, Cheats used: $cheatCount)"
+
+    companion object {
+        /** How many times the bot may cheat in a single game before it gives up. */
+        private const val MAX_CHEATS = 3
+
+        /** Desperation at/above which cheating is deterministic. */
+        private const val CHEAT_THRESHOLD = 0.75
+    }
 }

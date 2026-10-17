@@ -107,8 +107,15 @@ class PointsManager @Inject constructor(
 
     // ---- Earning / spending ------------------------------------------------------
 
+    /**
+     * Records a finished game and pays out **only on a win**.
+     *
+     * Losing or drawing pays nothing — coins are the scarce resource that gates
+     * starting a game, so the loop is deliberately "watch a rewarded video → play →
+     * win → coins". Participation still bumps [totalGamesPlayed] and the per-game
+     * stats so win-rate/achievements stay accurate.
+     */
     fun awardPoints(basePoints: Int, gameType: Game.GameType, won: Boolean) {
-        val multiplier = if (won) 1.5 else 0.5
         val difficultyBonus = when (gameType) {
             Game.GameType.CHESS -> 2.0
             Game.GameType.CONNECT_FOUR -> 1.5
@@ -121,10 +128,8 @@ class PointsManager @Inject constructor(
             else -> 1.0
         }
 
-        val earned = maxOf(1L, (basePoints * multiplier * difficultyBonus).toLong())
-
-        _points.value += earned
-        _xp.value += earned
+        // Win pays the stake back with a bonus; a loss pays zero.
+        val earned = if (won) maxOf(1L, (basePoints * WIN_PAYOUT_MULTIPLIER * difficultyBonus).toLong()) else 0L
 
         _totalGamesPlayed.value++
         if (won) _totalWins.value++
@@ -139,7 +144,11 @@ class PointsManager @Inject constructor(
             ))
         }
 
-        recomputeLevel()
+        if (won) {
+            _points.value += earned
+            _xp.value += earned
+            recomputeLevel()
+        }
         checkAchievements(gameType, won)
         persist()
     }
@@ -270,6 +279,15 @@ class PointsManager @Inject constructor(
         private const val BASE_XP = 100L
         private const val GROWTH = 1.5
         private const val MAX_LEVEL = 99
+
+        /**
+         * Coins it costs to start one game. Wins pay this back with a bonus
+         * ([WIN_PAYOUT_MULTIPLIER]); losses pay nothing back. Coins are refilled by
+         * watching a rewarded video ([AD_REWARD_COINS]).
+         */
+        const val GAME_ENTRY_COST = 15L
+        const val WIN_PAYOUT_MULTIPLIER = 1.5
+        const val AD_REWARD_COINS = 60L
 
         @Volatile
         private var instance: PointsManager? = null

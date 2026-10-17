@@ -68,6 +68,11 @@ fun GameScreen(
     val moodRank by viewModel.moodRank.collectAsStateWithLifecycle()
     val angerLevel by viewModel.angerLevel.collectAsStateWithLifecycle()
     val adaptiveDifficultyName by viewModel.adaptiveDifficultyName.collectAsStateWithLifecycle()
+    val threatLevel by viewModel.threatLevel.collectAsStateWithLifecycle()
+    val closenessLabel by viewModel.closenessLabel.collectAsStateWithLifecycle()
+    val needsCoins by viewModel.needsCoins.collectAsStateWithLifecycle()
+    val points by viewModel.points.collectAsStateWithLifecycle()
+    val level by viewModel.level.collectAsStateWithLifecycle()
 
     // Set when navigation carries a game id we don't recognise (e.g. a deep link or a
     // stale route), so the user gets an explicit message instead of a silent no-op.
@@ -88,13 +93,34 @@ fun GameScreen(
     CupCakeTheme {
         Column(Modifier.fillMaxSize()) {
             TopAppBar(
-                title = { Text("Games") },
-                navigationIcon = { 
-                    androidx.compose.material3.IconButton(onClick = onClose) { 
-                        Icon(imageVector = androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") 
-                    } 
+                title = {
+                    Column {
+                        Text("Games", fontWeight = FontWeight.Bold)
+                        Text(
+                            text = "Lv $level · ${adaptiveDifficultyName.uppercase()}",
+                            fontSize = 11.sp,
+                            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                },
+                navigationIcon = {
+                    androidx.compose.material3.IconButton(onClick = onClose) {
+                        Icon(imageVector = androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
                 },
                 actions = {
+                    // Coins at the top-right: the currency that gates every game.
+                    Surface(
+                        color = androidx.compose.material3.MaterialTheme.colorScheme.primaryContainer,
+                        shape = RoundedCornerShape(50)
+                    ) {
+                        Text(
+                            text = "🪙 $points",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                        )
+                    }
                     if (gameState != null) {
                         IconButton(onClick = { viewModel.endGame() }) {
                             Icon(imageVector = androidx.compose.material.icons.Icons.Filled.Close, contentDescription = "End game")
@@ -109,6 +135,31 @@ fun GameScreen(
                     containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerLow
                 )
             )
+
+            // Not enough coins to start a game — offer the rewarded-video top-up.
+            if (needsCoins) {
+                androidx.compose.material3.AlertDialog(
+                    onDismissRequest = { viewModel.dismissNeedsCoins() },
+                    title = { Text("Out of coins 🪙") },
+                    text = {
+                        Text(
+                            "Playing a game costs ${com.cupcake.game.PointsManager.GAME_ENTRY_COST} coins, " +
+                                "and you only keep them by winning. Watch a short video to earn " +
+                                "${com.cupcake.game.PointsManager.AD_REWARD_COINS} coins."
+                        )
+                    },
+                    confirmButton = {
+                        Button(onClick = { viewModel.watchRewardedAd() }) {
+                            Text("Watch video (+${com.cupcake.game.PointsManager.AD_REWARD_COINS})")
+                        }
+                    },
+                    dismissButton = {
+                        androidx.compose.material3.TextButton(onClick = { viewModel.dismissNeedsCoins() }) {
+                            Text("Not now")
+                        }
+                    }
+                )
+            }
 
             // Live bot commentary — Marin's reaction to your move / game-ending
             botComment?.let { comment ->
@@ -165,6 +216,44 @@ fun GameScreen(
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Medium,
                             color = androidx.compose.material3.MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                }
+            }
+
+            // Threat "map": how close you are to winning, and the difficulty she is
+            // matching it with. Deterministic — it only moves when your position improves.
+            if (activeGame != null) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    colors = androidx.compose.material3.CardDefaults.cardColors(
+                        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant
+                    ),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Threat: $closenessLabel",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = "${(threatLevel * 100).toInt()}%",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = androidx.compose.material3.MaterialTheme.colorScheme.error
+                            )
+                        }
+                        androidx.compose.material3.LinearProgressIndicator(
+                            progress = { threatLevel.toFloat() },
+                            modifier = Modifier.fillMaxWidth().padding(top = 6.dp)
                         )
                     }
                 }
@@ -246,7 +335,9 @@ fun GameScreen(
                     )
                     com.cupcake.game.Game.GameType.CLICKER -> ClickerBoardUI(
                         state = boardState,
-                        onTap = { viewModel.makeMove(0) }
+                        onTap = { viewModel.makeMove(0) },
+                        onFinish = { viewModel.finishClicker() },
+                        onRestart = { viewModel.restartGame() }
                     )
                     com.cupcake.game.Game.GameType.GUESS_NUMBER -> GuessNumberBoardUI(
                         state = boardState,
@@ -610,45 +701,73 @@ private fun isWinningCell(board: com.cupcake.game.Game.TicTacToeBoard, pos: Int,
 @Composable
 fun ClickerBoardUI(
     state: com.cupcake.game.Game.State,
-    onTap: () -> Unit
+    onTap: () -> Unit,
+    onFinish: () -> Unit,
+    onRestart: () -> Unit
 ) {
     val board = state.board as? com.cupcake.game.Game.ClickerBoard ?: return
-    
+    val playing = state.status == com.cupcake.game.Game.GameStatus.PLAYING
+
+    // Round countdown. When it reaches zero we tell the manager to score the round once.
+    var remainingMs by remember(board.startedAt) {
+        androidx.compose.runtime.mutableLongStateOf(board.durationMs)
+    }
+    androidx.compose.runtime.LaunchedEffect(board.startedAt, playing) {
+        if (!playing) return@LaunchedEffect
+        while (true) {
+            remainingMs = (board.startedAt + board.durationMs - System.currentTimeMillis()).coerceAtLeast(0L)
+            if (remainingMs <= 0L) { onFinish(); break }
+            kotlinx.coroutines.delay(100)
+        }
+    }
+
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            Text("⏱ ${(remainingMs / 1000.0).let { "%.1f".format(it) }}s", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text("🎯 ${board.target}", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        }
         Text(
             text = "Score: ${board.score}",
             fontSize = 48.sp,
             fontWeight = FontWeight.Bold,
             color = androidx.compose.material3.MaterialTheme.colorScheme.primary
         )
-        
-        androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(top = 32.dp))
-        
+
+        androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(top = 24.dp))
+
         androidx.compose.material3.Surface(
-            onClick = onTap,
+            onClick = { if (playing) onTap() },
             shape = androidx.compose.foundation.shape.CircleShape,
             color = androidx.compose.material3.MaterialTheme.colorScheme.secondaryContainer,
             modifier = Modifier.size(200.dp)
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Text(
-                    text = "🧁",
-                    fontSize = 100.sp
-                )
+                Text(text = "🧁", fontSize = 100.sp)
             }
         }
-        
-        androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(top = 32.dp))
-        
+
+        androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(top = 24.dp))
+
         Text(
-            text = "Tap the cupcake as fast as you can!",
+            text = if (playing) "Tap the cupcake! Reach ${board.target} to win the coins."
+                   else if (board.score >= board.target) "You hit the target! 🎉"
+                   else "Time's up — you needed ${board.target}, got ${board.score}.",
             fontSize = 16.sp,
+            textAlign = TextAlign.Center,
             color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
         )
+
+        if (!playing) {
+            androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(top = 16.dp))
+            Button(onClick = onRestart) { Text("Play Again") }
+        }
     }
 }
 

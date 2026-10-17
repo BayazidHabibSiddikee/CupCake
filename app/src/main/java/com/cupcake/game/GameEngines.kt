@@ -420,8 +420,11 @@ object ReactionTimeEngine {
     }
 
     fun recordTap(board: Game.ReactionTimeBoard): Game.ReactionTimeBoard {
-        val reactionTime = System.currentTimeMillis() - board.startTime
-        val isValid = reactionTime > 100 // Prevent cheating
+        val now = System.currentTimeMillis()
+        // The signal only becomes valid at startTime. Before that, the round was jumped.
+        val tooEarly = now < board.startTime
+        val reactionTime = (now - board.startTime).coerceAtLeast(0L)
+        val isValid = !tooEarly && reactionTime >= 80L
         val round = Game.ReactionTimeBoard.ReactionRound(
             roundNumber = board.currentRound,
             reactionTimeMs = if (isValid) reactionTime else -1,
@@ -434,6 +437,9 @@ object ReactionTimeEngine {
             bestTime = newBest
         )
     }
+
+    /** Points at/above which a reaction-time run counts as a win (3 of 5 clean rounds). */
+    const val REACTION_WIN_ROUNDS = 3
 }
 
 object ConnectFourEngine {
