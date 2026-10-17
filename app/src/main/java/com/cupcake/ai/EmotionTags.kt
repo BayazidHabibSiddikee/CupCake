@@ -20,7 +20,7 @@ object EmotionTags {
 
     /** Canonical tags in prompt order. Keep in sync with the training data distribution. */
     val ALL: List<String> = listOf(
-        "happy", "sleepy", "surprised", "sad", "angry", "thinking", "confused"
+        "happy", "sleepy", "surprised", "sad", "angry", "thinking", "confused", "annoyed"
     )
 
     /** Canonical tags as a lookup set, for the scorer and any runtime validation. */

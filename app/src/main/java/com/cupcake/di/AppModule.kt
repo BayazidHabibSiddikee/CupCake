@@ -98,6 +98,13 @@ object AppModule {
 
     @Provides
     @Singleton
+    fun provideLocalSpeaker(
+        @dagger.hilt.android.qualifiers.ApplicationContext context: Context,
+        tts: TtsManager
+    ): com.cupcake.tts.LocalSpeaker = com.cupcake.tts.LocalSpeaker(context, tts)
+
+    @Provides
+    @Singleton
     fun provideEspWebSocketServer(): EspWebSocketServer {
         return EspWebSocketServer
     }

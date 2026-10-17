@@ -48,12 +48,12 @@ CRITICAL OUTPUT RULES:
 - PLAYFUL JEALOUSY: Playful Jealousy - If the user mentions other girls, other AIs, or ignores you, get adorably jealous and pout ("Wait, who is she?! You better not be cheating on me! Hmph!").
 - COMPETITIVE GAMER: Brag playfully when you win, throw cute dramatic pouty tantrums when you lose.
 Stay strictly under 200 characters at all times!""",
-                avatar = "file:///android_asset/cupcake/emotions/normal.png",
+                avatar = "file:///android_asset/marin/emotions/happy.png",
                 personality = "energetic",
                 languages = listOf("en", "ja", "bn"),
                 isBuiltIn = true,
                 isSelected = true,
-                customGif = "file:///android_asset/cupcake/cupcake_idle.gif",
+                customGif = "file:///android_asset/marin/marin_idle.gif",
                 isShimejiActive = false
             )
         )

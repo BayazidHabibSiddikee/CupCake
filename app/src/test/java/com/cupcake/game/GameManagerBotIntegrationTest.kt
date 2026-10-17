@@ -107,7 +107,7 @@ class GameManagerBotIntegrationTest {
     @Test
     fun `bot move comments are persisted to the character chat session`() = runBlocking {
         stubBotReply("Interesting move")
-        val characterId = CharacterManager.getCurrentCharacter()?.id ?: "marin_kitagawa"
+        val characterId = CharacterManager.getCurrentCharacter()?.id ?: "cupcake_kitagawa"
         val before = sessionStore.messages(characterId).value.size
 
         gameManager.startGame(Game.GameType.GUESS_NUMBER)
@@ -125,7 +125,7 @@ class GameManagerBotIntegrationTest {
     @Test
     fun `game ending reaction is persisted to the character chat session`() = runBlocking {
         stubBotReply("Rematch right now")
-        val characterId = CharacterManager.getCurrentCharacter()?.id ?: "marin_kitagawa"
+        val characterId = CharacterManager.getCurrentCharacter()?.id ?: "cupcake_kitagawa"
         val before = sessionStore.messages(characterId).value.size
 
         gameManager.startGame(Game.GameType.WORD_SCRAMBLE)

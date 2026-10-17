@@ -22,6 +22,7 @@ class GameViewModel @Inject constructor(
     private val energyManager: EnergyManager,
     private val pointsManager: PointsManager,
     private val ttsManager: TtsManager,
+    private val localSpeaker: com.cupcake.tts.LocalSpeaker,
     private val espServer: EspWebSocketServer,
     private val adManager: AdManager
 ) : ViewModel() {
@@ -85,6 +86,7 @@ class GameViewModel @Inject constructor(
                 refreshEscalation()
 
                 viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                    localSpeaker.speak(reaction.text) { com.cupcake.ai.EmotionAssets.speechText(it) }
                     ttsManager.speakStreaming(reaction.text) { audioChunk ->
                         espServer.sendAudio(audioChunk)
                     }

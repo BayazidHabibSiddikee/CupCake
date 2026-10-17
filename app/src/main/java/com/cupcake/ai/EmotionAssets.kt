@@ -20,57 +20,64 @@ object EmotionAssets {
     const val URL_PREFIX = "file:///android_asset/$DIR"
     const val HTTP_PREFIX = "/assets/$DIR"
 
-    /** Canonical PNG stems present in `assets/marin/emotions/`. */
+    /** Canonical PNG stems present in `assets/marin/emotions/` (from the sprite sheet). */
     val ALL_STEMS: List<String> = listOf(
-        "normal", "laugh", "lovely", "flirty", "excited",
-        "confident", "thinking", "shock", "sad", "angry", "eating"
+        "happy", "sleepy", "surprised", "sad", "angry", "thinking", "confused", "annoyed"
     )
 
     private val emotionToStem = mapOf(
-        EmotionClassifier.Emotion.JOY to "laugh",
-        EmotionClassifier.Emotion.SURPRISE to "shock",
-        EmotionClassifier.Emotion.AFFECTION to "lovely",
-        EmotionClassifier.Emotion.JEALOUSY to "flirty",
+        EmotionClassifier.Emotion.JOY to "happy",
+        EmotionClassifier.Emotion.SURPRISE to "surprised",
+        EmotionClassifier.Emotion.AFFECTION to "happy",
+        EmotionClassifier.Emotion.JEALOUSY to "annoyed",
         EmotionClassifier.Emotion.THINKING to "thinking",
         EmotionClassifier.Emotion.SADNESS to "sad",
         EmotionClassifier.Emotion.ANGER to "angry",
-        EmotionClassifier.Emotion.NEUTRAL to "normal"
+        EmotionClassifier.Emotion.NEUTRAL to "happy"
     )
 
     /** Bracket tags emitted by the local model -> asset stem. */
     private val tagToStem = mapOf(
-        "sleepy" to "normal",
-        "confused" to "confident",
-        "surprised" to "shock",
-        "shock" to "shock",
-        "happy" to "laugh",
-        "laugh" to "laugh",
+        "sleepy" to "sleepy",
+        "confused" to "confused",
+        "surprised" to "surprised",
+        "shock" to "surprised",
+        "happy" to "happy",
+        "laugh" to "happy",
         "sad" to "sad",
         "angry" to "angry",
+        "annoyed" to "annoyed",
         "thinking" to "thinking",
-        "excited" to "excited",
-        "confident" to "confident",
-        "flirty" to "flirty",
-        "lovely" to "lovely",
-        "love" to "lovely",
-        "hungry" to "eating",
-        "eating" to "eating",
-        "pout" to "flirty"
+        "excited" to "surprised",
+        "confident" to "annoyed",
+        "flirty" to "annoyed",
+        "lovely" to "happy",
+        "love" to "happy",
+        "hungry" to "happy",
+        "eating" to "happy",
+        "pout" to "annoyed",
+        "normal" to "happy"
     )
 
     /** Asset stem -> ESP32 face expression (see EspWebSocketServer.FaceExpression). */
     private val stemToEspFace = mapOf(
+        "happy" to "happy",
+        "sleepy" to "sleepy",
+        "surprised" to "surprised",
+        "sad" to "sad",
+        "angry" to "angry",
+        "thinking" to "thinking",
+        "confused" to "confused",
+        "annoyed" to "annoyed",
+        // Legacy stems (older PNGs still shipped) keep mapping to nothing new.
         "normal" to "neutral",
         "confident" to "neutral",
         "eating" to "neutral",
         "laugh" to "happy",
-        "excited" to "excited",
+        "excited" to "surprised",
         "lovely" to "heart_eyes",
         "flirty" to "wink",
-        "angry" to "angry",
-        "sad" to "sad",
-        "shock" to "excited",
-        "thinking" to "thinking"
+        "shock" to "surprised"
     )
 
     private val tagRegex = Regex("\\[([a-zA-Z]+)\\]")
@@ -78,6 +85,13 @@ object EmotionAssets {
     /** First bracketed emotion tag in [text], lowercased, if any. */
     fun tagOf(text: String): String? =
         tagRegex.find(text)?.groupValues?.getOrNull(1)?.lowercase()
+
+    /** Text suitable for speaking: drops [emotion] tags and *stage directions*. */
+    fun speechText(text: String): String =
+        text.replace(Regex("\\s*\\[[a-zA-Z]+]"), "")
+            .replace(Regex("\\s*\\*[^*]{0,120}\\*"), "")
+            .replace(Regex("\\s+"), " ")
+            .trim()
 
     fun stemForEmotion(emotion: EmotionClassifier.Emotion): String =
         emotionToStem[emotion] ?: "normal"

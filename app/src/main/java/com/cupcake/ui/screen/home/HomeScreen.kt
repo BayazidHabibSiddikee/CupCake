@@ -96,9 +96,9 @@ fun HomeScreen(
             name = "CupCake Kitagawa",
             description = "Energetic anime & cosplay companion",
             systemPrompt = "You are CupCake Kitagawa!",
-            avatar = "file:///android_asset/cupcake/emotions/normal.png",
+            avatar = "file:///android_asset/marin/emotions/normal.png",
             personality = "energetic",
-            customGif = "file:///android_asset/cupcake/cupcake_idle.gif"
+            customGif = "file:///android_asset/marin/marin_idle.gif"
         )
 
     val (currentXp, nextXp) = viewModel.getLevelProgress()

@@ -376,8 +376,10 @@ class ShimejiPetService : Service() {
         const val EXTRA_TEXT = "extra_text"
         const val EXTRA_EMOTION = "extra_emotion"
         const val EXTRA_FACE_ASSET = "extra_face_asset"
+        const val KEY_RUNNING = "overlay_running"
 
         fun start(context: Context, avatar: String? = null, gif: String? = null, name: String? = null) {
+            prefs(context).edit().putBoolean(KEY_RUNNING, true).apply()
             val intent = Intent(context, ShimejiPetService::class.java).apply {
                 putExtra(EXTRA_AVATAR, avatar)
                 putExtra(EXTRA_GIF, gif)
@@ -391,11 +393,25 @@ class ShimejiPetService : Service() {
         }
 
         fun stop(context: Context) {
+            prefs(context).edit().putBoolean(KEY_RUNNING, false).apply()
             val intent = Intent(context, ShimejiPetService::class.java).apply {
                 action = ACTION_STOP
             }
             context.startService(intent)
         }
+
+        /**
+         * Restarts the overlay pet if it was enabled last session, so the companion
+         * keeps its foreground-service process slot (and the cached model with it).
+         */
+        fun restoreIfRunning(context: Context) {
+            if (prefs(context).getBoolean(KEY_RUNNING, false)) {
+                start(context)
+            }
+        }
+
+        private fun prefs(context: Context) =
+            context.getSharedPreferences("cupcake_companion", Context.MODE_PRIVATE)
 
         fun showSpeech(context: Context, text: String, emotionAsset: String? = null) {
             val intent = Intent(context, ShimejiPetService::class.java).apply {

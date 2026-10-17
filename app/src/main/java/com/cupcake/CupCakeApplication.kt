@@ -24,6 +24,10 @@ class CupCakeApplication : Application(), ImageLoaderFactory {
         // Initialize character manager
         CharacterManager.initialize(filesDir)
 
+        // Bring back the floating companion if it was running before the process
+        // died — the foreground service keeps the process (and cached model) alive.
+        com.cupcake.service.ShimejiPetService.restoreIfRunning(this)
+
         // Initialize Energy Manager (loads saved state)
         EnergyManager(this)
 

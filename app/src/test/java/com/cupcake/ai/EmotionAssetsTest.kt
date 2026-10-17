@@ -11,32 +11,32 @@ class EmotionAssetsTest {
     @Test
     fun `bracket tag takes priority over lexical detection`() {
         val asset = EmotionAssets.assetForText("[happy] *bounces* you're so cute!")
-        assertEquals("$base/laugh.png", asset)
+        assertEquals("$base/happy.png", asset)
     }
 
     @Test
-    fun `sleepy tag maps to normal art`() {
+    fun `sleepy tag maps to sleepy art`() {
         val asset = EmotionAssets.assetForText("[sleepy] *yawns* good morning")
-        assertEquals("$base/normal.png", asset)
+        assertEquals("$base/sleepy.png", asset)
     }
 
     @Test
-    fun `lexical affection maps to lovely art`() {
+    fun `lexical affection maps to happy art`() {
         val asset = EmotionAssets.assetForText("*blushes and looks away* i love you so much")
-        assertEquals("$base/lovely.png", asset)
+        assertEquals("$base/happy.png", asset)
     }
 
     @Test
-    fun `neutral text maps to normal art`() {
-        assertEquals("$base/normal.png", EmotionAssets.assetForText("the weather is okay today"))
+    fun `neutral text maps to happy art`() {
+        assertEquals("$base/happy.png", EmotionAssets.assetForText("the weather is okay today"))
     }
 
     @Test
     fun `emotion enum maps to expected stems`() {
         assertEquals("$base/angry.png", EmotionAssets.assetFor(EmotionClassifier.Emotion.ANGER))
         assertEquals("$base/sad.png", EmotionAssets.assetFor(EmotionClassifier.Emotion.SADNESS))
-        assertEquals("$base/flirty.png", EmotionAssets.assetFor(EmotionClassifier.Emotion.JEALOUSY))
-        assertEquals("$base/shock.png", EmotionAssets.assetFor(EmotionClassifier.Emotion.SURPRISE))
+        assertEquals("$base/annoyed.png", EmotionAssets.assetFor(EmotionClassifier.Emotion.JEALOUSY))
+        assertEquals("$base/surprised.png", EmotionAssets.assetFor(EmotionClassifier.Emotion.SURPRISE))
     }
 
     @Test
@@ -47,9 +47,9 @@ class EmotionAssetsTest {
 
     @Test
     fun `stem is the shared vocabulary for app and esp`() {
-        assertEquals("laugh", EmotionAssets.stemForText("[happy] *bounces* hi"))
-        assertEquals("happy", EmotionAssets.espFaceForStem("laugh"))
-        assertEquals("/assets/marin/emotions/laugh.png", EmotionAssets.httpPathForStem("laugh"))
+        assertEquals("happy", EmotionAssets.stemForText("[happy] *bounces* hi"))
+        assertEquals("happy", EmotionAssets.espFaceForStem("happy"))
+        assertEquals("/assets/marin/emotions/happy.png", EmotionAssets.httpPathForStem("happy"))
     }
 
     @Test

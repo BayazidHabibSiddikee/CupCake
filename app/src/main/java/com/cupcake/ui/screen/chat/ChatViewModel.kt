@@ -48,6 +48,7 @@ class ChatViewModel @Inject constructor(
     private val gameManager: GameManager,
     private val espServer: EspWebSocketServer,
     private val ttsManager: TtsManager,
+    private val localSpeaker: com.cupcake.tts.LocalSpeaker,
     private val energyManager: EnergyManager,
     private val getApiProvidersUseCase: GetApiProvidersUseCase,
     private val modelRepository: ModelRepository,
@@ -570,8 +571,10 @@ class ChatViewModel @Inject constructor(
 
     private fun sendToEspForTts(text: String) {
         espServer.sendCommand("speak", mapOf("text" to text))
-        
-        // Also stream audio via WebSocket binary frames
+
+        // Voice-over: speak locally (over background music) and forward to any
+        // connected ESP speaker at the same time.
+        localSpeaker.speak(text) { com.cupcake.ai.EmotionAssets.speechText(it) }
         viewModelScope.launch(Dispatchers.IO) {
             ttsManager.speakStreaming(text) { audioChunk ->
                 espServer.sendAudio(audioChunk)

@@ -19,6 +19,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -217,6 +218,43 @@ fun ChatConfigSheet(
                         value = maxTokens.toFloat(),
                         onValueChange = { maxTokens = (it / 32f).roundToInt() * 32 },
                         valueRange = 128f..1024f
+                    )
+                }
+            }
+
+            // ---- Voice -------------------------------------------------------
+            val voiceContext = androidx.compose.ui.platform.LocalContext.current
+            var voiceEnabled by remember {
+                mutableStateOf(com.cupcake.tts.VoiceSettings.isEnabled(voiceContext))
+            }
+            SheetHeader("🗣️", "Voice-over")
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text("Speak every reply", fontWeight = FontWeight.Medium)
+                        Text(
+                            "Always on — mixes over background music",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = voiceEnabled,
+                        onCheckedChange = {
+                            voiceEnabled = it
+                            com.cupcake.tts.VoiceSettings.setEnabled(voiceContext, it)
+                        }
                     )
                 }
             }
