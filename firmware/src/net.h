@@ -44,6 +44,8 @@ public:
 
 private:
     void updateBeacon();
+    void ensureUdp();
+    bool udpReady() const;
     void connectWs();
     void onWsEvent(WStype_t type, uint8_t* payload, size_t len);
     void handleEnvelope(const String& text);

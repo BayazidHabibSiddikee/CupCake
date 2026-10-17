@@ -12,8 +12,19 @@ void Net::begin() {
     phoneIp_ = prefs.getString("phone_ip", "");
     prefs.end();
     if (ssid.length()) wifiConnect(ssid, pass);
-    udp_.begin(BEACON_PORT);
+    // NOTE: udp_.begin() only AFTER the WiFi/lwIP stack is up — opening it
+    // beforehand crashes lwIP (null sys-mutex assert).
 }
+
+/** One-shot: bind the UDP beacon socket once WiFi/lwIP is ready. */
+static bool udpUp_ = false;
+
+void Net::ensureUdp() {
+    if (udpUp_ || WiFi.status() != WL_CONNECTED) return;
+    if (udp_.begin(BEACON_PORT)) udpUp_ = true;
+}
+
+bool Net::udpReady() const { return udpUp_; }
 
 void Net::wifiConnect(const String& ssid, const String& password) {
     prefs.begin("cupcake_net", false);
@@ -73,8 +84,10 @@ void Net::tick() {
 }
 
 void Net::updateBeacon() {
+    ensureUdp();
     if (millis() - lastBeaconSend_ < 300) return;
     lastBeaconSend_ = millis();
+    if (!udpReady()) return;
 
     int size = udp_.parsePacket();
     if (size <= 0) return;

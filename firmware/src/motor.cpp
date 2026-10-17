@@ -4,6 +4,8 @@
 void Motors::begin() {
     ESP32PWM::allocateTimer(0);
     ESP32PWM::allocateTimer(1);
+    ESP32PWM::allocateTimer(2);
+    ESP32PWM::allocateTimer(3);
     base_.setPeriodHertz(50);
     base_.attach(PIN_BASE, 500, 2400);
     base_.write(BASE_HOME);
