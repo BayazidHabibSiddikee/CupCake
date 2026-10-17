@@ -63,6 +63,13 @@ fun ChatScreen(
     val modelConfig by viewModel.modelConfig.collectAsStateWithLifecycle()
     val systemPrompt by viewModel.systemPrompt.collectAsStateWithLifecycle()
     val providers by viewModel.providers.collectAsStateWithLifecycle()
+    val liveEmotionStem by viewModel.liveEmotionStem.collectAsStateWithLifecycle()
+    // The header 2D model is the sprite-sheet face: it re-renders with every
+    // emotion the bot expresses, replacing both the old static avatar and the
+    // removed VRM 3D model.
+    val headerAvatar = liveEmotionStem?.let {
+        com.cupcake.ai.EmotionAssets.assetForStem(it)
+    } ?: currentCharacter?.avatar ?: "🤖"
     val isModelLoading = modelLoadState is ChatViewModel.ModelLoadState.Loading
 
     var scrollToBottom by remember { mutableStateOf(false) }
@@ -78,7 +85,7 @@ fun ChatScreen(
             // Character header
             CharacterHeader(
                 characterName = currentCharacter?.name ?: "Companion",
-                characterAvatar = currentCharacter?.avatar ?: "🤖",
+                characterAvatar = headerAvatar,
                 isFaceActive = showFace,
                 onToggleFace = { showFace = !showFace },
                 onConfigClick = { showConfigSheet = true },

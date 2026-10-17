@@ -13,12 +13,19 @@ Motors motors;
 BleLink ble;
 Net net;
 
-// Battery sense: battery+ -> 2x 100k divider -> GPIO2 (ADC1_CH2).
+// Battery sense: battery+ -> 2x 100k divider -> battery PIN.
+// Plain ESP32: GPIO2 is ADC2 (unusable while WiFi is on) — use ADC1-only
+// input pin GPIO34. ESP32-S3 keeps the documented GPIO2.
 // 3.0-4.2 V maps to 1.5-2.1 V, safe under the 3.3 V ADC reference.
+#if defined(CONFIG_IDF_TARGET_ESP32S3)
 static constexpr int PIN_BATTERY = 2;
+#else
+static constexpr int PIN_BATTERY = 34;  // input-only, ADC1_CH6
+#endif
 static constexpr float ADC_SCALE = 2.0f;      // divider ratio
 static constexpr float BATTERY_FULL = 4.2f;
 static constexpr float BATTERY_EMPTY = 3.3f;
+static uint32_t lastBatterySend_ = 0;
 
 static float batteryVoltage() {
     uint32_t acc = 0;

@@ -15,7 +15,11 @@ static void txNotify(const uint8_t* data, size_t len) {
 }
 
 static void txNotifyText(const char* text) {
+#if defined(CONFIG_IDF_TARGET_ESP32S3)
     g_tx->setValue(const_cast<uint8_t*>((const uint8_t*)text));
+#else
+    g_tx->setValue(String(text));
+#endif
     g_tx->notify();
 }
 
@@ -29,7 +33,12 @@ class ServerCallbacks : public BLEServerCallbacks {
 
 class RxCallbacks : public BLECharacteristicCallbacks {
     void onWrite(BLECharacteristic* c) override {
+#if defined(CONFIG_IDF_TARGET_ESP32S3)
         std::string value = c->getValue();
+#else
+        // Plain ESP32 BLE lib returns Arduino String here.
+        std::string value = std::string(c->getValue().c_str());
+#endif
         if (value.empty()) return;
 
         // Binary frames (ProtocolDecoder types): ping 0x04 -> pong 0x84,

@@ -51,7 +51,7 @@ class TtsManager(private val context: Context) {
                     isInitialized = true
                     loadVoices()
                     setLanguage(Locale.ENGLISH)
-                    
+                    applyChildishRobotVoice()
                     tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                         override fun onStart(utteranceId: String) {
                             this@TtsManager.callback?.onStart(utteranceId)
@@ -92,6 +92,15 @@ class TtsManager(private val context: Context) {
 
     fun setLanguage(locale: Locale): Int {
         return tts?.setLanguage(locale) ?: TextToSpeech.LANG_MISSING_DATA
+    }
+
+    /**
+     * The companion's signature tone: high-pitched childish + robotic beeps.
+     * Baked in once at init so every synthesis (file + stream) gets it.
+     */
+    fun applyChildishRobotVoice() {
+        tts?.setPitch(1.65f)   // high pitch — child-like
+        tts?.setSpeechRate(1.15f) // slightly faster — snappy, robotic energy
     }
 
     fun autoDetectLanguage(text: String): Locale {

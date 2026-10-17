@@ -59,10 +59,18 @@ void Net::send(const String& type, const String& payloadJson) {
 
 void Net::sendStatus() {
     JsonDocument d;
-    send("status", status(d).as<String>());
+    JsonObject o = status(d);
+    String out;
+    serializeJson(o, out);
+    send("status", out);
 }
 
 // ----------------------- UDP phone discovery --------------------------------
+
+void Net::tick() {
+    updateBeacon();
+    ws_.loop();
+}
 
 void Net::updateBeacon() {
     if (millis() - lastBeaconSend_ < 300) return;

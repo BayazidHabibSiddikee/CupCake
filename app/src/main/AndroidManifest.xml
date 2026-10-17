@@ -71,6 +71,20 @@
                 android:value="Floating desktop companion overlay" />
         </service>
 
+        <!-- CupCake companion keyboard (IME) — watches your draft from ANY app -->
+        <service
+            android:name=".ime.CompanionKeyboardService"
+            android:exported="true"
+            android:label="@string/ime_label"
+            android:permission="android.permission.BIND_INPUT_METHOD">
+            <intent-filter>
+                <action android:name="android.view.InputMethod" />
+            </intent-filter>
+            <meta-data
+                android:name="android.view.im"
+                android:resource="@xml/method" />
+        </service>
+
         <!-- FileProvider for exporting and sharing Character Cards -->
         <provider
             android:name="androidx.core.content.FileProvider"

@@ -27,7 +27,9 @@ public:
     void tick();
 
 private:
-    U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2_{};
+    // Heap-allocated: U8g2 needs constructor args, so a direct member breaks
+    // default construction in the global Face instance.
+    U8G2_SSD1306_128X64_NONAME_F_HW_I2C* u8g2_ = nullptr;
     String expr_ = "neutral";
     uint32_t lastFrame_ = 0;
     uint32_t blinkAt_ = 3000;

@@ -30,7 +30,7 @@ static void blockyArc(int cx, int cy, int halfW, int ry, bool up) {
     for (int dx = -halfW; dx <= halfW; dx++) {
         int dy = (int)(ry * sqrtf(max(0.f, 1.f - (dx * dx) / float(halfW * halfW))));
         if (up) dy = -dy;
-        g->fillRect(cx + dx, cy + dy, 2, 2);
+        g->drawBox(cx + dx, cy + dy, 2, 2);
     }
 }
 
@@ -48,20 +48,20 @@ static void faceHappy() {
     g->clearBuffer();
     blockyArc(42, 22, 16, 9, true);
     blockyArc(86, 22, 16, 9, true);
-    g->fillRect(34, 24, 5, 2);   // blush specks
-    g->fillRect(89, 24, 5, 2);
+    g->drawBox(34, 24, 5, 2);   // blush specks
+    g->drawBox(89, 24, 5, 2);
     blockyArc(64, 38, 10, 6, true);   // w-shaped smile
-    g->fillRect(63, 44, 4, 2);
+    g->drawBox(63, 44, 4, 2);
 }
 
 static void faceSleepy() {
     g->clearBuffer();
-    g->fillRect(28, 22, 26, 4);
-    g->fillRect(74, 22, 26, 4);
-    g->fillRect(32, 37, 12, 3);
-    g->fillRect(52, 25, 2, 6);
-    g->fillRect(52, 31, 12, 3);
-    g->fillRect(64, 43, 6, 3);
+    g->drawBox(28, 22, 26, 4);
+    g->drawBox(74, 22, 26, 4);
+    g->drawBox(32, 37, 12, 3);
+    g->drawBox(52, 25, 2, 6);
+    g->drawBox(52, 31, 12, 3);
+    g->drawBox(64, 43, 6, 3);
     g->setFont(u8g2_font_6x10_tf);
 }
 
@@ -74,12 +74,12 @@ static void faceSurprised() {
 
 static void faceSad() {
     g->clearBuffer();
-    g->fillRect(30, 20, 14, 4);
-    g->fillRect(26, 24, 6, 6);
-    g->fillRect(84, 20, 14, 4);
-    g->fillRect(94, 24, 6, 6);
-    g->fillRect(32, 30, 8, 4);   // tears
-    g->fillRect(94, 30, 8, 4);
+    g->drawBox(30, 20, 14, 4);
+    g->drawBox(26, 24, 6, 6);
+    g->drawBox(84, 20, 14, 4);
+    g->drawBox(94, 24, 6, 6);
+    g->drawBox(32, 30, 8, 4);   // tears
+    g->drawBox(94, 30, 8, 4);
     blockyArc(64, 46, 12, 6, false);  // frown
 }
 
@@ -94,16 +94,16 @@ static void faceAngry() {
     g->drawLine(104, 26, 84, 36);
     g->drawLine(84, 36, 90, 30);
     blockyArc(64, 50, 10, 5, false);
-    g->fillRect(94, 8, 3, 3);
-    g->fillRect(99, 5, 3, 3);
-    g->fillRect(98, 11, 3, 3);
+    g->drawBox(94, 8, 3, 3);
+    g->drawBox(99, 5, 3, 3);
+    g->drawBox(98, 11, 3, 3);
 }
 
 static void faceRage() {
     faceAngry();
     // Extra "steam" puffs + tighter brows
-    g->fillRect(30, 6, 4, 4);
-    g->fillRect(96, 6, 4, 4);
+    g->drawBox(30, 6, 4, 4);
+    g->drawBox(96, 6, 4, 4);
 }
 
 static void faceThinking() {
@@ -112,8 +112,8 @@ static void faceThinking() {
     g->drawDisc(38, 18, 3);            // pupils top-left
     filledOval(88, 20, 9, 10, true);
     g->drawDisc(86, 18, 3);
-    g->fillRect(60, 46, 14, 3);
-    g->fillRect(74, 43, 4, 3);
+    g->drawBox(60, 46, 14, 3);
+    g->drawBox(74, 43, 4, 3);
 }
 
 static void faceThinkingDots(int phase) {
@@ -121,7 +121,7 @@ static void faceThinkingDots(int phase) {
     static const int ys[] = {22, 14, 8};
     for (int i = 0; i < 3; i++) {
         int r = (phase + i) % 3;
-        g->fillRect(xs[i] - r, ys[i] - r, r * 2 + 2, r * 2 + 2);
+        g->drawBox(xs[i] - r, ys[i] - r, r * 2 + 2, r * 2 + 2);
     }
 }
 
@@ -129,12 +129,12 @@ static void faceConfused() {
     g->clearBuffer();
     filledOval(42, 26, 9, 9, true);
     g->setDrawColor(0);
-    g->fillRect(42, 23, 5, 5);
+    g->drawBox(42, 23, 5, 5);
     g->setDrawColor(1);
     g->drawDisc(44, 25, 2);
     filledOval(88, 26, 9, 9, true);
     g->setDrawColor(0);
-    g->fillRect(88, 28, 5, 5);
+    g->drawBox(88, 28, 5, 5);
     g->setDrawColor(1);
     g->drawDisc(92, 25, 2);
     g->setFont(u8g2_font_8x13B_tf);
@@ -144,10 +144,10 @@ static void faceConfused() {
 
 static void faceAnnoyed() {
     g->clearBuffer();
-    g->fillRect(26, 24, 24, 3);
-    g->fillRect(78, 22, 24, 3);
-    g->fillRect(56, 42, 14, 3);
-    g->fillRect(72, 38, 4, 3);
+    g->drawBox(26, 24, 24, 3);
+    g->drawBox(78, 22, 24, 3);
+    g->drawBox(56, 42, 14, 3);
+    g->drawBox(72, 38, 4, 3);
 }
 
 static void faceWink() {
@@ -155,7 +155,7 @@ static void faceWink() {
     filledOval(42, 24, 8, 10, true);
     g->drawDisc(42, 24, 3);
     blockyArc(86, 24, 10, 6, true);
-    g->fillRect(56, 46, 16, 3);
+    g->drawBox(56, 46, 16, 3);
 }
 
 static void faceHeartEyes() {
@@ -180,7 +180,7 @@ static void faceNeutral() {
     filledOval(86, 24, 8, 10, true);
     g->drawDisc(42, 25, 3);
     g->drawDisc(86, 25, 3);
-    g->fillRect(56, 46, 16, 3);
+    g->drawBox(56, 46, 16, 3);
 }
 
 // ---------------------------------------------------------------------------
@@ -188,9 +188,10 @@ static void faceNeutral() {
 // ---------------------------------------------------------------------------
 
 void Face::begin() {
-    g = &u8g2_;
-    u8g2_.begin();
-    u8g2_.clear();
+    if (!u8g2_) u8g2_ = new U8G2_SSD1306_128X64_NONAME_F_HW_I2C(U8G2_R0, U8X8_PIN_NONE);
+    g = u8g2_;
+    g->begin();
+    g->clear();
     render(0);
 }
 
@@ -237,11 +238,11 @@ void Face::render(uint32_t now) {
     int idlePhase = (now / 400) % 8;
     drawFace(expr_, idlePhase);
     if (blinking_) renderBlinkOverlay();
-    u8g2_.sendBuffer();
+    g->sendBuffer();
 }
 
 /** Overlay closed eyes over the current frame for ~140 ms. */
 void Face::renderBlinkOverlay() {
-    g->fillRect(32, 22, 22, 3);
-    g->fillRect(74, 22, 22, 3);
+    g->drawBox(32, 22, 22, 3);
+    g->drawBox(74, 22, 22, 3);
 }

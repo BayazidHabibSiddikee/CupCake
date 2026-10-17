@@ -13,9 +13,17 @@
  */
 class Motors {
 public:
+    // GPIO6=GPIO11 are flash pins on plain ESP32, so the reserved neck servo
+    // moves to GPIO13 there; S3 builds keep the original layout.
+#if defined(CONFIG_IDF_TARGET_ESP32S3)
     static constexpr int PIN_BASE = 4;
     static constexpr int PIN_SHOULDER = 5;
     static constexpr int PIN_NECK = 6;   // not installed; ignored
+#else
+    static constexpr int PIN_BASE = 4;
+    static constexpr int PIN_SHOULDER = 5;
+    static constexpr int PIN_NECK = 13;  // not installed; ignored
+#endif
 
     // Mechanical limits (tune after first power-on!)
     static constexpr int BASE_HOME = 90;
