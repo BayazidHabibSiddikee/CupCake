@@ -1413,6 +1413,30 @@ class GameManager(
     /** Human-readable threat label, e.g. "ONE MOVE FROM WINNING". */
     fun getClosenessLabel(): String = jealousyTracker.getClosenessLabel()
 
+    /** Read-only snapshot of the bot's live competitive state, for the stats screen. */
+    fun getBotStatus(): BotStatus = BotStatus(
+        botWins = jealousyTracker.getBotWins(),
+        playerWins = jealousyTracker.getPlayerWins(),
+        totalGames = jealousyTracker.getTotalGames(),
+        jealousy = jealousyTracker.getJealousyLevel(),
+        anger = jealousyTracker.getAngerLevel(),
+        threat = jealousyTracker.getThreatLevel(),
+        mood = jealousyTracker.getBotMood().name,
+        difficulty = jealousyTracker.getAdaptiveDifficulty(difficulty).name
+    )
+
+    /** Bot side of the head-to-head record, shown next to the human's stats. */
+    data class BotStatus(
+        val botWins: Int,
+        val playerWins: Int,
+        val totalGames: Int,
+        val jealousy: Double,
+        val anger: Double,
+        val threat: Double,
+        val mood: String,
+        val difficulty: String
+    )
+
     /** Recomputes the live board threat and feeds it to the bot's mood model. */
     private fun refreshThreat() {
         jealousyTracker.reportBoardThreat(boardThreat())

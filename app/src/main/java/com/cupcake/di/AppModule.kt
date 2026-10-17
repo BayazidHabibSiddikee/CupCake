@@ -129,8 +129,11 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun providePointsViewModel(pointsManager: PointsManager): PointsViewModel {
-        return PointsViewModel(pointsManager)
+    fun providePointsViewModel(
+        pointsManager: PointsManager,
+        gameManager: GameManager
+    ): PointsViewModel {
+        return PointsViewModel(pointsManager, gameManager)
     }
 
     @Provides

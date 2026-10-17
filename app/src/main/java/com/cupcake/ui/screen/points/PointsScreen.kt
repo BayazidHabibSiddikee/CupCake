@@ -22,11 +22,13 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -71,6 +73,9 @@ fun PointsScreen(
     val totalWins by viewModel.totalWins.collectAsStateWithLifecycle()
     val gameStats by viewModel.gameStats.collectAsStateWithLifecycle()
     val achievements by viewModel.achievements.collectAsStateWithLifecycle()
+    val affection by viewModel.affection.collectAsStateWithLifecycle()
+    val currentDemand by viewModel.currentDemand.collectAsStateWithLifecycle()
+    val botStatus = viewModel.botStatus()
     val (currentXp, nextXp) = viewModel.getLevelProgress()
 
     var selectedTab by remember { mutableIntStateOf(0) }
@@ -141,7 +146,12 @@ fun PointsScreen(
                         currentXp = currentXp,
                         nextXp = nextXp,
                         totalGamesPlayed = totalGamesPlayed,
-                        totalWins = totalWins
+                        totalWins = totalWins,
+                        botStatus = botStatus,
+                        affection = affection,
+                        demandTitle = currentDemand?.title,
+                        demandCost = currentDemand?.cost,
+                        onFulfill = { viewModel.fulfillDemand() }
                     )
                     1 -> AchievementsTab(achievements = achievements)
                     else -> StatsTab(
@@ -163,7 +173,12 @@ fun ProfileTab(
     currentXp: Long,
     nextXp: Long,
     totalGamesPlayed: Int,
-    totalWins: Int
+    totalWins: Int,
+    botStatus: com.cupcake.game.GameManager.BotStatus,
+    affection: Int,
+    demandTitle: String?,
+    demandCost: Long?,
+    onFulfill: () -> Unit
 ) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         CuteCard {
@@ -255,6 +270,68 @@ fun ProfileTab(
                 value = if (totalGamesPlayed > 0) "${((totalWins.toFloat() / totalGamesPlayed) * 100).toInt()}%" else "0%",
                 color = MaterialTheme.colorScheme.tertiary
             )
+        }
+
+        // Marin vs You
+        CuteCard {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text("💢 Marin vs You", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    Text("Marin: ${botStatus.botWins} wins", fontWeight = FontWeight.SemiBold)
+                    Text("You: ${botStatus.playerWins} wins", fontWeight = FontWeight.SemiBold)
+                }
+                val headToHead = botStatus.botWins + botStatus.playerWins
+                Text(
+                    text = if (headToHead == 0)
+                        "No games settled yet — challenge her!"
+                    else if (botStatus.playerWins > botStatus.botWins)
+                        "You're ahead by ${botStatus.playerWins - botStatus.botWins}. She is NOT happy about it."
+                    else if (botStatus.botWins > botStatus.playerWins)
+                        "Marin leads by ${botStatus.botWins - botStatus.playerWins}. Smug Marin noises."
+                    else
+                        "Dead even. She wants a rematch right now.",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    "Mood: ${botStatus.mood.lowercase().replaceFirstChar { it.uppercase() }} • Skill: ${botStatus.difficulty.lowercase()}",
+                    fontSize = 13.sp
+                )
+                Text("Anger ${(botStatus.anger * 100).toInt()}% • Jealousy ${(botStatus.jealousy * 100).toInt()}%", fontSize = 12.sp)
+                LinearProgressIndicator(
+                    progress = { botStatus.anger.toFloat().coerceIn(0f, 1f) },
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+        }
+
+        // Hunger / cravings
+        CuteCard {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text("🍰 Hunger & Cravings", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Text("Affection: $affection", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (demandTitle != null && demandCost != null) {
+                    Text("$demandTitle — $demandCost coins", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    Button(
+                        onClick = onFulfill,
+                        enabled = points >= demandCost
+                    ) {
+                        Text(if (points >= demandCost) "Feed her ($demandCost)" else "Need ${demandCost - points} more coins")
+                    }
+                } else {
+                    Text("She's content for now. Win games to earn coins before she gets hungry.", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
         }
 
         // Level Rewards Preview
