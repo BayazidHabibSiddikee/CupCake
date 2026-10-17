@@ -40,7 +40,7 @@ class RxCallbacks : public BLECharacteristicCallbacks {
             txNotify(pong, 5);
             return;
         }
-        if (value[0] == '{') pending_ = value;  // parsed in tick()
+        if (value[0] == '{') g_pending = value;  // parsed in tick()
     }
 };
 
