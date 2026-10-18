@@ -35,7 +35,8 @@ fun CharacterAvatar(
             avatar.endsWith(".webp", ignoreCase = true)
 
     val imageModel = when {
-        avatar == "companion_hero" -> "file:///android_asset/companion_hero.jpg"
+        avatar == "companion_hero" || avatar.isBlank() ->
+            "file:///android_asset/cupcake/emotions/normal.png"
         avatar.startsWith("/") -> "file://$avatar"
         else -> avatar
     }
