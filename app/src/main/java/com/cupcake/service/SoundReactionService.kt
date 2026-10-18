@@ -259,12 +259,15 @@ class SoundReactionService : Service() {
             .onFailure { Log.w(TAG, "voice reaction failed: ${it.message}") }
     }
 
-    /** Lazily built local TTS voice for spoken reactions. */
+    /**
+     * The app-wide voice player from Hilt (same TTS singleton the chat/keyboard use).
+     * Voice toggle gating lives inside LocalSpeaker.
+     */
     private val speaker: com.cupcake.tts.LocalSpeaker by lazy {
-        val tts = com.cupcake.tts.TtsManager(applicationContext).apply {
-            if (!initialize()) Log.w(TAG, "system TTS unavailable — reactions stay silent")
-        }
-        com.cupcake.tts.LocalSpeaker(applicationContext, tts)
+        dagger.hilt.android.EntryPointAccessors.fromApplication(
+            applicationContext,
+            com.cupcake.ime.CompanionKeyboardService.CompanionKbEntryPoint::class.java
+        ).localSpeaker()
     }
 
     private fun ensureChannel() {

@@ -391,8 +391,9 @@ class ShimejiPetService : Service() {
     }
 
     /**
-     * Swaps the pet face to [stem] for a few seconds, then restores the base look.
-     * Reflects the companion's live emotion without opening a speech bubble.
+     * Adopts [stemOrAsset] as the pet's persistent face. Pushed by the chat/game
+     * whenever the companion's mood changes, so the floating overlay stays in sync
+     * with the in-app emotion indicator instead of flashing and reverting.
      */
     private fun setEmotionFace(stemOrAsset: String) {
         val rig = petRig ?: return
@@ -400,9 +401,9 @@ class ShimejiPetService : Service() {
         if (angryMode) return
         val stem = EmotionAssets.stemFromAsset(stemOrAsset) ?: EmotionAssets.canonicalStem(stemOrAsset)
         faceRestoreRunnable?.let { handler.removeCallbacks(it) }
+        faceRestoreRunnable = null
+        baseEmotion = stem
         rig.emotion = stem
-        faceRestoreRunnable = Runnable { rig.emotion = baseEmotion }
-        handler.postDelayed(faceRestoreRunnable!!, 4000)
     }
 
     fun showSpeechBubble(text: String, emotionAsset: String? = null, force: Boolean = false) {
@@ -424,14 +425,17 @@ class ShimejiPetService : Service() {
             EmotionAssets.stemFromAsset(it) ?: EmotionAssets.canonicalStem(it)
         }
         if (emotionStem != null) {
-            val rig = petRig
-            if (rig != null) rig.emotion = emotionStem
+            petRig?.emotion = emotionStem
         }
 
         speechBubbleDismissRunnable = Runnable {
             speechBubble.visibility = View.GONE
             petRig?.speaking = false
-            if (emotionStem != null) restoreBaseFace()
+            // Only restore when no newer emotion was pushed while this bubble was up.
+            val rig = petRig
+            if (emotionStem != null && rig != null && rig.emotion == emotionStem) {
+                restoreBaseFace()
+            }
         }
         handler.postDelayed(speechBubbleDismissRunnable!!, 4000)
     }

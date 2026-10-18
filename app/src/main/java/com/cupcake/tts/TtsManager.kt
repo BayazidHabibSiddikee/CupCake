@@ -150,9 +150,22 @@ class TtsManager(private val context: Context) {
                tts?.isLanguageAvailable(locale) == TextToSpeech.LANG_COUNTRY_AVAILABLE
     }
 
+    /**
+     * TextToSpeech binds asynchronously — [initialize] returns before the engine is
+     * really up. Callers should wait for [isInitialized] instead of hearing silence.
+     */
+    private suspend fun awaitInitialized(timeoutMs: Long = 5_000L): Boolean {
+        var waited = 0L
+        while ((!isInitialized || tts == null) && waited < timeoutMs) {
+            kotlinx.coroutines.delay(50)
+            waited += 50
+        }
+        return isInitialized && tts != null
+    }
+
     fun speak(text: String): ReceiveChannel<ByteArray> = Channel<ByteArray>().apply {
         CoroutineScope(Dispatchers.IO).launch {
-            if (!isInitialized || tts == null) {
+            if (!awaitInitialized()) {
                 close(Exception("TTS not initialized"))
                 return@launch
             }
@@ -181,7 +194,7 @@ class TtsManager(private val context: Context) {
 
     fun speakStreaming(text: String, onChunk: (ByteArray) -> Unit): ReceiveChannel<Unit> = Channel<Unit>().apply {
         CoroutineScope(Dispatchers.IO).launch {
-            if (!isInitialized || tts == null) {
+            if (!awaitInitialized()) {
                 close(Exception("TTS not initialized"))
                 return@launch
             }
