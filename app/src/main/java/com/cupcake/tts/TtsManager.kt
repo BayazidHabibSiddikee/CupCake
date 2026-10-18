@@ -46,6 +46,7 @@ class TtsManager(private val context: Context) {
     fun initialize(callback: TtsCallback? = null): Boolean {
         this.callback = callback
         return try {
+            var triedFallback = false
             tts = TextToSpeech(context, { status ->
                 if (status == TextToSpeech.SUCCESS) {
                     isInitialized = true
@@ -67,6 +68,22 @@ class TtsManager(private val context: Context) {
                     })
                     
                     Log.i("TtsManager", "TTS initialized successfully")
+                } else if (!triedFallback) {
+                    // Preferred engine ("com.google.android.tts") failed to bind — fall
+                    // back to whatever the system default TTS is instead of staying mute.
+                    triedFallback = true
+                    Log.w("TtsManager", "Google TTS unavailable (status=$status); retrying with system default engine")
+                    tts = TextToSpeech(context) { st ->
+                        if (st == TextToSpeech.SUCCESS) {
+                            isInitialized = true
+                            loadVoices()
+                            setLanguage(Locale.ENGLISH)
+                            applyChildishRobotVoice()
+                            Log.i("TtsManager", "TTS initialized via system default engine")
+                        } else {
+                            Log.e("TtsManager", "TTS initialization failed on fallback too: $st")
+                        }
+                    }
                 } else {
                     Log.e("TtsManager", "TTS initialization failed: $status")
                 }
@@ -170,6 +187,7 @@ class TtsManager(private val context: Context) {
             }
 
             val utteranceId = "utt_${System.currentTimeMillis()}"
+            Log.i("TtsManager", "speakStreaming: ${text.take(40)}")
             val locale = autoDetectLanguage(text)
             tts?.setLanguage(locale)
 

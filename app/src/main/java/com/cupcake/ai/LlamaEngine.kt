@@ -9,6 +9,7 @@ import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.launch
 import java.io.File
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.FileOutputStream
 import java.io.InputStream
 
@@ -16,6 +17,8 @@ class LlamaEngine private constructor() {
 
     companion object {
         private const val TAG = "LlamaEngine"
+        /** Max time a queued generation waits for the previous turn to finish. */
+        private const val BUSY_WAIT_MS = 45_000L
         private const val LIB_NAME = "llama_jni"
         private var _instance: LlamaEngine? = null
         private val lock = Any()
@@ -126,7 +129,7 @@ class LlamaEngine private constructor() {
         val nCtx: Int = 2048,
         val nThreads: Int = recommendedThreadCount(),
         val nBatch: Int = 512,
-        val maxTokens: Int = 256,
+        val maxTokens: Int = 128,
         val temperature: Float = 0.7f,
         val topP: Float = 0.9f,
         val topK: Int = 40,
@@ -220,10 +223,26 @@ class LlamaEngine private constructor() {
 
     private val generateMutex = Mutex()
 
-    fun generateStream(prompt: String): ReceiveChannel<String> = Channel<String>(Channel.UNLIMITED).apply {
+    /**
+     * Streams a generation. When the engine is mid-turn (chat vs games vs warm-up)
+     * we no longer drop the request with "Engine busy" — instead we [preempt]:
+     * politely cancel the running native generation and wait for the slot
+     * (bounded, so a wedged engine still surfaces an error instead of hanging).
+     */
+    fun generateStream(prompt: String, preempt: Boolean = false): ReceiveChannel<String> = Channel<String>(Channel.UNLIMITED).apply {
         CoroutineScope(Dispatchers.IO).launch {
-            if (!generateMutex.tryLock()) {
-                Log.w(TAG, "Engine busy, dropping generation request.")
+            val locked = if (generateMutex.tryLock()) {
+                true
+            } else {
+                if (preempt) runCatching { cancel() }
+                try {
+                    withTimeoutOrNull(BUSY_WAIT_MS) { generateMutex.lock(); true }
+                } catch (_: IllegalStateException) {
+                    false // mutex died with the owning scope
+                } ?: false
+            }
+            if (!locked) {
+                Log.w(TAG, "Engine still busy after ${BUSY_WAIT_MS}ms, dropping generation request.")
                 close(Exception("Engine busy"))
                 return@launch
             }

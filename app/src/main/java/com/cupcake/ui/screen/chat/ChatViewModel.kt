@@ -425,7 +425,7 @@ class ChatViewModel @Inject constructor(
                     // instead of ~50% on the 0.6B model.
                     LlamaEngine.getInstance()
                         .setGrammar(com.cupcake.ai.EmotionGrammar.TAG_ACTION)
-                    val tokenChannel = LlamaEngine.getInstance().generateStream(prompt)
+                    val tokenChannel = LlamaEngine.getInstance().generateStream(prompt, preempt = true)
                     var tick = 0
                     for (token in tokenChannel) {
                         fullResponse += token

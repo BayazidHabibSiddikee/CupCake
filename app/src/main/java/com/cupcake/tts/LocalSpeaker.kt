@@ -44,7 +44,11 @@ class LocalSpeaker @Inject constructor(
         private set
 
     fun speak(rawText: String, normalize: (String) -> String = { it }) {
-        if (!VoiceSettings.isEnabled(context)) return
+        if (!VoiceSettings.isEnabled(context)) {
+            Log.i(TAG, "voice disabled in settings — skipping")
+            return
+        }
+        Log.i(TAG, "speak: ${rawText.take(40)}")
         stop()
         val text = normalize(rawText)
         if (text.isBlank()) return
@@ -154,6 +158,7 @@ class LocalSpeaker @Inject constructor(
             .build()
         player.track = track
         track.play()
+        Log.i(TAG, "AudioTrack started: ${player.sampleRate}Hz ch=${player.channels} bits=${player.bitsPerSample}")
     }
 
     private fun writePcm(player: Player, bytes: ByteArray, off: Int, len: Int) {
