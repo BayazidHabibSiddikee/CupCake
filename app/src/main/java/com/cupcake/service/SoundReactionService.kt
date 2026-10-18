@@ -107,7 +107,7 @@ class SoundReactionService : Service() {
             ServiceCompat.startForeground(
                 this,
                 NOTIF_ID,
-                buildNotification("Listening for sounds…"),
+                buildNotification("Listening every 5 seconds…"),
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
                     ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE else 0,
             )
@@ -127,39 +127,62 @@ class SoundReactionService : Service() {
         scope.launch {
             val shorts = ShortArray(SoundClassifier.SAMPLE_COUNT)
             val floats = FloatArray(SoundClassifier.SAMPLE_COUNT)
+            // Duty-cycled sampling: every [LISTEN_INTERVAL_MS] we take one short
+            // listening window, classify it, then go quiet again — instead of
+            // listening non-stop. Cheaper on battery and less "creepy always-on".
+            var nextWindowAt = System.currentTimeMillis()
             while (listening) {
-                val read = record.read(shorts, 0, shorts.size)
-                if (read > 0) {
-                    // Discard clipped silence so the classifier isn't fed pure noise.
-                    var peak = 0
-                    for (i in 0 until read) {
-                        val s = shorts[i].toInt()
-                        if (s > peak) peak = s else if (-s > peak) peak = -s
-                    }
-                    if (peak > 900) {
-                        for (i in 0 until read) floats[i] = shorts[i] / 32768f
-                        val event = classifier?.classify(floats)
-                        if (event != null) {
-                            // Require the same category twice in a row before reacting —
-                            // single-frame noise blips are ignored.
-                            if (event.category == candidateCategory) {
-                                candidateHits++
+                val wait = nextWindowAt - System.currentTimeMillis()
+                if (wait > 0) delay(wait)
+
+                candidateCategory = null
+                candidateHits = 0
+                val windowEnd = System.currentTimeMillis() + LISTEN_WINDOW_MS
+                var acted = false
+                var frames = 0
+
+                while (listening && !acted && System.currentTimeMillis() < windowEnd) {
+                    val read = record.read(shorts, 0, shorts.size)
+                    if (read > 0) {
+                        frames++
+                        // Discard clipped silence so the classifier isn't fed pure noise.
+                        var peak = 0
+                        for (i in 0 until read) {
+                            val s = shorts[i].toInt()
+                            if (s > peak) peak = s else if (-s > peak) peak = -s
+                        }
+                        if (peak > 900) {
+                            for (i in 0 until read) floats[i] = shorts[i] / 32768f
+                            val event = classifier?.classify(floats)
+                            if (event != null) {
+                                // Require the same category twice in a row before reacting —
+                                // single-frame noise blips are ignored.
+                                if (event.category == candidateCategory) {
+                                    candidateHits++
+                                } else {
+                                    candidateCategory = event.category
+                                    candidateLabel = event.label
+                                    candidateHits = 1
+                                }
+                                if (candidateHits >= requiredHits) {
+                                    handleEvent(event.category, event.label, event.confidence)
+                                    acted = true
+                                }
                             } else {
-                                candidateCategory = event.category
-                                candidateLabel = event.label
-                                candidateHits = 1
-                            }
-                            if (candidateHits >= requiredHits) {
-                                handleEvent(event.category, event.label, event.confidence)
+                                candidateCategory = null
                                 candidateHits = 0
                             }
-                        } else {
-                            candidateCategory = null
-                            candidateHits = 0
                         }
                     }
+                    if (!acted) delay(150)
                 }
-                delay(150)
+
+                val now = System.currentTimeMillis()
+                nextWindowAt += LISTEN_INTERVAL_MS
+                // If we fell behind (device slept / long stall), snap forward so we
+                // don't fire a burst of back-to-back windows.
+                if (nextWindowAt <= now) nextWindowAt = now + LISTEN_INTERVAL_MS
+                Log.i(TAG, "Listen window done (frames=$frames acted=$acted), next in ${nextWindowAt - now}ms")
             }
         }
     }
@@ -247,6 +270,12 @@ class SoundReactionService : Service() {
         private const val TAG = "SoundReactionService"
         private const val CHANNEL_ID = "sound_reaction"
         private const val NOTIF_ID = 42
+
+        /** How long each listening burst stays open. */
+        private const val LISTEN_WINDOW_MS = 2_500L
+
+        /** Gap between listening bursts — she "checks in" every 5 seconds. */
+        private const val LISTEN_INTERVAL_MS = 5_000L
         const val ACTION_START = "com.cupcake.action.START_LISTENING"
         const val ACTION_STOP = "com.cupcake.action.STOP_LISTENING"
 
