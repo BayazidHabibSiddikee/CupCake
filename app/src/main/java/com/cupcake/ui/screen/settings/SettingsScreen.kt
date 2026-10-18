@@ -70,6 +70,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.core.content.ContextCompat
 import com.cupcake.data.model.ApiProvider
 import com.cupcake.data.model.ModelConfig
+import com.cupcake.service.ShortsWatchService
 import com.cupcake.service.SoundReactionService
 import com.cupcake.ui.theme.CupCakeTheme
 
@@ -213,6 +214,15 @@ fun SettingsScreen(
                     )
                 }
                 item { SoundAwarenessCard() }
+
+                // ---- Shorts watchdog (doom-scroll radar) ----------------------
+                item {
+                    SectionHeader(
+                        "📱", "Shorts Watchdog",
+                        "CupCake notices when you drift into Shorts/Reels on YouTube, Facebook or Instagram — she gets annoyed, docks your coins and eventually throws a tantrum."
+                    )
+                }
+                item { ShortsWatchdogCard() }
 
                 // ---- On-device models -----------------------------------------
                 item {
@@ -397,6 +407,79 @@ private fun SoundAwarenessCard() {
                     if (on) enable() else {
                         stopSoundService(context)
                         listening = false
+                    }
+                }
+            )
+        }
+    }
+}
+
+/**
+ * Toggle card for the Shorts/Reels watchdog. It is an Accessibility service, so the
+ * switch routes the user to the system Accessibility screen and reflects the real
+ * enabled state when they come back.
+ */
+@Composable
+private fun ShortsWatchdogCard() {
+    val context = LocalContext.current
+    val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+    var enabled by remember { mutableStateOf(ShortsWatchService.isEnabled(context)) }
+    var today by remember { mutableStateOf(ShortsWatchService.todayCount(context)) }
+
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                enabled = ShortsWatchService.isEnabled(context)
+                today = ShortsWatchService.todayCount(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Watch my shorts scrolling", fontWeight = FontWeight.SemiBold)
+                Text(
+                    when {
+                        enabled && today > 0 -> "On — $today shorts today. Watch your coins 😤"
+                        enabled -> "On — CupCake is keeping an eye on you 👀"
+                        else -> "Off — tap to enable the doom-scroll radar"
+                    },
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(
+                checked = enabled,
+                onCheckedChange = { on ->
+                    if (on) {
+                        val intent = Intent(
+                            android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS
+                        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        runCatching { context.startActivity(intent) }
+                        enabled = ShortsWatchService.isEnabled(context)
+                    } else {
+                        android.widget.Toast.makeText(
+                            context,
+                            "Turn off CupCake in Accessibility settings",
+                            android.widget.Toast.LENGTH_LONG
+                        ).show()
+                        runCatching {
+                            context.startActivity(
+                                Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            )
+                        }
                     }
                 }
             )

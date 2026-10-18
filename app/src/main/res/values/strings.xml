@@ -2,4 +2,5 @@
 <resources>
     <string name="app_name">CupCake</string>
     <string name="ime_label">CupCake Keyboard</string>
+    <string name="shorts_watch_description">Lets CupCake notice when you drift into Shorts/Reels on YouTube, Facebook or Instagram. She gets annoyed, docks your coins and eventually storms off in a huff.</string>
 </resources>
