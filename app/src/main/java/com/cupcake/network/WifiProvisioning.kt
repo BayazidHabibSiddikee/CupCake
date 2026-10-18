@@ -36,15 +36,29 @@ data class WifiStatus(
  */
 class WifiProvisioner(private val client: BleGattClient) {
 
-    /** Scans for nearby networks on the device. */
-    suspend fun scanNetworks(): Result<List<WifiNetwork>> {
-        val response = client.sendCommand(ProtocolDecoder.Commands.wifiScan(), timeoutMs = 15_000L)
-            ?: return Result.failure(IllegalStateException("No response from device"))
-        if (response.status != "ok") {
-            return Result.failure(IllegalStateException(response.data?.get("message") ?: "Scan failed"))
+    /**
+     * Scans for nearby networks on the device. The firmware kicks off an async
+     * scan and answers "scanning" until results are cached; we poll within the
+     * budget so the BLE link never stalls behind a blocking scan.
+     */
+    suspend fun scanNetworks(budgetMs: Long = 15_000L): Result<List<WifiNetwork>> {
+        val deadline = System.currentTimeMillis() + budgetMs
+        while (System.currentTimeMillis() < deadline) {
+            val response = client.sendCommand(ProtocolDecoder.Commands.wifiScan(), timeoutMs = 8_000L)
+                ?: return Result.failure(IllegalStateException("No response from device"))
+            if (response.status != "ok") {
+                // "scanning": device accepted the request, results pending — poll again.
+                if (response.data?.get("message") == "scanning") {
+                    kotlinx.coroutines.delay(1_500)
+                    continue
+                }
+                return Result.failure(IllegalStateException(response.data?.get("message") ?: "Scan failed"))
+            }
+            val raw = response.data?.get("networks")
+                ?: return Result.success(emptyList())
+            return Result.success(parseScan(raw))
         }
-        val raw = response.data?.get("networks") ?: return Result.success(emptyList())
-        return Result.success(parseScan(raw))
+        return Result.failure(IllegalStateException("Scan timed out"))
     }
 
     /** Sends credentials; the device associates asynchronously. */
