@@ -111,7 +111,8 @@ class ShimejiPetService : Service() {
             layoutFlag,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                     WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
-                    WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
+                    WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
@@ -119,16 +120,11 @@ class ShimejiPetService : Service() {
             y = 350
         }
 
+
         // Inflate view
         val inflater = LayoutInflater.from(this)
         val view = inflater.inflate(R.layout.overlay_shimeji_pet, null)
         floatView = view
-
-        val closeBtn = view.findViewById<View>(R.id.pet_close_btn)
-        closeBtn?.setOnClickListener {
-            Log.i(TAG, "Dismissing floating pet via close button")
-            stopSelf()
-        }
 
         updatePetVisual(avatar)
 
@@ -169,9 +165,9 @@ class ShimejiPetService : Service() {
                         if (isDragging) {
                             val displayMetrics = resources.displayMetrics
                             val screenHeight = displayMetrics.heightPixels
-                            // Cut off / dismiss when dragged below screen
-                            if (layoutParams!!.y > screenHeight - 160) {
-                                Log.i(TAG, "Pet dragged below screen, cutting off / dismissing")
+                            // Fluid bubble dismissal: drag down to bottom of screen
+                            if (layoutParams!!.y > screenHeight - 200) {
+                                Log.i(TAG, "Pet bubbled down to bottom, dismissing")
                                 stopSelf()
                                 return true
                             }

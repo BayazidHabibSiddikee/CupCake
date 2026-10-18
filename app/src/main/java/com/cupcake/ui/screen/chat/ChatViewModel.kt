@@ -385,8 +385,9 @@ class ChatViewModel @Inject constructor(
     }
 
     fun sendMessage(text: String) {
-        if (text.isBlank() || _isGenerating.value) return
-
+        val sanitized = sanitizeInput(text)
+        if (sanitized.isBlank() || _isGenerating.value) return
+        
         val config = _modelConfig.value
         val isReady = if (config.isLocal()) LlamaEngine.getInstance().isReady() else ollamaEngine.isReady()
         if (!isReady) {
@@ -400,11 +401,11 @@ class ChatViewModel @Inject constructor(
             )
             return
         }
-
+        
         // Check energy
         energyManager.consumeEnergy() // Consume it but don't block if they don't have it (make it simple!)
-
-        val userMessage = ChatMessage.user(text, conversationId)
+        
+        val userMessage = ChatMessage.user(sanitized, conversationId)
         addMessage(userMessage)
         com.cupcake.ai.ProactiveEngagementManager.onUserActivity(appContext)
         scheduleIdleChatter()
@@ -478,6 +479,9 @@ class ChatViewModel @Inject constructor(
                 _currentResponse.value = ""
 
                 if (fullResponse.isNotBlank()) {
+                    // Settle the live face on the raw response (containing tags) BEFORE translation
+                    refreshLiveEmotion(fullResponse.trim())
+
                     // Translate output
                     val personality = currentCharacter.value?.personality ?: ""
                     val translatedText = com.cupcake.ai.BanglishTranslator.translate(fullResponse.trim(), personality)
@@ -490,14 +494,25 @@ class ChatViewModel @Inject constructor(
                     )
                     addMessage(assistantMessage)
 
-                    // Settle the live face on the final emotion.
-                    refreshLiveEmotion(translatedText)
-
-                    // Send to ESP32 for TTS
-                    sendToEspForTts(fullResponse.trim())
+                    // Send to ESP32 for TTS (use translated text for speech)
+                    sendToEspForTts(translatedText)
                 }
             }
         }
+    }
+
+    /** Cleans input of emojis and distracting special characters (like ~ / ") before sending to LLM. */
+    private fun sanitizeInput(text: String): String {
+        // Strip emojis and common symbols used in user input that distract small models
+        return text.replace(Regex("[\\uD83C-\\uDBFF\\uDC00-\\uDFFF]+"), "")
+                    .replace(Regex("[~\"']"), "")
+                    .trim()
+    }
+
+    private fun sanitizeInput(text: String): String {
+        return text.replace(Regex("[\\uD83C-\\uDBFF\\uDC00-\\uDFFF]+"), "")
+                    .replace(Regex("[~\"']"), "")
+                    .trim()
     }
 
     private fun buildPrompt(): String {

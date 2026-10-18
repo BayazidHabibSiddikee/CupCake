@@ -23,8 +23,9 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+
 
     <!-- Features -->
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
@@ -53,6 +54,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Sound Reaction Service (Hearing) -->
+        <service
+            android:name=".service.SoundReactionService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
 
         <!-- Foreground service for BLE scanning -->
         <service

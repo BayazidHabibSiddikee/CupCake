@@ -22,6 +22,14 @@ object PersonaEngine {
         val mode: PersonaMode,
     )
 
+    /** External trigger for reactions (e.g. from SoundReactionService). */
+    fun triggerReaction(tag: String, quip: String) {
+        // This forwards the reaction to the UI/Robotic Body
+        // In a real impl, this would update a StateFlow that the ViewModel observes
+        // For now, we log it and the Service handles the direct push to ESP if needed.
+        Log.i("PersonaEngine", "External Reaction Triggered: $tag -> $quip")
+    }
+
     // --- sleepy: soft, drowsy, gently spicy --------------------------------
     private val sleepy = listOf(
         "[sleepy] *yawns* eto kotha bolo keno... let me sleep",
