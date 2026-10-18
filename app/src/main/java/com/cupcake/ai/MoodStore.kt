@@ -12,7 +12,8 @@ import kotlinx.coroutines.flow.asStateFlow
  * [LEVEL_MAX] she gives the *silent treatment*: the floating pet freezes, stares angry
  * and stops chatting, and her chat/game replies turn cold (see [angerPrompt]). Anger
  * stays put while she keeps being provoked and cools off [COOLDOWN_MS] after the last
- * escalation, so "too many shorts" fades after ~2 hours of quiet.
+ * escalation, so "too many shorts" fades after ~15 minutes of quiet — or instantly
+ * when the user taps the sulk to make it up to her (see ShimejiPetService).
  *
  * Backed by SharedPreferences so the mood survives process restarts, with an in-memory
  * [StateFlow] mirror for live UI (the floating pet avatar / in-app screens).
@@ -25,7 +26,7 @@ object MoodStore {
     const val LEVEL_MAX = 3
 
     /** How long anger lingers after the last escalation before cooling off. */
-    const val COOLDOWN_MS = 2 * 60 * 60 * 1000L // 2 hours
+    const val COOLDOWN_MS = 15 * 60 * 1000L // 15 minutes — long enough to notice, not a 2-hour lock-out
 
     private const val PREFS = "cupcake_mood"
     private const val KEY_LEVEL = "anger_level"

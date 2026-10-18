@@ -252,6 +252,18 @@ class LlamaEngine private constructor() {
                 close(Exception("Engine busy"))
                 return@launch
             }
+            // The native layer has one worker + one global callback. Before installing
+            // OUR callback we must be sure no previous worker is still alive, otherwise
+            // its final emit lands in our callback and completes our deferred before our
+            // generation even starts (silent truncation + cascading -2 failures).
+            if (runCatching { isGenerating() }.getOrDefault(false)) {
+                if (preempt) runCatching { cancel() }
+                var waited = 0
+                while (runCatching { isGenerating() }.getOrDefault(false) && waited < 60_000) {
+                    delay(25)
+                    waited += 25
+                }
+            }
             // Native generate() returns immediately (it spawns a detached worker
             // thread) — the ONLY reliable completion signal is the callback, so we
             // await a deferred it completes, and release the mutex in finally so a
@@ -277,18 +289,18 @@ class LlamaEngine private constructor() {
                 // Apply the current grammar right before decoding so callers can change it
                 // per generation without reloading the model.
                 nativeSetGrammar(grammar)
-                // Native generate() claims a single slot; if a just-cancelled worker is
-                // still unwinding it can briefly answer -2. Wait for the native worker
-                // to actually exit, then retry instead of surfacing a hard failure.
-                var started = generate(prompt)
+                // Native generate() claims a single slot; if a worker is still unwinding
+                // keep asking it to yield instead of failing the turn outright.
                 var attempts = 0
-                while (started == -2 && attempts < 8) {
+                var started = generate(prompt)
+                while (started == -2 && attempts < 20) {
                     attempts++
-                    Log.w(TAG, "generate() busy (-2), waiting for native worker to settle (attempt $attempts)")
+                    Log.w(TAG, "generate() busy (-2), yielding previous worker (attempt $attempts)")
+                    runCatching { cancel() }
                     var waited = 0
-                    while (isGenerating() && waited < 3_000) {
-                        delay(50)
-                        waited += 50
+                    while (runCatching { isGenerating() }.getOrDefault(false) && waited < 5_000) {
+                        delay(25)
+                        waited += 25
                     }
                     started = generate(prompt)
                 }

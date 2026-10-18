@@ -14,10 +14,14 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import okhttp3.Call
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -238,35 +242,68 @@ class OllamaEngine private constructor(
         }
         kotlinx.coroutines.withContext(Dispatchers.IO) {
             try {
-                val effectiveUrl = if (baseUrl.endsWith("/v1")) {
-                    baseUrl.removeSuffix("/v1").removeSuffix("/")
-                } else if (baseUrl.endsWith("/v1/")) {
-                    baseUrl.removeSuffix("/v1/").removeSuffix("/")
-                } else {
-                    baseUrl.removeSuffix("/")
-                }
-                val url = "$effectiveUrl/api/chat"
-
-                val requestBody = OllamaChatRequest(
-                    model = config.modelName,
-                    messages = messages,
-                    stream = config.useStreaming,
-                    options = OllamaOptions(
-                        temperature = config.temperature,
-                        top_p = config.topP,
-                        top_k = config.topK,
-                        num_predict = config.maxTokens,
-                        num_ctx = 4096,
-                        repeat_penalty = 1.1f,
-                        repeat_last_n = 64,
-                        seed = -1
+                // Two distinct wire protocols live behind "remote":
+                //  - Ollama servers: /api/chat with {"options": {...}}
+                //  - OpenAI-compatible hosts (also served by vLLM, LM Studio,
+                //    llama.cpp server, OpenRouter...): /chat/completions with
+                //    flat max_tokens/temperature. Routing every provider into
+                //    /api/chat 404s the moment the base URL carries /v1.
+                val isOllamaApi = config.provider == ModelConfig.ModelProvider.CUSTOM_OLLAMA
+                val cleanedBase = baseUrl.removeSuffix("/")
+                    .removeSuffix("/v1")
+                val url: String
+                val jsonBody: String
+                if (isOllamaApi) {
+                    url = "$cleanedBase/api/chat"
+                    jsonBody = json.encodeToString(
+                        OllamaChatRequest(
+                            model = config.modelName,
+                            messages = messages,
+                            stream = config.useStreaming,
+                            options = OllamaOptions(
+                                temperature = config.temperature,
+                                top_p = config.topP,
+                                top_k = config.topK,
+                                num_predict = config.maxTokens,
+                                num_ctx = 4096,
+                                repeat_penalty = 1.1f,
+                                repeat_last_n = 64,
+                                seed = -1
+                            )
+                        )
                     )
-                )
+                } else {
+                    url = "${baseUrl.removeSuffix("/")}/chat/completions"
+                    val messagesJson = buildJsonArray {
+                        messages.forEach { msg ->
+                            addJsonObject {
+                                put("role", msg.role)
+                                put("content", msg.content)
+                            }
+                        }
+                    }
+                    jsonBody = json.encodeToString(
+                        buildJsonObject {
+                            put("model", config.modelName)
+                            put("stream", config.useStreaming)
+                            put("max_tokens", config.maxTokens)
+                            put("temperature", config.temperature)
+                            put("top_p", config.topP)
+                            put("messages", messagesJson)
+                        }
+                    )
+                }
 
-                val jsonBody = json.encodeToString(requestBody)
                 val request = Request.Builder()
                     .url(url)
                     .post(jsonBody.toRequestBody("application/json".toMediaType()))
+                    .apply {
+                        // Authenticated remotes (OpenAI, OpenRouter, gated vLLM)
+                        // 401 without the bearer header.
+                        if (config.apiKey.isNotBlank()) {
+                            addHeader("Authorization", "Bearer ${config.apiKey}")
+                        }
+                    }
                     .build()
 
                 val call = okHttpClient.newCall(request)
@@ -288,6 +325,16 @@ class OllamaEngine private constructor(
 
                     val reader = BufferedReader(InputStreamReader(body.byteStream()))
                     var line: String?
+                    // Guard against double onComplete(): the [DONE] sentinel fires it,
+                    // then the post-loop call would fire it again (double translate
+                    // flash + double fan-out downstream).
+                    var completed = false
+                    val finish: () -> Unit = {
+                        if (!completed) {
+                            completed = true
+                            callback.onComplete()
+                        }
+                    }
                     while (reader.readLine().also { line = it } != null) {
                         val trimmed = line?.trim() ?: continue
                         if (trimmed.isEmpty()) continue
@@ -296,7 +343,7 @@ class OllamaEngine private constructor(
                         val jsonString = if (trimmed.startsWith("data:")) {
                             val dataPayload = trimmed.removePrefix("data:").trim()
                             if (dataPayload == "[DONE]") {
-                                callback.onComplete()
+                                finish()
                                 break
                             }
                             dataPayload
@@ -322,17 +369,25 @@ class OllamaEngine private constructor(
                                 if (!openAiContent.isNullOrEmpty()) {
                                     callback.onToken(openAiContent)
                                 }
+                                // finish_reason present ⇒ last chunk of this response
+                                val finishReason =
+                                    choices[0].jsonObject["finish_reason"]?.jsonPrimitive?.content
+                                if (!finishReason.isNullOrEmpty()) {
+                                    finish()
+                                    break
+                                }
                             }
 
                             val isDone = jsonObj["done"]?.jsonPrimitive?.booleanOrNull == true
                             if (isDone) {
+                                finish()
                                 break
                             }
                         } catch (e: Exception) {
                             Log.w(TAG, "Failed parsing chunk: $jsonString", e)
                         }
                     }
-                    callback.onComplete()
+                    finish()
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Generation error", e)

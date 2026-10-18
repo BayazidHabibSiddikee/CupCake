@@ -208,6 +208,9 @@ class ShimejiPetService : Service() {
                             if (now - lastClickTime < 350) {
                                 // Double Click -> Open App
                                 openApp()
+                            } else if (angryMode) {
+                                // She is sulking: a gentle tap is an apology and she thaws.
+                                forgiveCompanion()
                             } else {
                                 // Single Click -> Cute Quote + celebrate with a dance
                                 val cuteQuotes = listOf(
@@ -359,7 +362,7 @@ class ShimejiPetService : Service() {
     }
 
     /**
-     * Nothing else will poke the pet when the 2-hour anger cooldown simply lapses, so
+     * Nothing else will poke the pet when the anger cooldown simply lapses, so
      * poll once per cooldown and thaw her back to the lively roaming pet.
      */
     private fun scheduleAngerCoolOff() {
@@ -375,6 +378,22 @@ class ShimejiPetService : Service() {
         }
         angerCoolRunnable = check
         handler.postDelayed(check, MoodStore.COOLDOWN_MS + 2_000L)
+    }
+
+    /**
+     * The user tapped the sulk to make it up to her: forgiveness clears the mood,
+     * lifts the frozen glare and brings back the lively roaming pet.
+     */
+    private fun forgiveCompanion() {
+        Log.i(TAG, "User apologised — lifting silent treatment")
+        MoodStore.calmDown(this)
+        angerCoolRunnable?.let { handler.removeCallbacks(it) }
+        angerCoolRunnable = null
+        angryMode = false
+        danceTicksLeft = 0
+        restoreBaseFace()
+        startRoaming()
+        showSpeechBubble("Aww… okay, friends again 💕", null, force = true)
     }
 
     /** Persistently shows [stem] as the pet face (no auto-restore). */

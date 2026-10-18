@@ -392,8 +392,12 @@ Java_com_cupcake_ai_LlamaEngine_generate(
         }
         
         llama_sampler_free(smpl);
-        g_is_generating = false;
+        // Emit completion BEFORE releasing the slot: callers wait for the slot to
+        // free (g_is_generating) and only then install their own callback — if the
+        // completion fired after the release it could land in the NEXT request's
+        // callback and falsely complete it before its generation even starts.
         emit_complete(env, 0);
+        g_is_generating = false;
         g_jvm->DetachCurrentThread();
     }).detach();
     
