@@ -37,16 +37,14 @@
 
         <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:background="@drawable/bg_pet_circle"
-            android:padding="2dp">
+            android:layout_height="match_parent">
 
             <ImageView
                 android:id="@+id/pet_image"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:scaleType="centerInside"
-                android:contentDescription="Desktop Pet Fallback"
+                android:scaleType="fitCenter"
+                android:contentDescription="Desktop Pet"
                 android:visibility="gone" />
 
             <TextView
@@ -57,26 +55,6 @@
                 android:textSize="44sp"
                 android:text="🐱"
                 android:visibility="gone" />
-        </FrameLayout>
-
-        <!-- Close / Dismiss Button on top-right of pet -->
-        <FrameLayout
-            android:id="@+id/pet_close_btn"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:layout_gravity="top|end"
-            android:background="@drawable/bg_speech_bubble"
-            android:clickable="true"
-            android:focusable="true">
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:gravity="center"
-                android:textColor="#FFFFFF"
-                android:textSize="12sp"
-                android:textStyle="bold"
-                android:text="✕" />
         </FrameLayout>
     </FrameLayout>
 

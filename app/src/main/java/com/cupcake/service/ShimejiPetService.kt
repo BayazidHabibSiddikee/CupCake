@@ -51,6 +51,18 @@ class ShimejiPetService : Service() {
 
     private var baseImageSource: String? = null
 
+    // Lively roaming/dancing animation state.
+    private var roamRunnable: Runnable? = null
+    private var screenW = 0
+    private var screenH = 0
+    private var petWidth = 0
+    private var petHeight = 0
+    private var baseY = 0
+    private var facing = 1
+    private var tick = 0
+    private var danceTicksLeft = 0
+    private var danceCooldown = 90
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
@@ -171,13 +183,18 @@ class ShimejiPetService : Service() {
                                 stopSelf()
                                 return true
                             }
+                            // Resume strolling from wherever the pet was dropped.
+                            baseY = layoutParams!!.y.coerceIn(
+                                0,
+                                (screenHeight - petHeight).coerceAtLeast(0)
+                            )
                         } else {
                             val now = System.currentTimeMillis()
                             if (now - lastClickTime < 350) {
                                 // Double Click -> Open App
                                 openApp()
                             } else {
-                                // Single Click -> Cute Quote
+                                // Single Click -> Cute Quote + celebrate with a dance
                                 val cuteQuotes = listOf(
                                     "✨ Kyaa! I'm right here on your screen!",
                                     "💖 Don't ignore me! Let's play or chat!",
@@ -187,6 +204,8 @@ class ShimejiPetService : Service() {
                                     "⭐ You're doing great! Keep going!"
                                 )
                                 showSpeechBubble(cuteQuotes.random())
+                                danceTicksLeft = 40
+                                danceCooldown = 140
                             }
                             lastClickTime = now
                         }
@@ -200,9 +219,98 @@ class ShimejiPetService : Service() {
         try {
             windowManager?.addView(floatView, layoutParams)
             Log.i(TAG, "Shimeji pet overlay attached successfully")
+            view.post { startRoaming() }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to add floating view", e)
         }
+    }
+
+    /**
+     * Drives the desktop-pet loop: strolls horizontally across the whole screen with a
+     * gentle walk-bob, and periodically breaks into a bouncing spin-dance for a few seconds.
+     * Pauses automatically while the user drags the pet.
+     */
+    private fun startRoaming() {
+        if (roamRunnable != null) return
+        val metrics = resources.displayMetrics
+        screenW = metrics.widthPixels
+        screenH = metrics.heightPixels
+        val params = layoutParams ?: return
+        petWidth = floatView?.width?.takeIf { it > 0 } ?: (120 * metrics.density).toInt()
+        petHeight = floatView?.height?.takeIf { it > 0 } ?: (140 * metrics.density).toInt()
+        baseY = params.y.coerceIn(0, (screenH - petHeight).coerceAtLeast(0))
+
+        val runner = object : Runnable {
+            override fun run() {
+                stepPet()
+                handler.postDelayed(this, FRAME_MS)
+            }
+        }
+        roamRunnable = runner
+        handler.postDelayed(runner, FRAME_MS)
+    }
+
+    private fun stepPet() {
+        val params = layoutParams ?: return
+        val view = floatView ?: return
+        if (isDragging) return
+
+        tick++
+        val dancing = danceTicksLeft > 0
+        if (dancing) {
+            danceTicksLeft--
+        } else if (danceCooldown > 0) {
+            danceCooldown--
+        }
+
+        if (dancing) {
+            // Bounce in place + spin wiggle.
+            params.y = baseY - (abs(kotlin.math.sin(tick / 4.0)) * 28).toInt()
+            val wobble = (kotlin.math.sin(tick / 3.0) * 16f).toFloat()
+            applyPetTransforms(view, faceRight = facing >= 0, rotation = wobble)
+        } else {
+            // Stroll left/right across the whole screen.
+            val speed = ((screenW / 260).coerceIn(3, 12))
+            params.x += facing * speed
+            val maxX = (screenW - petWidth).coerceAtLeast(0)
+            if (params.x <= 0) {
+                params.x = 0
+                facing = 1
+            } else if (params.x >= maxX) {
+                params.x = maxX
+                facing = -1
+            }
+            params.y = baseY + (kotlin.math.sin(tick / 7.0) * 7).toInt()
+            applyPetTransforms(view, faceRight = facing >= 0, rotation = 0f)
+
+            if (danceCooldown <= 0 && (0..6).random() == 0) {
+                danceTicksLeft = 30 + (0..24).random()
+                danceCooldown = 140 + (0..160).random()
+            }
+        }
+
+        try {
+            windowManager?.updateViewLayout(view, params)
+        } catch (e: Exception) {
+            Log.w(TAG, "roam updateViewLayout failed", e)
+        }
+    }
+
+    private fun applyPetTransforms(view: View, faceRight: Boolean, rotation: Float) {
+        val scaleX = if (faceRight) 1f else -1f
+        view.findViewById<ImageView>(R.id.pet_image)?.let {
+            it.scaleX = scaleX
+            it.rotation = rotation
+        }
+        view.findViewById<TextView>(R.id.pet_emoji)?.let {
+            it.scaleX = scaleX
+            it.rotation = rotation
+        }
+    }
+
+    private fun stopRoaming() {
+        roamRunnable?.let { handler.removeCallbacks(it) }
+        roamRunnable = null
     }
 
     private fun updatePetVisual(avatar: String?) {
@@ -338,6 +446,7 @@ class ShimejiPetService : Service() {
     }
 
     override fun onDestroy() {
+        stopRoaming()
         if (floatView != null && windowManager != null) {
             try {
                 windowManager?.removeView(floatView)
@@ -356,6 +465,7 @@ class ShimejiPetService : Service() {
         private const val TAG = "ShimejiPetService"
         private const val CHANNEL_ID = "cupcake_shimeji_channel"
         private const val NOTIFICATION_ID = 2002
+        private const val FRAME_MS = 40L
 
         /** True while the floating overlay service is actually alive (not just requested). */
         @Volatile
