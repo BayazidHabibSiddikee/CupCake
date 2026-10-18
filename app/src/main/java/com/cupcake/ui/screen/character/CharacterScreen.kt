@@ -147,7 +147,6 @@ fun CharacterScreen(
                                     ShimejiPetService.start(
                                         context = context,
                                         avatar = character.avatar,
-                                        gif = character.customGif,
                                         name = character.name
                                     )
                                 } else {

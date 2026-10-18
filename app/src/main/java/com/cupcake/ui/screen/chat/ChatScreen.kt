@@ -366,7 +366,6 @@ fun CharacterHeader(
                             com.cupcake.service.ShimejiPetService.start(
                                 context = context,
                                 avatar = characterAvatar,
-                                gif = if (characterName.contains("CupCake", ignoreCase = true)) "file:///android_asset/marin/marin_idle.gif" else null,
                                 name = characterName
                             )
                             com.cupcake.service.ShimejiPetService.showSpeech(context, "✨ Activated on screen!")

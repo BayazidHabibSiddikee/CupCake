@@ -98,7 +98,6 @@ fun HomeScreen(
             systemPrompt = "You are CupCake Kitagawa!",
             avatar = "file:///android_asset/marin/emotions/normal.png",
             personality = "energetic",
-            customGif = "file:///android_asset/marin/marin_idle.gif"
         )
 
     val (currentXp, nextXp) = viewModel.getLevelProgress()
@@ -172,7 +171,6 @@ fun HomeScreen(
                                     ShimejiPetService.start(
                                         context = context,
                                         avatar = activeCompanion.avatar,
-                                        gif = activeCompanion.customGif,
                                         name = activeCompanion.name
                                     )
                                     ShimejiPetService.showSpeech(context, "Kyaa! ${activeCompanion.name} is on your screen! ✨")

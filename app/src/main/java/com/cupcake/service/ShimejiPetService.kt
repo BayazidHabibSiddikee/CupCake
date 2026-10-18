@@ -76,15 +76,14 @@ class ShimejiPetService : Service() {
             }
             else -> {
                 val avatar = intent?.getStringExtra(EXTRA_AVATAR)
-                val customGif = intent?.getStringExtra(EXTRA_GIF)
                 val characterName = intent?.getStringExtra(EXTRA_NAME) ?: "Companion"
-                setupFloatingView(avatar, customGif, characterName)
+                setupFloatingView(avatar, characterName)
             }
         }
         return START_STICKY
     }
 
-    private fun setupFloatingView(avatar: String?, customGif: String?, characterName: String) {
+    private fun setupFloatingView(avatar: String?, characterName: String) {
         if (!Settings.canDrawOverlays(this)) {
             Log.w(TAG, "Cannot draw overlays: permission missing")
             stopSelf()
@@ -93,7 +92,7 @@ class ShimejiPetService : Service() {
 
         if (floatView != null) {
             // Already created, update image
-            updatePetVisual(avatar, customGif)
+            updatePetVisual(avatar)
             return
         }
 
@@ -131,7 +130,7 @@ class ShimejiPetService : Service() {
             stopSelf()
         }
 
-        updatePetVisual(avatar, customGif)
+        updatePetVisual(avatar)
 
         // Drag & Click Logic
         view.setOnTouchListener(object : View.OnTouchListener {
@@ -210,15 +209,16 @@ class ShimejiPetService : Service() {
         }
     }
 
-    private fun updatePetVisual(avatar: String?, customGif: String?) {
+    private fun updatePetVisual(avatar: String?) {
         val view = floatView ?: return
         val petImageView = view.findViewById<ImageView>(R.id.pet_image) ?: return
         val petEmojiView = view.findViewById<TextView>(R.id.pet_emoji) ?: return
 
-        val imageSource = customGif?.takeIf { it.isNotBlank() } ?: avatar?.takeIf { it.isNotBlank() }
+        // Base look = the 2D sprite from the emotion set (no GIFs anymore).
+        val imageSource = avatar?.takeIf { it.isNotBlank() }
         baseImageSource = imageSource
 
-        if (imageSource != null && (imageSource.startsWith("http") || imageSource.startsWith("content://") || imageSource.startsWith("file://") || imageSource.endsWith(".gif") || imageSource.endsWith(".png") || imageSource.endsWith(".webp") || imageSource.endsWith(".jpg"))) {
+        if (imageSource != null && (imageSource.startsWith("http") || imageSource.startsWith("content://") || imageSource.startsWith("file://") || imageSource.endsWith(".png") || imageSource.endsWith(".webp") || imageSource.endsWith(".jpg"))) {
             petEmojiView.visibility = View.GONE
             petImageView.visibility = View.VISIBLE
             petImageView.load(imageSource) {
@@ -371,18 +371,16 @@ class ShimejiPetService : Service() {
         const val ACTION_SET_FACE = "com.cupcake.shimeji.SET_FACE"
 
         const val EXTRA_AVATAR = "extra_avatar"
-        const val EXTRA_GIF = "extra_gif"
         const val EXTRA_NAME = "extra_name"
         const val EXTRA_TEXT = "extra_text"
         const val EXTRA_EMOTION = "extra_emotion"
         const val EXTRA_FACE_ASSET = "extra_face_asset"
         const val KEY_RUNNING = "overlay_running"
 
-        fun start(context: Context, avatar: String? = null, gif: String? = null, name: String? = null) {
+        fun start(context: Context, avatar: String? = null, name: String? = null) {
             prefs(context).edit().putBoolean(KEY_RUNNING, true).apply()
             val intent = Intent(context, ShimejiPetService::class.java).apply {
                 putExtra(EXTRA_AVATAR, avatar)
-                putExtra(EXTRA_GIF, gif)
                 putExtra(EXTRA_NAME, name)
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

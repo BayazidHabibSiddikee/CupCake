@@ -53,7 +53,6 @@ Stay strictly under 200 characters at all times!""",
                 languages = listOf("en", "ja", "bn"),
                 isBuiltIn = true,
                 isSelected = true,
-                customGif = "file:///android_asset/marin/marin_idle.gif",
                 isShimejiActive = false
             )
         )
