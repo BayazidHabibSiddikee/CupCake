@@ -134,7 +134,9 @@ void setup() {
     face.begin();
     motors.begin();
 
-    net.onFace = [](const String& expression) { face.set(expression); };
+    net.onFace = [](const String& expression, uint32_t durationMs) {
+        face.set(expression, durationMs);
+    };
     net.onMotor = [](const String& action) { motors.execute(action); };
 
     ble.onFace = [](const String& expression) { face.set(expression); };

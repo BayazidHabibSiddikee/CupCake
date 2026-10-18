@@ -88,7 +88,11 @@ class ShimejiPetService : Service() {
                 showSpeechBubble(text, emotionAsset)
             }
             ACTION_SET_FACE -> {
-                intent.getStringExtra(EXTRA_FACE_ASSET)?.let { setEmotionFace(it) }
+                val extra = intent.getStringExtra(EXTRA_FACE_ASSET)
+                if (extra != null) {
+                    stashedFaceAsset = extra
+                    setEmotionFace(extra)
+                }
             }
             ACTION_SET_ANGER -> {
                 val level = intent.getIntExtra(EXTRA_ANGER, MoodStore.LEVEL_CALM)
@@ -242,6 +246,8 @@ class ShimejiPetService : Service() {
                 if (MoodStore.isMaxAngry(this)) {
                     applyAnger(MoodStore.LEVEL_MAX, null, null)
                 } else {
+                    // A face pushed while the overlay was down replays on attach.
+                    popStashedFace()?.let { setEmotionFace(it) }
                     startRoaming()
                 }
             }
@@ -533,6 +539,23 @@ class ShimejiPetService : Service() {
         /** True while the floating overlay service is actually alive (not just requested). */
         @Volatile
         var isRunning = false
+
+        /**
+         * Last face pushed while the overlay was down (permission missing, service
+         * killed...). Without the stash the emotion is silently dropped; the pet
+         * attaches with its default face and the user only notices in chat.
+         */
+        @Volatile
+        private var stashedFaceAsset: String? = null
+
+        @JvmStatic
+        fun stashFace(asset: String?) {
+            if (asset == null) return
+            stashedFaceAsset = asset
+        }
+
+        @JvmStatic
+        private fun popStashedFace(): String? = stashedFaceAsset?.also { stashedFaceAsset = null }
 
         const val ACTION_START = "com.cupcake.shimeji.START"
         const val ACTION_STOP = "com.cupcake.shimeji.STOP"

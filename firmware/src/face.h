@@ -29,13 +29,14 @@ public:
             Serial.println("[face] disabled (CUPCAKE_NO_FACE build)");
         }
     }
-    void set(const String& expression) { expr_ = expression; }
+    void set(const String& expression, uint32_t durationMs = 0) { expr_ = expression; revertAt_ = durationMs ? millis() + durationMs : 0; }
     const String& current() const { return expr_; }
     void tick() {}
 
 private:
     bool announced_ = false;
     String expr_ = "neutral";
+    uint32_t revertAt_ = 0;
 };
 
 #else
@@ -48,8 +49,12 @@ public:
     static constexpr int H = 64;
 
     void begin();
-    /** Sets the current expression by name ("happy", "confused", ...). */
-    void set(const String& expression);
+    /**
+     * Sets the current expression by name ("happy", "confused", ...).
+     * With a non-zero [durationMs] the previous expression is restored when it
+     * expires — without this every face latched forever.
+     */
+    void set(const String& expression, uint32_t durationMs = 0);
     /** Current expression name. */
     const String& current() const { return expr_; }
     /** Call from loop(); animates blink / idle motion at ~15 fps. */
@@ -60,6 +65,8 @@ private:
     // default construction in the global Face instance.
     U8G2_SSD1306_128X64_NONAME_F_HW_I2C* u8g2_ = nullptr;
     String expr_ = "neutral";
+    String prevExpr_ = "neutral";
+    uint32_t revertAt_ = 0;
     uint32_t lastFrame_ = 0;
     uint32_t blinkAt_ = 3000;
     bool blinking_ = false;

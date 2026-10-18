@@ -41,7 +41,7 @@ public:
     void send(const String& type, const String& payloadJson);
     void sendStatus();
 
-    std::function<void(const String&)> onFace;    // expression
+    std::function<void(const String&, uint32_t)> onFace;   // expression, durationMs (0 = latch)
     std::function<void(const String&)> onMotor;   // action name
 
     /** Auth for the WS handshake — connects as /esp?token=<pairing-token>. */

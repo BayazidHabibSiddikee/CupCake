@@ -222,10 +222,14 @@ static void drawFace(const String& name, int idlePhase) {
     else                                                   faceNeutral();
 }
 
-void Face::set(const String& expression) {
+void Face::set(const String& expression, uint32_t durationMs) {
     if (expression == expr_) return;
+    prevExpr_ = expr_;
     expr_ = expression;
     blinking_ = false;
+    // 0 = latch (old behaviour). Non-zero = the timeout the phone sends with
+    // every face envelope; revert so one surprise doesn't own the display forever.
+    revertAt_ = durationMs ? millis() + durationMs : 0;
     if (!g) return;
     render(millis());
 }
@@ -233,6 +237,16 @@ void Face::set(const String& expression) {
 void Face::tick() {
     if (!g) return;   // displayless builds / no panel detected
     uint32_t now = millis();
+
+    if (revertAt_ && now >= revertAt_) {
+        revertAt_ = 0;
+        expr_ = prevExpr_;
+        prevExpr_ = "neutral";
+        blinking_ = false;
+        render(now);
+        return;
+    }
+
     if (now - lastFrame_ < 66) return;   // ~15 fps
     lastFrame_ = now;
 

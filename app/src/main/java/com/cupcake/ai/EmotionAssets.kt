@@ -56,7 +56,10 @@ object EmotionAssets {
         "hungry" to "happy",
         "eating" to "happy",
         "pout" to "annoyed",
-        "normal" to "happy"
+        "normal" to "happy",
+        // A bare "neutral" used to fall through to itself and 404 on neutral.png.
+        "neutral" to "normal",
+        "rage" to "angry"
     )
 
     /** Asset stem -> ESP32 face expression (see EspWebSocketServer.FaceExpression). */
@@ -74,10 +77,29 @@ object EmotionAssets {
         "confident" to "neutral",
         "eating" to "neutral",
         "laugh" to "happy",
-        "excited" to "surprised",
+        "excited" to "excited",
         "lovely" to "heart_eyes",
         "flirty" to "wink",
-        "shock" to "surprised"
+        "shock" to "surprised",
+        "rage" to "rage"
+    )
+
+    /**
+     * ESP face for a raw tag. The phone folds every tag onto one of the 8 canonical
+     * art stems before painting the on-screen face, but the firmware's alias map
+     * (firmware/src/face.cpp drawFace) knows richer expressions — heart_eyes, wink,
+     * rage, excited — that the phone used to starve by sending the folded stem.
+     * A tag that maps 1:1 onto an ESP vocabulary name now passes through verbatim.
+     */
+    fun espFaceForTag(tag: String?): String? {
+        val lower = tag?.lowercase()?.trim() ?: return null
+        if (lower in directEspTags) return lower
+        return stemToEspFace[lower] ?: espFaceForStem(canonicalStem(lower))
+    }
+
+    private val directEspTags = setOf(
+        "happy", "sleepy", "surprised", "sad", "angry", "thinking", "confused",
+        "annoyed", "rage", "wink", "heart_eyes", "excited", "neutral"
     )
 
     private val tagRegex = Regex("\\[([a-zA-Z]+)\\]")

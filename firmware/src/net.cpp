@@ -152,7 +152,11 @@ void Net::handleEnvelope(const String& text) {
         String payload = doc["payload"].isNull() ? "" : String(doc["payload"].as<const char*>());
         JsonDocument p;
         if (!deserializeJson(p, payload)) {
-            if (onFace) onFace(String(p["expression"].as<const char*>()));
+            // The phone sends duration + emotion + image alongside the legacy
+            // expression; the duration defines how long the face lingers.
+            uint32_t durationMs = 0;
+            if (!p["duration"].isNull()) durationMs = p["duration"].as<uint32_t>();
+            if (onFace) onFace(String(p["expression"].as<const char*>()), durationMs);
         }
     } else if (type == "motor") {
         String payload = doc["payload"].isNull() ? "" : String(doc["payload"].as<const char*>());

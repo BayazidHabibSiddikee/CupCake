@@ -118,7 +118,7 @@ class ChatViewModel @Inject constructor(
     private var idleChatterJob: Job? = null
 
     /** Updates the live emotion face, the floating pet, and pushes the image to the ESP board. */
-    private fun pushEmotion(stem: String, duration: Int = 5000) {
+    private fun pushEmotion(stem: String, duration: Int = 5000, tag: String? = null) {
         _liveEmotionStem.value = stem
         if (stem == lastPushedFaceStem) return
         lastPushedFaceStem = stem
@@ -126,10 +126,17 @@ class ChatViewModel @Inject constructor(
         // Reflect the emotion on the floating companion overlay (static art, no VRM needed).
         if (ShimejiPetService.isRunning) {
             ShimejiPetService.setFace(appContext, com.cupcake.ai.EmotionAssets.assetForStem(stem))
+        } else {
+            // Overlay denied or service dead: hold the face and replay it on the
+            // next attach instead of silently dropping it.
+            ShimejiPetService.stashFace(com.cupcake.ai.EmotionAssets.assetForStem(stem))
         }
 
+        // The raw tag carries the richer firmware vocabulary (heart_eyes, wink,
+        // rage, excited) that folding to the canonical art stem would destroy.
         espServer.sendFaceExpression(
-            expression = com.cupcake.ai.EmotionAssets.espFaceForStem(stem),
+            expression = com.cupcake.ai.EmotionAssets.espFaceForTag(tag)
+                ?: com.cupcake.ai.EmotionAssets.espFaceForStem(stem),
             duration = duration,
             emotion = stem,
             imagePath = com.cupcake.ai.EmotionAssets.httpPathForStem(stem)
@@ -140,7 +147,7 @@ class ChatViewModel @Inject constructor(
     private fun refreshLiveEmotion(text: String) {
         if (text.length < 3) return
         val stem = com.cupcake.ai.EmotionAssets.stemForText(text)
-        if (stem != _liveEmotionStem.value) pushEmotion(stem)
+        if (stem != _liveEmotionStem.value) pushEmotion(stem, tag = com.cupcake.ai.EmotionAssets.tagOf(text))
     }
 
     private var systemPromptCache = ""
