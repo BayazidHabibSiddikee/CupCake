@@ -583,25 +583,51 @@ class ChatViewModel @Inject constructor(
         sessionStore.addMessage(characterId, message)
     }
 
-    private fun sendToEspForTts(text: String) {
-        espServer.sendCommand("speak", mapOf("text" to text))
-
-        // Voice-over: speak locally (over background music) and forward to any
-        // connected ESP speaker at the same time.
-        localSpeaker.speak(text) { com.cupcake.ai.EmotionAssets.speechText(it) }
+    /**
+     * One voice pipeline, two destinations. sendToEspForTts()/speakResponse() used
+     * to build two independent TTS streams that raced on identical millisecond
+     * utterance IDs and could double-speak or double-stream. Everything — the
+     * phone speaker, the ESP "speak" command and the ESP audio stream — now shares
+     * one synthesized stream.
+     */
+    private fun speakAsCompanion(rawText: String) {
+        // Same strip the local path applies: [emotion] tags and *actions* are
+        // choreography, not speech. ESP text and audio chunks must never see them.
+        val speech = com.cupcake.ai.EmotionAssets.speechText(rawText)
+        if (speech.isBlank()) return
+        // ESP firmware TTS (spoken by the doll itself)
+        espServer.sendCommand("speak", mapOf("text" to speech))
+        // Phone speaker (deliberately no audio focus — mixes over background music)
+        localSpeaker.speak(speech)
+        // Raw PCM stream to any connected ESP speaker. The TTS writes a WAV
+        // envelope; the firmware wants bare PCM, so drop the RIFF header.
         viewModelScope.launch(Dispatchers.IO) {
-            ttsManager.speakStreaming(text) { audioChunk ->
-                espServer.sendAudio(audioChunk)
+            var headerHandled = false
+            try {
+                ttsManager.speakStreaming(speech) { chunk ->
+                    val clean = if (!headerHandled && chunk.size > 48 &&
+                        chunk[0] == 'R'.toByte() && chunk[1] == 'I'.toByte() &&
+                        chunk[2] == 'F'.toByte() && chunk[3] == 'F'.toByte()
+                    ) {
+                        headerHandled = true
+                        chunk.copyOfRange(44, chunk.size)
+                    } else {
+                        chunk
+                    }
+                    espServer.sendAudio(clean)
+                }
+            } catch (e: Exception) {
+                Log.w("ChatViewModel", "ESP audio stream failed: ${e.message}")
             }
         }
     }
 
+    private fun sendToEspForTts(text: String) {
+        speakAsCompanion(text)
+    }
+
     private fun speakResponse(text: String) {
-        viewModelScope.launch(Dispatchers.IO) {
-            ttsManager.speakStreaming(text) { audioChunk ->
-                espServer.sendAudio(audioChunk)
-            }
-        }
+        speakAsCompanion(text)
     }
 
     // Game controls
