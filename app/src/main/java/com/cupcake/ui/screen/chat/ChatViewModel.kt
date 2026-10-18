@@ -198,7 +198,9 @@ class ChatViewModel @Inject constructor(
     fun ensureModelLoaded() {
         val config = _modelConfig.value
         if (config.isLocal()) {
-            val targetModel = config.modelName
+            // Configs saved by older builds sometimes carry a "models/" prefix;
+            // doubling it makes asset lookup fail and the load loop forever.
+            val targetModel = config.modelName.removePrefix("models/")
             if (LlamaEngine.getInstance().isReady() && LlamaEngine.getInstance().getLoadedModelName() == targetModel) {
                 _modelLoadState.value = ModelLoadState.Ready
                 drainPendingQueue()
@@ -673,6 +675,8 @@ class ChatViewModel @Inject constructor(
      * one synthesized stream.
      */
     private fun speakAsCompanion(rawText: String) {
+        // The Settings "Speak to me" switch (F8) mutes every voice path at once.
+        if (!com.cupcake.tts.VoiceSettings.isEnabled(appContext)) return
         // Same strip the local path applies: [emotion] tags and *actions* are
         // choreography, not speech. ESP text and audio chunks must never see them.
         val speech = com.cupcake.ai.EmotionAssets.speechText(rawText)
@@ -770,7 +774,16 @@ class ChatViewModel @Inject constructor(
     fun updateSystemPrompt(text: String?) {
         val trimmed = text?.trim().orEmpty()
         if (trimmed.isEmpty()) {
+            // Clear must also delete the stored row, otherwise the old prompt
+            // reappears on the next cold start.
+            val existing = _systemPrompt.value
             _systemPrompt.value = null
+            if (existing != null) {
+                viewModelScope.launch {
+                    runCatching { systemPromptRepository.deletePrompt(existing.id) }
+                        .onFailure { Log.w("ChatViewModel", "Failed to delete system prompt", it) }
+                }
+            }
             return
         }
         val existing = _systemPrompt.value
@@ -803,14 +816,16 @@ class ChatViewModel @Inject constructor(
     }
 }
 
-/** Cute spontaneous lines the companion may send on its own while the chat is open. */
+/** Cute spontaneous lines the companion may send on its own while the chat is open.
+ *  Tags are chosen from EmotionAssets/ESP-face vocabulary only — unresolvable tags
+ *  ([lovely], [flirty], [eating]) made the idle face fall back to blank/normal. */
 private val IDLE_CHATTER_LINES = listOf(
-    "*hums softly and glances at you* [lovely] Still there? I like having you around~",
-    "[excited] Ooh, I just thought of something fun! Want to hear it?",
+    "*hums softly and glances at you* [heart_eyes] Still there? I like having you around~",
+    "[happy] Ooh, I just thought of something fun! Want to hear it?",
     "*stretches* [normal] Taking a tiny break... don't wander off too far, okay?",
-    "[lovely] Hey, you've been quiet. Everything okay?",
+    "[heart_eyes] Hey, you've been quiet. Everything okay?",
     "*tilts head* [thinking] What are you up to right now?",
-    "[flirty] I was thinking about you again... oops, said that out loud!",
-    "*brings you a little snack* [eating] You should eat something too, you know!",
-    "[confident] I bet you're doing amazing today. Just saying~"
+    "[wink] I was thinking about you again... oops, said that out loud!",
+    "*brings you a little snack* [happy] You should eat something too, you know!",
+    "[wink] I bet you're doing amazing today. Just saying~"
 )

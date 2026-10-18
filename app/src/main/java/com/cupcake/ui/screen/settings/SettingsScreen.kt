@@ -215,6 +215,15 @@ fun SettingsScreen(
                 }
                 item { SoundAwarenessCard() }
 
+                // ---- Companion voice ------------------------------------------
+                item {
+                    SectionHeader(
+                        "🔊", "Companion Voice",
+                        "When CupCake talks back — on the phone speaker and streamed to the ESP32 board. Turn off for silent chat."
+                    )
+                }
+                item { VoiceCard() }
+
                 // ---- Shorts watchdog (doom-scroll radar) ----------------------
                 item {
                     SectionHeader(
@@ -408,6 +417,45 @@ private fun SoundAwarenessCard() {
                         stopSoundService(context)
                         listening = false
                     }
+                }
+            )
+        }
+    }
+}
+
+/**
+ * Toggle card for the companion's voice (phone TTS + ESP32 streaming).
+ * One shared preference — [com.cupcake.tts.VoiceSettings] — is consulted by
+ * LocalSpeaker and the chat voice fan-out, so both go quiet together (F8).
+ */
+@Composable
+private fun VoiceCard() {
+    val context = LocalContext.current
+    var enabled by remember { mutableStateOf(com.cupcake.tts.VoiceSettings.isEnabled(context)) }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Speak to me", fontWeight = FontWeight.SemiBold)
+                Text(
+                    if (enabled) "Voice on 🔊" else "Voice off — text only",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(
+                checked = enabled,
+                onCheckedChange = { on ->
+                    com.cupcake.tts.VoiceSettings.setEnabled(context, on)
+                    enabled = on
                 }
             )
         }

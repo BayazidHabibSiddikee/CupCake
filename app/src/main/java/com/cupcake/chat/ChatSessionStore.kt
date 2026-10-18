@@ -27,7 +27,6 @@ class ChatSessionStore @Inject constructor(
     constructor() : this(null)
 
     private val sessions = ConcurrentHashMap<String, MutableStateFlow<List<ChatMessage>>>()
-    private val idCounter = java.util.concurrent.atomic.AtomicLong(1L)
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     init {
@@ -48,8 +47,10 @@ class ChatSessionStore @Inject constructor(
 
     fun addMessage(characterId: String, message: ChatMessage) {
         val flow = session(characterId)
-        val uniqueId = if (message.id > 0) message.id else idCounter.getAndIncrement()
-        val stamped = message.copy(id = uniqueId, conversationId = conversationIdFor(characterId))
+        // id==0 keeps the message id/0 for the UI (Room autoGenerate assigns the real
+        // row id on insert). Fabricating a parallel counter here collided with Room's
+        // own ids (both minted id=N), so insert(REPLACE) silently deleted whole rows.
+        val stamped = message.copy(conversationId = conversationIdFor(characterId))
         flow.value = flow.value + stamped
 
         database?.let { db ->
@@ -102,11 +103,13 @@ class ChatSessionStore @Inject constructor(
                         val convId = conversationIdFor(characterId)
                         val stored = db.chatMessageDao().getMessagesPaged(convId, 300, 0)
                         if (stored.isNotEmpty()) {
-                            flow.value = stored
-                            val maxId = stored.maxOfOrNull { it.id } ?: 0L
-                            if (maxId >= idCounter.get()) {
-                                idCounter.set(maxId + 1)
+                            // Merge, never replace: a message sent while the load was
+                            // in flight must not be orphaned (it was dropped this way).
+                            val inFlight = flow.value.filterNot { migrated ->
+                                stored.any { s -> s.id == migrated.id }
                             }
+                            flow.value = (stored + inFlight)
+                                .sortedBy { it.timestamp.toEpochMilli() }
                         }
                     } catch (e: Exception) {
                         android.util.Log.e("ChatSessionStore", "Failed to load chat history for $characterId", e)
