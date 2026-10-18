@@ -101,4 +101,65 @@ class EmotionAssetsTest {
         assertNull(EmotionAssets.tagOf("no tags here"))
         assertNull(EmotionAssets.tagOf("[no-space]"))
     }
+
+    // -- regression tests for the verify-fix pass (H5/M4/F6/F8/P2-1/P2-3) ----
+
+    @Test
+    fun `speech strip removes tags and stage directions for TTS`() {
+        // Game ESP path used to speak "[happy] *waves* ..." aloud (F6/M4).
+        assertEquals("hello cutie", EmotionAssets.speechText("[happy] *waves* hello cutie"))
+        assertEquals("hi there", EmotionAssets.speechText("[heart_eyes] hi there"))
+        assertEquals("", EmotionAssets.speechText("[sad] *sighs*"))
+    }
+
+    @Test
+    fun `sticker parity - tag wins over lexical content`() {
+        // P2-1: ChatScreen must agree with ChatViewModel.stemForText.
+        assertEquals("sad", EmotionAssets.stemForText("[sad] *bounces* yay!"))
+        assertEquals("happy", EmotionAssets.stemForText("[happy] *bounces* boo hiss"))
+    }
+
+    @Test
+    fun `neutral stem never 404s on disk`() {
+        // P2-3: neutral.png does not ship; only normal.png does.
+        assertEquals("$base/normal.png", EmotionAssets.assetForStem("neutral"))
+        assertEquals("$base/normal.png", EmotionAssets.assetForStem("normal"))
+    }
+
+    @Test
+    fun `esp constants cover all on-device stems`() {
+        // P1-2/P2-3 leftovers: every canonical stem must reach a named constant.
+        val faces = setOf(
+            com.cupcake.network.EspWebSocketServer.FaceExpression.NEUTRAL,
+            com.cupcake.network.EspWebSocketServer.FaceExpression.HAPPY,
+            com.cupcake.network.EspWebSocketServer.FaceExpression.SAD,
+            com.cupcake.network.EspWebSocketServer.FaceExpression.ANGRY,
+            com.cupcake.network.EspWebSocketServer.FaceExpression.RAGE,
+            com.cupcake.network.EspWebSocketServer.FaceExpression.EXCITED,
+            com.cupcake.network.EspWebSocketServer.FaceExpression.THINKING,
+            com.cupcake.network.EspWebSocketServer.FaceExpression.SLEEPY,
+            com.cupcake.network.EspWebSocketServer.FaceExpression.WINK,
+            com.cupcake.network.EspWebSocketServer.FaceExpression.HEART_EYES,
+            com.cupcake.network.EspWebSocketServer.FaceExpression.SURPRISED,
+            com.cupcake.network.EspWebSocketServer.FaceExpression.CONFUSED,
+            com.cupcake.network.EspWebSocketServer.FaceExpression.ANNOYED
+        )
+        for (stem in EmotionAssets.ALL_STEMS + listOf("normal", "neutral")) {
+            val face = EmotionAssets.espFaceForStem(
+                EmotionAssets.canonicalStem(stem).let {
+                    // mirror assetForStem canonicalization for the legacy names
+                    it
+                }
+            )
+            if (stem == "neutral") {
+                assertEquals("neutral", EmotionAssets.espFaceForStem("normal"))
+            } else {
+                assertTrue("stem=$stem face=$face", face in faces || face == "neutral")
+            }
+        }
+        assertEquals(
+            "tantrum",
+            com.cupcake.network.EspWebSocketServer.MotorAction.TANTRUM
+        )
+    }
 }

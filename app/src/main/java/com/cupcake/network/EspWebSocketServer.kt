@@ -101,6 +101,9 @@ object EspWebSocketServer {
         const val SLEEPY = "sleepy"
         const val WINK = "wink"
         const val HEART_EYES = "heart_eyes"
+        const val SURPRISED = "surprised"
+        const val CONFUSED = "confused"
+        const val ANNOYED = "annoyed"
     }
 
     // Motor actions
@@ -108,7 +111,9 @@ object EspWebSocketServer {
         const val IDLE = "idle"
         const val NOD = "nod"
         const val SHAKE = "shake"
-        const val TANTUM = "tantrum"
+        const val TANTRUM = "tantrum"
+        // Legacy misspelling kept for callers compiled against it (P2-4).
+        const val TANTUM = TANTRUM
         const val DANCE = "dance"
         const val WAVE = "wave"
         const val LOOK_LEFT = "look_left"

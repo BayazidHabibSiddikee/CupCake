@@ -136,7 +136,7 @@ class LilTiiEvaluator(
         val trimmed = rawOutput.trim()
         // Find the tag anywhere so we can distinguish "absent" from "present but
         // misplaced / not in the allowed set" — the two failure modes need different fixes.
-        val tagRegex = Regex("""\[([a-zA-Z]+)\]""")
+        val tagRegex = Regex("""\[([a-zA-Z_]+)\]""")
         val allowedTags = EmotionTags.SET
         val actionRegex = Regex("""^\*(.+?)\*\s*""")
 

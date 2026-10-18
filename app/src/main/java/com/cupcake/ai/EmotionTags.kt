@@ -3,7 +3,7 @@ package com.cupcake.ai
 /**
  * The one and only emotion-tag vocabulary.
  *
- * These seven tags are exactly what the bundled `liltii-v0.2` GGUF was fine-tuned to emit,
+ * These eight tags are exactly what the bundled `liltii-v0.2` GGUF was fine-tuned to emit,
  * so every consumer MUST read them from here instead of re-declaring its own list:
  *
  *  - the training-data generators (`training/build_dataset.py`, `augment_*.py`),
@@ -29,7 +29,7 @@ object EmotionTags {
     /** `[happy] [sleepy] ...` — ready to embed in a prompt instruction line. */
     val PROMPT_LIST: String = ALL.joinToString(" ") { "[$it]" }
 
-    private val TAG_REGEX = Regex("""\[([a-zA-Z]+)]""")
+    private val TAG_REGEX = Regex("""\[([a-zA-Z_]+)]""")
 
     /** True when [tag] (any case) is one of the [ALL] canonical tags. */
     fun isKnown(tag: String?): Boolean = tag != null && tag.lowercase() in SET

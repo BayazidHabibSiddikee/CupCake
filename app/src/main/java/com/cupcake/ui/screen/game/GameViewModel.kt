@@ -85,10 +85,10 @@ class GameViewModel @Inject constructor(
                 espServer.sendFaceExpression(expression, 3000)
 
                 val motorAction = when (reaction.mood) {
-                    GameManager.ReactionMood.ANGRY -> EspWebSocketServer.MotorAction.TANTUM
+                    GameManager.ReactionMood.ANGRY -> EspWebSocketServer.MotorAction.TANTRUM
                     GameManager.ReactionMood.SAD -> EspWebSocketServer.MotorAction.SHAKE
                     GameManager.ReactionMood.GLOATING -> EspWebSocketServer.MotorAction.DANCE
-                    else -> if (reaction.humanWon) EspWebSocketServer.MotorAction.TANTUM
+                    else -> if (reaction.humanWon) EspWebSocketServer.MotorAction.TANTRUM
                             else EspWebSocketServer.MotorAction.DANCE
                 }
                 espServer.sendMotorAction(motorAction)
@@ -117,12 +117,34 @@ class GameViewModel @Inject constructor(
                     )
                 }
 
+                val speech = com.cupcake.ai.EmotionAssets.speechText(reaction.text)
+                if (speech.isBlank()) return@collect
                 refreshEscalation()
 
+                // Single shared voice pipeline: gate once, strip once, synthesize once.
+                // (F6/F7/F8/F9) The old code ran localSpeaker.speak() AND a raw
+                // ttsManager.speakStreaming(reaction.text) — double synthesis, raw
+                // [emotion] tags + WAV header to ESP, and the ESP half bypassed
+                // the Settings "Speak to me" toggle.
+                if (!com.cupcake.tts.VoiceSettings.isEnabled(appContext)) return@collect
                 viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                    localSpeaker.speak(reaction.text) { com.cupcake.ai.EmotionAssets.speechText(it) }
-                    ttsManager.speakStreaming(reaction.text) { audioChunk ->
-                        espServer.sendAudio(audioChunk)
+                    try {
+                        localSpeaker.speak(speech)
+                        var headerHandled = false
+                        ttsManager.speakStreaming(speech) { audioChunk ->
+                            val clean = if (!headerHandled && audioChunk.size > 48 &&
+                                audioChunk[0] == 'R'.code.toByte() && audioChunk[1] == 'I'.code.toByte() &&
+                                audioChunk[2] == 'F'.code.toByte() && audioChunk[3] == 'F'.code.toByte()
+                            ) {
+                                headerHandled = true
+                                audioChunk.copyOfRange(44, audioChunk.size)
+                            } else {
+                                audioChunk
+                            }
+                            espServer.sendAudio(clean)
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.w("GameViewModel", "game voice failed: ${e.message}")
                     }
                 }
             }

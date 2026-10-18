@@ -102,7 +102,7 @@ object EmotionAssets {
         "annoyed", "rage", "wink", "heart_eyes", "excited", "neutral"
     )
 
-    private val tagRegex = Regex("\\[([a-zA-Z]+)\\]")
+    private val tagRegex = Regex("\\[([a-zA-Z_]+)\\]")
 
     /** First bracketed emotion tag in [text], lowercased, if any. */
     fun tagOf(text: String): String? =
@@ -110,7 +110,7 @@ object EmotionAssets {
 
     /** Text suitable for speaking: drops [emotion] tags and *stage directions*. */
     fun speechText(text: String): String =
-        text.replace(Regex("\\s*\\[[a-zA-Z]+]"), "")
+        text.replace(Regex("\\s*\\[[a-zA-Z_]+]"), "")
             .replace(Regex("\\s*\\*[^*]{0,120}\\*"), "")
             .replace(Regex("\\s+"), " ")
             .trim()
@@ -124,7 +124,12 @@ object EmotionAssets {
         return stemForEmotion(EmotionClassifier.detectEmotion(text))
     }
 
-    fun assetForStem(stem: String): String = "$URL_PREFIX/$stem.png"
+    fun assetForStem(stem: String): String {
+        // P2-3: a bare "neutral" has no neutral.png on disk (only normal.png).
+        // Canonicalize so direct callers never 404.
+        val disk = if (stem.lowercase() == "neutral") "normal" else stem
+        return "$URL_PREFIX/$disk.png"
+    }
 
     fun assetForText(text: String): String = assetForStem(stemForText(text))
 

@@ -114,13 +114,19 @@ class ChatViewModel @Inject constructor(
 
     private var lastPushedFaceStem: String? = null
 
+    // Declared before any init{} runs: ensureModelLoaded → drainPendingQueue
+    // is invoked from the constructor and Kotlin initializes members in order.
+    private val pendingUserMessages = ArrayDeque<String>()
+
     /** Job that occasionally lets the companion speak first while the chat is open. */
     private var idleChatterJob: Job? = null
 
     /** Updates the live emotion face, the floating pet, and pushes the image to the ESP board. */
-    private fun pushEmotion(stem: String, duration: Int = 5000, tag: String? = null) {
+    private fun pushEmotion(stem: String, duration: Int = 5000, tag: String? = null, force: Boolean = false) {
         _liveEmotionStem.value = stem
-        if (stem == lastPushedFaceStem) return
+        // P3-1: streaming dedup suppresses re-asserts of the same stem after the
+        // overlay's 6s auto-restore — a new message boundary must force a re-push.
+        if (!force && stem == lastPushedFaceStem) return
         lastPushedFaceStem = stem
 
         // Reflect the emotion on the floating companion overlay (static art, no VRM needed).
@@ -247,9 +253,9 @@ class ChatViewModel @Inject constructor(
                     _modelLoadState.value = connectionResult.fold(
                         onSuccess = { connected ->
                             if (connected) ModelLoadState.Ready
-                            else ModelLoadState.Error("Init failed")
+                            else ModelLoadState.Error("Init failed: server at $baseUrl unreachable or wrong API path — expected Ollama /api/chat or OpenAI-compatible /chat/completions (M5)")
                         },
-                        onFailure = { ModelLoadState.Error(it.message ?: "Connection failed") }
+                        onFailure = { ModelLoadState.Error("Connection failed ($baseUrl): ${it.message ?: "unknown error"}") }
                     )
                 }
                 if (_modelLoadState.value is ModelLoadState.Ready) drainPendingQueue()
@@ -313,7 +319,7 @@ class ChatViewModel @Inject constructor(
                 refreshLiveEmotion(reaction.text)
 
                 // Motor action
-                val motorAction = if (reaction.humanWon) EspWebSocketServer.MotorAction.TANTUM
+                val motorAction = if (reaction.humanWon) EspWebSocketServer.MotorAction.TANTRUM
                 else EspWebSocketServer.MotorAction.DANCE
                 espServer.sendMotorAction(motorAction)
 
@@ -440,8 +446,6 @@ class ChatViewModel @Inject constructor(
         startGeneration(sanitized, config)
     }
 
-    private val pendingUserMessages = ArrayDeque<String>()
-
     /** Replays the last held message when the engine becomes usable. */
     private fun drainPendingQueue() {
         if (_isGenerating.value) return
@@ -544,8 +548,15 @@ class ChatViewModel @Inject constructor(
                 _currentResponse.value = ""
 
                 if (fullResponse.isNotBlank()) {
-                    // Settle the live face on the raw response (containing tags) BEFORE translation
-                    refreshLiveEmotion(fullResponse.trim())
+                    // Settle the live face on the raw response (containing tags) BEFORE translation.
+                    // Force: a completed message re-asserts even when the stem matches
+                    // the streaming value (beats overlay auto-restore, P3-1).
+                    val settledStem = com.cupcake.ai.EmotionAssets.stemForText(fullResponse.trim())
+                    pushEmotion(
+                        settledStem,
+                        tag = com.cupcake.ai.EmotionAssets.tagOf(fullResponse.trim()),
+                        force = true
+                    )
 
                     // Translate output
                     val personality = currentCharacter.value?.personality ?: ""

@@ -116,7 +116,7 @@ class LilTiiEvalViewModel @Inject constructor(
                             }
                             val raw = sb.toString()
                             val trimmed = raw.trim()
-                            val emotionTagRegex = Regex("""^\[([a-zA-Z]+)\]\s*(.*)""", RegexOption.IGNORE_CASE)
+                            val emotionTagRegex = Regex("""^\[([a-zA-Z_]+)\]\s*(.*)""", RegexOption.IGNORE_CASE)
                             val actionRegex = Regex("""^\*(.+?)\*\s*""")
                             val tagMatch = emotionTagRegex.find(trimmed)
                             val emotionTag = tagMatch?.groupValues?.getOrNull(1)?.lowercase()

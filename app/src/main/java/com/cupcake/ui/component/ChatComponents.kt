@@ -130,7 +130,7 @@ fun ChatMessageItem(
 
                 Column(modifier = Modifier.widthIn(max = 285.dp)) {
                     val displayText = remember(message.content) {
-                        message.content.replaceFirst(Regex("^\\s*\\[[a-zA-Z]+\\]\\s*"), "")
+                        message.content.replaceFirst(Regex("^\\s*\\[[a-zA-Z_]+\\]\\s*"), "")
                     }
 
                     Box(

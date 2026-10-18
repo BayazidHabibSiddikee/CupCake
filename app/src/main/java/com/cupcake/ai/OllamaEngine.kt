@@ -362,12 +362,23 @@ class OllamaEngine private constructor(
                             }
 
                             // Try OpenAI format: {"choices": [{"delta": {"content": "..."}}]}
+                            // or non-stream {"choices": [{"message": {"content": "..."}}]} (H5).
                             val choices = jsonObj["choices"]?.jsonArray
                             if (choices != null && choices.isNotEmpty()) {
-                                val delta = choices[0].jsonObject["delta"]?.jsonObject
+                                val first = choices[0].jsonObject
+                                val delta = first["delta"]?.jsonObject
                                 val openAiContent = delta?.get("content")?.jsonPrimitive?.content
+                                    ?: first["message"]?.jsonObject?.get("content")?.jsonPrimitive?.content
                                 if (!openAiContent.isNullOrEmpty()) {
                                     callback.onToken(openAiContent)
+                                }
+                                // Server-side refusal / error payload: surface it instead of
+                                // falling through to the empty-response fallback (H5/M5).
+                                val errObj = first["error"]?.jsonObject ?: jsonObj["error"]?.jsonObject
+                                val errMsg = errObj?.get("message")?.jsonPrimitive?.content
+                                if (!errMsg.isNullOrEmpty()) {
+                                    callback.onError(errMsg)
+                                    return@use
                                 }
                                 // finish_reason present ⇒ last chunk of this response
                                 val finishReason =
@@ -382,6 +393,19 @@ class OllamaEngine private constructor(
                             if (isDone) {
                                 finish()
                                 break
+                            }
+
+                            // Ollama /api/generate shape: {"response": "...", "done": false} (H5).
+                            val generateText = jsonObj["response"]?.jsonPrimitive?.content
+                            if (!generateText.isNullOrEmpty()) {
+                                callback.onToken(generateText)
+                            }
+                            // Top-level error object (both APIs): don't swallow it (H5/M5).
+                            if (jsonObj["error"]?.jsonObject?.get("message")?.jsonPrimitive?.content?.isNotBlank() == true &&
+                                jsonObj["choices"] == null && jsonObj["message"] == null && jsonObj["response"] == null
+                            ) {
+                                callback.onError(jsonObj["error"]!!.jsonObject["message"]!!.jsonPrimitive.content)
+                                return@use
                             }
                         } catch (e: Exception) {
                             Log.w(TAG, "Failed parsing chunk: $jsonString", e)

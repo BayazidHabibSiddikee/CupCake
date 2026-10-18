@@ -94,18 +94,25 @@ fun ChatScreen(
             )
 
             // Emotion sticker panel (toggled from the header)
+            // P2-1: tag wins, exactly like ChatViewModel.stemForText — the old
+            // classifier-only path diverged (e.g. "[sad] *bounces* yay!" showed a
+            // sad header but a happy sticker).
             if (showFace) {
-                val detectedEmotion = remember(currentResponse, messages.size) {
-                    val companionText = if (currentResponse.isNotBlank()) {
-                        currentResponse
-                    } else {
-                        messages.lastOrNull { it.role == com.cupcake.data.model.ChatMessage.MessageRole.ASSISTANT }?.content
-                            ?: messages.lastOrNull()?.content
-                            ?: ""
-                    }
-                    com.cupcake.ai.EmotionClassifier.detectEmotion(companionText)
+                val companionText = if (currentResponse.isNotBlank()) {
+                    currentResponse
+                } else {
+                    messages.lastOrNull { it.role == com.cupcake.data.model.ChatMessage.MessageRole.ASSISTANT }?.content
+                        ?: messages.lastOrNull()?.content
+                        ?: ""
                 }
-                val stem = com.cupcake.ai.EmotionAssets.stemForEmotion(detectedEmotion)
+                val stem = remember(companionText, messages.size) {
+                    com.cupcake.ai.EmotionAssets.stemForText(companionText)
+                }
+                val detectedName = remember(stem) {
+                    com.cupcake.ai.EmotionAssets.stemFromAsset(
+                        com.cupcake.ai.EmotionAssets.assetForStem(stem)
+                    ) ?: stem
+                }
 
                 Surface(
                     modifier = Modifier
@@ -117,7 +124,7 @@ fun ChatScreen(
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         coil.compose.AsyncImage(
                             model = com.cupcake.ai.EmotionAssets.assetForStem(stem),
-                            contentDescription = "CupCake looks ${detectedEmotion.name.lowercase()}",
+                            contentDescription = "CupCake looks $detectedName",
                             modifier = Modifier.fillMaxSize().padding(8.dp),
                             contentScale = androidx.compose.ui.layout.ContentScale.Fit
                         )
@@ -130,7 +137,7 @@ fun ChatScreen(
                             shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
                         ) {
                             Text(
-                                text = "Emotion: ${detectedEmotion.name.lowercase().replaceFirstChar { it.uppercase() }}",
+                                text = "Emotion: ${detectedName.replaceFirstChar { it.uppercase() }}",
                                 fontSize = 11.sp,
                                 color = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
