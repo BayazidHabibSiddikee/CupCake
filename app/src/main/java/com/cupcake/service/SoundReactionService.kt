@@ -4,6 +4,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
@@ -11,6 +12,7 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.app.ServiceCompat
 import com.cupcake.R
 import com.cupcake.ai.SoundClassifier
 import kotlinx.coroutines.CoroutineScope
@@ -35,6 +37,11 @@ class SoundReactionService : Service() {
     /** Per-category throttle so the companion doesn't repeat the same quip. */
     private val lastReactionAt = HashMap<String, Long>()
     private var lastLabel: String? = null
+    /** Temporal smoothing: the same category must appear in N consecutive frames. */
+    private var candidateCategory: String? = null
+    private var candidateLabel: String? = null
+    private var candidateHits = 0
+    private val requiredHits = 2
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -48,8 +55,11 @@ class SoundReactionService : Service() {
         when (intent?.action) {
             ACTION_START -> startListening()
             ACTION_STOP -> stopListening()
+            else -> stopSelf()   // restarted without an action: don't linger
         }
-        return START_STICKY
+        // User-driven service: never auto-restart from the background, where a
+        // microphone FGS start is disallowed and would crash-loop.
+        return START_NOT_STICKY
     }
 
     private fun startListening() {
@@ -93,7 +103,25 @@ class SoundReactionService : Service() {
         record.startRecording()
         listening = true
         isListening = true
-        startForeground(NOTIF_ID, buildNotification("Listening for sounds…"))
+        try {
+            ServiceCompat.startForeground(
+                this,
+                NOTIF_ID,
+                buildNotification("Listening for sounds…"),
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE else 0,
+            )
+        } catch (e: SecurityException) {
+            // Started from the background — mic FGS isn't allowed there. Bail out
+            // cleanly instead of crashing (the UI toggle starts us in foreground).
+            Log.w(TAG, "Cannot start mic foreground service from background: ${e.message}")
+            listening = false
+            isListening = false
+            runCatching { record.stop(); record.release() }
+            audioRecord = null
+            stopSelf()
+            return
+        }
         Log.i(TAG, "Listening started")
 
         scope.launch {
@@ -111,7 +139,24 @@ class SoundReactionService : Service() {
                     if (peak > 900) {
                         for (i in 0 until read) floats[i] = shorts[i] / 32768f
                         val event = classifier?.classify(floats)
-                        if (event != null) handleEvent(event.category, event.label, event.confidence)
+                        if (event != null) {
+                            // Require the same category twice in a row before reacting —
+                            // single-frame noise blips are ignored.
+                            if (event.category == candidateCategory) {
+                                candidateHits++
+                            } else {
+                                candidateCategory = event.category
+                                candidateLabel = event.label
+                                candidateHits = 1
+                            }
+                            if (candidateHits >= requiredHits) {
+                                handleEvent(event.category, event.label, event.confidence)
+                                candidateHits = 0
+                            }
+                        } else {
+                            candidateCategory = null
+                            candidateHits = 0
+                        }
                     }
                 }
                 delay(150)
