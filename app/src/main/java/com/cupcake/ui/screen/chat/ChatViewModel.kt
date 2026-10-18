@@ -194,6 +194,7 @@ class ChatViewModel @Inject constructor(
             val targetModel = config.modelName
             if (LlamaEngine.getInstance().isReady() && LlamaEngine.getInstance().getLoadedModelName() == targetModel) {
                 _modelLoadState.value = ModelLoadState.Ready
+                drainPendingQueue()
                 return
             }
             _modelLoadState.value = ModelLoadState.Loading("Loading $targetModel...")
@@ -223,6 +224,7 @@ class ChatViewModel @Inject constructor(
                     } else {
                         ModelLoadState.Error(result.exceptionOrNull()?.message ?: "Failed to load model")
                     }
+                    if (result.isSuccess) drainPendingQueue()
                 } catch (e: Exception) {
                     _modelLoadState.value = ModelLoadState.Error(e.message ?: "Failed to load model")
                 }
@@ -241,6 +243,7 @@ class ChatViewModel @Inject constructor(
                         onFailure = { ModelLoadState.Error(it.message ?: "Connection failed") }
                     )
                 }
+                if (_modelLoadState.value is ModelLoadState.Ready) drainPendingQueue()
             }
         }
     }
@@ -387,8 +390,19 @@ class ChatViewModel @Inject constructor(
 
     fun sendMessage(text: String) {
         val sanitized = sanitizeInput(text)
-        if (sanitized.isBlank() || _isGenerating.value) return
-        
+        if (sanitized.isBlank()) return
+
+        // Queue instead of dropping: while a reply is streaming, a follow-up text
+        // used to be silently eaten by the isGenerating gate.
+        if (_isGenerating.value) {
+            pendingUserMessages.addLast(sanitized)
+            return
+        }
+
+        // Preserve the user's message bubble BEFORE the model-lock check below —
+        // bailing without adding the message is what made "emoji-only" texts
+        // disappear. The inverse also pays off: the sanitized text is what the
+        // user sees on screen, so don't mangle quotes/emojis away.
         val config = _modelConfig.value
         val isReady = if (config.isLocal()) LlamaEngine.getInstance().isReady() else ollamaEngine.isReady()
         if (!isReady) {
@@ -400,41 +414,80 @@ class ChatViewModel @Inject constructor(
                     conversationId
                 )
             )
+            // Hold the text and replay it once the engine finishes loading instead
+            // of silently eating the message.
+            pendingUserMessages.addLast(sanitized)
             return
         }
-        
+
         // Check energy
         energyManager.consumeEnergy() // Consume it but don't block if they don't have it (make it simple!)
-        
+
         val userMessage = ChatMessage.user(sanitized, conversationId)
         addMessage(userMessage)
         com.cupcake.ai.ProactiveEngagementManager.onUserActivity(appContext)
         scheduleIdleChatter()
 
+        startGeneration(sanitized, config)
+    }
+
+    private val pendingUserMessages = ArrayDeque<String>()
+
+    /** Replays the last held message when the engine becomes usable. */
+    private fun drainPendingQueue() {
+        if (_isGenerating.value) return
+        val next = pendingUserMessages.removeFirstOrNull() ?: return
+        viewModelScope.launch { sendMessage(next) }
+    }
+
+    /** Head of the work: bubble already added, model confirmed ready. */
+    private fun startGeneration(userText: String, config: ModelConfig) = viewModelScope.launch {
         _isGenerating.value = true
         _currentResponse.value = ""
         // Show a "thinking" face the moment the companion starts composing.
         pushEmotion("thinking")
 
-        viewModelScope.launch {
-            var fullResponse = ""
+        var fullResponse = ""
 
             try {
                 if (config.isLocal()) {
                     val prompt = buildPrompt()
-                    // buildPrompt always injects CUTE_STYLE, so constrain the sampler to the
-                    // same [tag] *action* reply shape: format compliance becomes deterministic
-                    // instead of ~50% on the 0.6B model.
-                    LlamaEngine.getInstance()
-                        .setGrammar(com.cupcake.ai.EmotionGrammar.TAG_ACTION)
-                    val tokenChannel = LlamaEngine.getInstance().generateStream(prompt, preempt = true)
-                    var tick = 0
-                    for (token in tokenChannel) {
-                        fullResponse += token
-                        _currentResponse.value = fullResponse
-                        if (++tick % 3 == 0) refreshLiveEmotion(fullResponse)
+                    // Grammar ladder: the fully-forced `[tag] *action* reply`
+                    // grammar can wedge a 0.6B model into an empty decode until
+                    // the 90s watchdog fires. Retry downwards, last run fully
+                    // unconstrained, rather than dropping the turn.
+                    val engine = LlamaEngine.getInstance()
+                    val grammarLadder = listOf(
+                        com.cupcake.ai.EmotionGrammar.TAG_ACTION,
+                        com.cupcake.ai.EmotionGrammar.TAG_ONLY,
+                        null
+                    )
+                    var decodeFailed: Exception? = null
+                    for (grammar in grammarLadder) {
+                        engine.setGrammar(grammar)
+                        var attempt = ""
+                        var tick = 0
+                        try {
+                            for (token in engine.generateStream(prompt, preempt = true)) {
+                                attempt += token
+                                _currentResponse.value = attempt
+                                if (++tick % 3 == 0) refreshLiveEmotion(attempt)
+                            }
+                            decodeFailed = null
+                        } catch (e: Exception) {
+                            decodeFailed = e
+                            Log.w(
+                                "ChatViewModel",
+                                "attempt with grammar=${grammar?.take(10) ?: "none"} failed: ${e.message}"
+                            )
+                        }
+                        refreshLiveEmotion(attempt)
+                        if (attempt.isNotBlank()) {
+                            fullResponse = attempt
+                            break
+                        }
                     }
-                    refreshLiveEmotion(fullResponse)
+                    if (fullResponse.isBlank() && decodeFailed != null) throw decodeFailed
                 } else {
                     val personality = currentCharacter.value?.personality ?: ""
                     val messages = buildOllamaMessages()
@@ -518,16 +571,18 @@ class ChatViewModel @Inject constructor(
                         )
                     )
                 }
+
+                // A pending follow-up (or a held "model loading" text) now gets its
+                // turn instead of vanishing.
+                drainPendingQueue()
             }
         }
-    }
 
-    /** Cleans input of emojis and distracting special characters (like ~ / ") before sending to LLM. */
+    /** Removes invisible padding — nothing else. Stripping quotes/emojis here
+     *  mangled authentic input ("i love you 😍") and made emoji-only texts drop
+     *  as blank; the 0.6B model handles raw text fine. */
     private fun sanitizeInput(text: String): String {
-        // Strip emojis and common symbols used in user input that distract small models
-        return text.replace(Regex("[\\uD83C-\\uDBFF\\uDC00-\\uDFFF]+"), "")
-                    .replace(Regex("[~\"']"), "")
-                    .trim()
+        return text.trim()
     }
 
     private fun buildPrompt(): String {
