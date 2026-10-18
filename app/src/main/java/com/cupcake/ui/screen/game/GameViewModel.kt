@@ -2,12 +2,15 @@ package com.cupcake.ui.screen.game
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import android.content.Context
 import com.cupcake.ai.AdManager
 import com.cupcake.ai.AdResult
+import com.cupcake.ai.EmotionAssets
 import com.cupcake.ai.EnergyManager
 import com.cupcake.game.GameManager
 import com.cupcake.game.PointsManager
 import com.cupcake.network.EspWebSocketServer
+import com.cupcake.service.ShimejiPetService
 import com.cupcake.tts.TtsManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,6 +18,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 
 @HiltViewModel
 class GameViewModel @Inject constructor(
@@ -24,7 +28,8 @@ class GameViewModel @Inject constructor(
     private val ttsManager: TtsManager,
     private val localSpeaker: com.cupcake.tts.LocalSpeaker,
     private val espServer: EspWebSocketServer,
-    private val adManager: AdManager
+    private val adManager: AdManager,
+    @ApplicationContext private val appContext: Context
 ) : ViewModel() {
 
     private val _gameState = MutableStateFlow<GameManager.Result?>(null)
@@ -39,6 +44,10 @@ class GameViewModel @Inject constructor(
     /** The bot's latest comment about the game — shown as a bubble above the board. */
     private val _botComment = MutableStateFlow<String?>(null)
     val botComment = _botComment.asStateFlow()
+
+    /** Live emotion art stem the bot wears during the game (drives the avatar + floating pet). */
+    private val _botEmotionStem = MutableStateFlow("happy")
+    val botEmotionStem = _botEmotionStem.asStateFlow()
 
     val points = pointsManager.points
     val level = pointsManager.level
@@ -82,6 +91,28 @@ class GameViewModel @Inject constructor(
                             else EspWebSocketServer.MotorAction.DANCE
                 }
                 espServer.sendMotorAction(motorAction)
+
+                // Show the same emotion on-device (avatar + floating pet) — not just on
+                // the ESP board — so games still emote when no hardware is connected.
+                val stem = when (reaction.mood) {
+                    GameManager.ReactionMood.ANGRY -> "angry"
+                    GameManager.ReactionMood.SAD -> "sad"
+                    GameManager.ReactionMood.GLOATING -> "annoyed"
+                    GameManager.ReactionMood.HAPPY -> "happy"
+                    GameManager.ReactionMood.NEUTRAL -> when {
+                        reaction.humanWon -> "angry"
+                        reaction.isDraw -> "thinking"
+                        else -> "happy"
+                    }
+                }
+                _botEmotionStem.value = stem
+                if (ShimejiPetService.isRunning) {
+                    ShimejiPetService.showSpeech(
+                        appContext,
+                        reaction.text,
+                        EmotionAssets.assetForStem(stem)
+                    )
+                }
 
                 refreshEscalation()
 

@@ -65,6 +65,7 @@ fun GameScreen(
     val availableGames by viewModel.availableGames.collectAsStateWithLifecycle()
     val selectedDifficulty by viewModel.selectedDifficulty.collectAsStateWithLifecycle()
     val botComment by viewModel.botComment.collectAsStateWithLifecycle()
+    val botEmotionStem by viewModel.botEmotionStem.collectAsStateWithLifecycle()
     val moodRank by viewModel.moodRank.collectAsStateWithLifecycle()
     val angerLevel by viewModel.angerLevel.collectAsStateWithLifecycle()
     val adaptiveDifficultyName by viewModel.adaptiveDifficultyName.collectAsStateWithLifecycle()
@@ -171,7 +172,10 @@ fun GameScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(text = "🌸", fontSize = 20.sp)
+                        com.cupcake.ui.component.CharacterAvatar(
+                            avatar = com.cupcake.ai.EmotionAssets.assetForStem(botEmotionStem),
+                            modifier = Modifier.size(40.dp)
+                        )
                         Text(
                             text = comment,
                             modifier = Modifier.weight(1f),
