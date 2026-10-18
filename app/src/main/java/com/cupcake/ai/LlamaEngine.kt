@@ -2,6 +2,7 @@ package com.cupcake.ai
 
 import android.content.Context
 import android.util.Log
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
@@ -19,6 +20,8 @@ class LlamaEngine private constructor() {
         private const val TAG = "LlamaEngine"
         /** Max time a queued generation waits for the previous turn to finish. */
         private const val BUSY_WAIT_MS = 45_000L
+        /** Hard ceiling for a *running* generation before we cancel & fail it. */
+        private const val GEN_WATCHDOG_MS = 90_000L
         private const val LIB_NAME = "llama_jni"
         private var _instance: LlamaEngine? = null
         private val lock = Any()
@@ -246,6 +249,11 @@ class LlamaEngine private constructor() {
                 close(Exception("Engine busy"))
                 return@launch
             }
+            // Native generate() returns immediately (it spawns a detached worker
+            // thread) — the ONLY reliable completion signal is the callback, so we
+            // await a deferred it completes, and release the mutex in finally so a
+            // wedged/stopped native loop can never lock the engine forever.
+            val done = CompletableDeferred<Unit>()
             try {
                 val callback = object : GenerateCallback {
                     override fun onToken(token: String) {
@@ -253,13 +261,11 @@ class LlamaEngine private constructor() {
                     }
 
                     override fun onComplete(status: Int) {
-                        if (generateMutex.isLocked) generateMutex.unlock()
-                        close()
+                        done.complete(Unit)
                     }
 
                     override fun onError(error: String) {
-                        Log.e(TAG, "Generation error: $error")
-                        if (generateMutex.isLocked) generateMutex.unlock()
+                        done.complete(Unit)
                         close(Exception(error))
                     }
                 }
@@ -268,14 +274,26 @@ class LlamaEngine private constructor() {
                 // Apply the current grammar right before decoding so callers can change it
                 // per generation without reloading the model.
                 nativeSetGrammar(grammar)
-                val result = generate(prompt)
-                if (result != 0) {
-                    if (generateMutex.isLocked) generateMutex.unlock()
-                    close(Exception("Generate failed: $result"))
+                val started = generate(prompt)
+                if (started != 0) {
+                    close(Exception("Generate failed: $started"))
+                    return@launch
+                }
+                // Hard ceiling slightly above token budget: with maxTokens<=256 the
+                // whole decode finishes in a few seconds on any phone; > this means
+                // the native loop is wedged — cancel it and surface the error.
+                val finished = withTimeoutOrNull(GEN_WATCHDOG_MS) { done.await() }
+                if (finished == null) {
+                    Log.e(TAG, "Generation watchdog: no onComplete in ${GEN_WATCHDOG_MS}ms, cancelling.")
+                    runCatching { cancel() }
+                    close(Exception("Generation timed out"))
+                } else {
+                    close()
                 }
             } catch (e: Exception) {
-                if (generateMutex.isLocked) generateMutex.unlock()
                 close(e)
+            } finally {
+                runCatching { if (generateMutex.isLocked) generateMutex.unlock() }
             }
         }
     }
