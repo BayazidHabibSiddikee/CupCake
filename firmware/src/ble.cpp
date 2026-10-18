@@ -79,6 +79,7 @@ void BleLink::begin(const char* name) {
 
 void BleLink::tick() {
     if (g_pending.empty() || !deviceConnected) return;
+    Serial.printf("[ble] cmd %s\n", g_pending.c_str());
     JsonDocument req;
     if (deserializeJson(req, g_pending)) { g_pending.clear(); return; }
     g_pending.clear();
@@ -106,10 +107,13 @@ void BleLink::tick() {
     // Device-auth gate: "auth" commands drive pairing, everything else must
     // carry the pairing token in params.token.
     if (auth_) {
+        Serial.printf("[auth] type=%s action=%s bound=%s\n", type.c_str(), action.c_str(),
+                      auth_->bound() ? "1" : "0");
         if (type == "auth") {
             JsonDocument dd;
             JsonObject d = dd.to<JsonObject>();
             bool ok = auth_->handleCommand(action, req["params"].as<JsonObjectConst>(), d);
+            String dbg; serializeJson(d, dbg); Serial.printf("[auth] out %s\n", dbg.c_str());
             respond(id, ok, d);
             return;
         }

@@ -1,5 +1,7 @@
+#ifndef CUPCAKE_NO_FACE
+
 #include "face.h"
-#include <Arduino.h>
+#include <Wire.h>
 
 // ---------------------------------------------------------------------------
 // Blocky drawing helpers (pixel-art feel on a native 128x64 canvas)
@@ -188,6 +190,14 @@ static void faceNeutral() {
 // ---------------------------------------------------------------------------
 
 void Face::begin() {
+    // Probe BEFORE constructing U8g2: an absent SSD1306 ACKs nothing, so we skip
+    // u8g2 init entirely instead of initing then hammering a dead bus 15x/sec.
+    Wire.begin();
+    Wire.beginTransmission(0x3C);
+    if (Wire.endTransmission() != 0) {
+        Serial.println("[face] no SSD1306 at 0x3C — displayless mode");
+        return;   // u8g2_/g stay null; tick()/set() no-op
+    }
     if (!u8g2_) u8g2_ = new U8G2_SSD1306_128X64_NONAME_F_HW_I2C(U8G2_R0, U8X8_PIN_NONE);
     g = u8g2_;
     g->begin();
@@ -216,10 +226,12 @@ void Face::set(const String& expression) {
     if (expression == expr_) return;
     expr_ = expression;
     blinking_ = false;
+    if (!g) return;
     render(millis());
 }
 
 void Face::tick() {
+    if (!g) return;   // displayless builds / no panel detected
     uint32_t now = millis();
     if (now - lastFrame_ < 66) return;   // ~15 fps
     lastFrame_ = now;
@@ -246,3 +258,5 @@ void Face::renderBlinkOverlay() {
     g->drawBox(32, 22, 22, 3);
     g->drawBox(74, 22, 22, 3);
 }
+
+#endif  // CUPCAKE_NO_FACE

@@ -9,7 +9,36 @@
  *    thinking sleepy wink heart_eyes
  *  - updated sprite sheet aliases: surprised confused annoyed
  * Unknown names fall back to neutral.
+ *
+ * Build with -DCUPCAKE_NO_FACE (dev boards without an OLED wired) to compile
+ * a do-nothing stub: no I2C traffic, identical public API.
  */
+
+#include <Arduino.h>
+
+#ifdef CUPCAKE_NO_FACE
+
+class Face {
+public:
+    static constexpr int W = 128;
+    static constexpr int H = 64;
+
+    void begin() {
+        if (!announced_) {
+            announced_ = true;
+            Serial.println("[face] disabled (CUPCAKE_NO_FACE build)");
+        }
+    }
+    void set(const String& expression) { expr_ = expression; }
+    const String& current() const { return expr_; }
+    void tick() {}
+
+private:
+    bool announced_ = false;
+    String expr_ = "neutral";
+};
+
+#else
 
 #include <U8g2lib.h>
 
@@ -39,3 +68,5 @@ private:
     void render(uint32_t now);
     void renderBlinkOverlay();
 };
+
+#endif
