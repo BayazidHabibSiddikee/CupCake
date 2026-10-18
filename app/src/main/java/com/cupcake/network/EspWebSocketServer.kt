@@ -136,14 +136,14 @@ object EspWebSocketServer {
                         }
                         // Serve the companion's emotion art so the ESP board can render
                         // the exact same image the phone is showing.
-                        get("/assets/marin/emotions/{file}") {
+                        get("/assets/cupcake/emotions/{file}") {
                             val file = call.parameters["file"].orEmpty()
                             if (!file.matches(Regex("[a-zA-Z0-9_]{1,32}\\.png"))) {
                                 call.respond(HttpStatusCode.BadRequest)
                                 return@get
                             }
                             val bytes = try {
-                                appContext?.assets?.open("marin/emotions/$file")?.use { it.readBytes() }
+                                appContext?.assets?.open("cupcake/emotions/$file")?.use { it.readBytes() }
                             } catch (e: Exception) {
                                 null
                             }
@@ -153,7 +153,7 @@ object EspWebSocketServer {
                                 call.respondBytes(bytes, ContentType.Image.PNG)
                             }
                         }
-                        get("/assets/marin/emotions") {
+                        get("/assets/cupcake/emotions") {
                             val list = com.cupcake.ai.EmotionAssets.ALL_STEMS.map { stem ->
                                 mapOf(
                                     "emotion" to stem,

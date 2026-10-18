@@ -501,7 +501,7 @@ class ChatViewModel @Inject constructor(
     }
 
     private fun buildPrompt(): String {
-        val charName = _currentCharacter.value?.name ?: "CupCake Kitagawa"
+        val charName = _currentCharacter.value?.name ?: "CupCake"
         val customSys = _systemPrompt.value?.fullPrompt()
         val rawSystemPrompt = if (!customSys.isNullOrBlank()) {
             customSys

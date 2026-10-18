@@ -6,7 +6,7 @@ Draws the companion as the FreeCAD robot (blue head + white bezel, blue/white
 torso, little arms and feet) with an in-screen pixel face per emotion —
 so the app sprite is literally "the bot you see in the OLED".
 
-Outputs 512x512 PNGs into app/src/main/assets/marin/emotions/.
+Outputs 512x512 PNGs into app/src/main/assets/cupcake/emotions/.
 
     python3 tools/gen_robot_sprites.py
 """
@@ -16,7 +16,7 @@ import os
 from PIL import Image, ImageDraw, ImageFont
 
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..",
-                   "app/src/main/assets/marin/emotions")
+                   "app/src/main/assets/cupcake/emotions")
 S = 4           # supersample factor
 W = 512 * S     # canvas
 

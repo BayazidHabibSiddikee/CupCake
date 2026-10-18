@@ -115,7 +115,7 @@ object EmotionClassifier {
         if (lower.contains("hmph") || lower.contains("pouting") || lower.contains("baka!")) {
             jealousyScore += 3
         }
-        if (lower.contains("kyaa") || lower.contains("love you") || lower.contains("i love") || lower.contains("my marin") || lower.contains("so cute")) {
+        if (lower.contains("kyaa") || lower.contains("love you") || lower.contains("i love") || lower.contains("my cupcake") || lower.contains("so cute")) {
             affectionScore += 3
         }
         if (lower.contains("no way") || lower.contains("what?!") || lower.contains("really?!")) {

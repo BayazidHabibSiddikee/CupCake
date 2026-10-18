@@ -26,7 +26,7 @@ import urllib.request
 
 REPO_EMOTIONS = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
-    "..", "..", "app", "src", "main", "assets", "marin", "emotions",
+    "..", "..", "app", "src", "main", "assets", "cupcake", "emotions",
 )
 PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
 
@@ -132,7 +132,7 @@ def main():
     failures = 0
 
     print("\n== emotion index ==")
-    index = json.loads(http_get(port, "/assets/marin/emotions"))
+    index = json.loads(http_get(port, "/assets/cupcake/emotions"))
     for item in index:
         print(f"  {item['emotion']:9} -> esp face '{item['face']}'  {item['image']}")
 

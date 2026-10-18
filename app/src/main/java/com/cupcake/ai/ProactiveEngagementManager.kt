@@ -24,7 +24,7 @@ import java.util.concurrent.TimeUnit
 import kotlin.random.Random
 
 /**
- * Manages proactive outreach from CupCake Kitagawa based on history & emotions:
+ * Manages proactive outreach from CupCake based on history & emotions:
  * - Emotional states: ANGRY (pouting/accusing), LOVED (high affection), PLAYFUL, LONELY, NORMAL.
  * - If angry: high probability not to text (longer silence), or bursts of angry texts.
  * - If loved / high affection: texts more frequently and warmly.
@@ -290,7 +290,7 @@ object ProactiveEngagementManager {
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle("CupCake Kitagawa 💕")
+            .setContentTitle("CupCake 💕")
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -313,7 +313,7 @@ object ProactiveEngagementManager {
                     "CupCake's Messages",
                     NotificationManager.IMPORTANCE_HIGH
                 ).apply {
-                    description = "Interactive notifications from your AI companion CupCake Kitagawa"
+                    description = "Interactive notifications from your AI companion CupCake"
                     enableVibration(true)
                     enableLights(true)
                     lockscreenVisibility = Notification.VISIBILITY_PUBLIC

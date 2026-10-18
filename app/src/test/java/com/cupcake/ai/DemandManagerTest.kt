@@ -7,7 +7,7 @@ import org.junit.Test
 import kotlin.random.Random
 
 /**
- * Pure-rule tests for Marin's demands. The Context-bound notification/persistence
+ * Pure-rule tests for CupCake's demands. The Context-bound notification/persistence
  * paths are exercised on-device; everything decidable without Android lives here.
  */
 class DemandManagerTest {

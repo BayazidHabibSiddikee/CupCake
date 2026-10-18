@@ -15,7 +15,7 @@ import org.junit.Test
 
 /**
  * Ping Pong flows through the shared game plumbing: points update the score, the
- * match ends at the target, a human win makes Marin angrier (raising adaptive
+ * match ends at the target, a human win makes CupCake angrier (raising adaptive
  * difficulty), and the reaction carries the right emotion for the UI/TTS.
  */
 class PingPongGameTest {

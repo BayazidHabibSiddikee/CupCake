@@ -93,10 +93,10 @@ fun HomeScreen(
         ?: characters.firstOrNull()
         ?: Character(
             id = "cupcake_kitagawa",
-            name = "CupCake Kitagawa",
+            name = "CupCake",
             description = "Energetic anime & cosplay companion",
-            systemPrompt = "You are CupCake Kitagawa!",
-            avatar = "file:///android_asset/marin/emotions/normal.png",
+            systemPrompt = "You are CupCake!",
+            avatar = "file:///android_asset/cupcake/emotions/normal.png",
             personality = "energetic",
         )
 
@@ -449,7 +449,7 @@ fun HomeScreen(
                     }
                 }
 
-                // MARIN'S DEMAND (costs points to satisfy)
+                // CUPCAKE'S DEMAND (costs points to satisfy)
                 currentDemand?.let { demand ->
                     item {
                         Card(
@@ -493,7 +493,7 @@ fun HomeScreen(
                     }
                 }
 
-                // GAMES WITH MARIN SECTION
+                // GAMES WITH CUPCAKE SECTION
                 item {
                     Row(
                         modifier = Modifier.fillMaxWidth(),

@@ -21,12 +21,12 @@ class EspFaceTest {
             expression = "happy",
             duration = 5000,
             emotion = "laugh",
-            imagePath = "/assets/marin/emotions/laugh.png"
+            imagePath = "/assets/cupcake/emotions/laugh.png"
         )
         assertEquals("happy", payload["expression"])
         assertEquals(5000, payload["duration"])
         assertEquals("laugh", payload["emotion"])
-        assertEquals("/assets/marin/emotions/laugh.png", payload["image"])
+        assertEquals("/assets/cupcake/emotions/laugh.png", payload["image"])
     }
 
     @Test

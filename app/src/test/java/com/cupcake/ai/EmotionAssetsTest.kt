@@ -6,7 +6,7 @@ import org.junit.Test
 
 class EmotionAssetsTest {
 
-    private val base = "file:///android_asset/marin/emotions"
+    private val base = "file:///android_asset/cupcake/emotions"
 
     @Test
     fun `bracket tag takes priority over lexical detection`() {
@@ -49,7 +49,7 @@ class EmotionAssetsTest {
     fun `stem is the shared vocabulary for app and esp`() {
         assertEquals("happy", EmotionAssets.stemForText("[happy] *bounces* hi"))
         assertEquals("happy", EmotionAssets.espFaceForStem("happy"))
-        assertEquals("/assets/marin/emotions/happy.png", EmotionAssets.httpPathForStem("happy"))
+        assertEquals("/assets/cupcake/emotions/happy.png", EmotionAssets.httpPathForStem("happy"))
     }
 
     @Test

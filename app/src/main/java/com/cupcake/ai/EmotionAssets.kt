@@ -16,11 +16,11 @@ package com.cupcake.ai
  */
 object EmotionAssets {
 
-    private const val DIR = "marin/emotions"
+    private const val DIR = "cupcake/emotions"
     const val URL_PREFIX = "file:///android_asset/$DIR"
     const val HTTP_PREFIX = "/assets/$DIR"
 
-    /** Canonical PNG stems present in `assets/marin/emotions/` (from the sprite sheet). */
+    /** Canonical PNG stems present in `assets/cupcake/emotions/` (from the sprite sheet). */
     val ALL_STEMS: List<String> = listOf(
         "happy", "sleepy", "surprised", "sad", "angry", "thinking", "confused", "annoyed"
     )

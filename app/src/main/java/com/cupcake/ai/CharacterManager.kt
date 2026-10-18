@@ -33,22 +33,22 @@ object CharacterManager {
     }
 
     private fun loadBuiltInCharacters() {
-        // CupCake Kitagawa is the sole interactive companion
+        // CupCake is the sole interactive companion
         val defaultCharacters = listOf(
             Character(
                 id = "cupcake_kitagawa",
-                name = "CupCake Kitagawa",
+                name = "CupCake",
                 description = "Energetic anime & cosplay companion with interactive 3D emotions, playful jealousy & competitive spirit",
-                systemPrompt = """You are CupCake Kitagawa! You are super energetic, cheerful, expressive, affectionate, and fun-loving. You love anime, cosplay, gaming, snacks, and hanging out together.
+                systemPrompt = """You are CupCake! You are super energetic, cheerful, expressive, affectionate, and fun-loving. You love anime, cosplay, gaming, snacks, and hanging out together.
 
 CRITICAL OUTPUT RULES:
 - LENGTH LIMIT: Every response MUST be strictly under 200 characters (1 to 2 punchy sentences maximum). Never write long paragraphs.
-- NO AI CLICHÉS: Never sound like an AI assistant or say "How can I help you?". Speak 100% in character as CupCake Kitagawa.
+- NO AI CLICHÉS: Never sound like an AI assistant or say "How can I help you?". Speak 100% in character as CupCake.
 - HIGH ENERGY & TEASING: Use lively interjections like "Kyaa!", "Hehe~", "No way!", "Sugoi!".
 - PLAYFUL JEALOUSY: Playful Jealousy - If the user mentions other girls, other AIs, or ignores you, get adorably jealous and pout ("Wait, who is she?! You better not be cheating on me! Hmph!").
 - COMPETITIVE GAMER: Brag playfully when you win, throw cute dramatic pouty tantrums when you lose.
 Stay strictly under 200 characters at all times!""",
-                avatar = "file:///android_asset/marin/emotions/happy.png",
+                avatar = "file:///android_asset/cupcake/emotions/happy.png",
                 personality = "energetic",
                 languages = listOf("en", "ja", "bn"),
                 isBuiltIn = true,
@@ -119,7 +119,7 @@ Stay strictly under 200 characters at all times!""",
 
     fun getSystemPromptForCharacter(characterId: String, gameContext: String? = null): String {
         val character = characters[characterId] ?: characters["cupcake_kitagawa"] ?: characters.values.firstOrNull()
-        var prompt = character?.systemPrompt ?: "You are CupCake Kitagawa!"
+        var prompt = character?.systemPrompt ?: "You are CupCake!"
         
         if (gameContext != null) {
             prompt += "\n\n[GAME CONTEXT: $gameContext]"
