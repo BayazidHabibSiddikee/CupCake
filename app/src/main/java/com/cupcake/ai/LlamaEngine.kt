@@ -7,6 +7,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
 import kotlinx.coroutines.sync.Mutex
@@ -119,6 +120,8 @@ class LlamaEngine private constructor() {
     external fun cancel()
     external fun release()
     external fun isLoaded(): Boolean
+    /** True while a native worker thread is still decoding. */
+    external fun isGenerating(): Boolean
     external fun getModelInfo(): String
 
     interface GenerateCallback {
@@ -274,7 +277,21 @@ class LlamaEngine private constructor() {
                 // Apply the current grammar right before decoding so callers can change it
                 // per generation without reloading the model.
                 nativeSetGrammar(grammar)
-                val started = generate(prompt)
+                // Native generate() claims a single slot; if a just-cancelled worker is
+                // still unwinding it can briefly answer -2. Wait for the native worker
+                // to actually exit, then retry instead of surfacing a hard failure.
+                var started = generate(prompt)
+                var attempts = 0
+                while (started == -2 && attempts < 8) {
+                    attempts++
+                    Log.w(TAG, "generate() busy (-2), waiting for native worker to settle (attempt $attempts)")
+                    var waited = 0
+                    while (isGenerating() && waited < 3_000) {
+                        delay(50)
+                        waited += 50
+                    }
+                    started = generate(prompt)
+                }
                 if (started != 0) {
                     close(Exception("Generate failed: $started"))
                     return@launch
@@ -300,6 +317,14 @@ class LlamaEngine private constructor() {
 
     fun unload() {
         if (_isModelLoaded) {
+            // Never free the context out from under a live worker thread — ask it to
+            // stop and give it a moment to exit before releasing the model.
+            runCatching { cancel() }
+            var waited = 0
+            while (runCatching { isGenerating() }.getOrDefault(false) && waited < 3_000) {
+                Thread.sleep(50)
+                waited += 50
+            }
             release()
             _isModelLoaded = false
             _loadedModelName = null

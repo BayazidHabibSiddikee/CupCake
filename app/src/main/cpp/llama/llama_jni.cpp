@@ -4,6 +4,7 @@
 #include <memory>
 #include <thread>
 #include <atomic>
+#include <chrono>
 #include <cstring>
 #include <ctime>
 #include <android/log.h>
@@ -202,12 +203,24 @@ Java_com_cupcake_ai_LlamaEngine_generate(
     if (!g_ctx || !g_model) {
         return -1;
     }
-    
-    if (g_is_generating) {
+
+    // Claim the single generation slot. A previous worker (often one we just
+    // cancelled) may still be unwinding on its thread; instead of failing with -2
+    // we wait briefly for it to finish, then atomically take the slot. This is what
+    // stops two workers from ever decoding on the same context.
+    bool claimed = false;
+    for (int i = 0; i < 300; ++i) {   // up to ~3s
+        if (!g_is_generating.exchange(true)) {
+            claimed = true;
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    if (!claimed) {
+        LOGE("generate: previous generation still running after wait; refusing");
         return -2;
     }
-    
-    g_is_generating = true;
+
     g_should_stop = false;
 
     const char* prompt_str = env->GetStringUTFChars(prompt, nullptr);
@@ -389,8 +402,16 @@ Java_com_cupcake_ai_LlamaEngine_generate(
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_cupcake_ai_LlamaEngine_cancel(JNIEnv* env, jobject thiz) {
+    // Only ask the worker to stop. The worker thread owns g_is_generating and clears
+    // it when it actually exits — clearing it here let a fresh generate() spawn a
+    // second worker on the same llama_context while the first was still decoding,
+    // which corrupted state and surfaced to the user as "Generate failed: -2".
     g_should_stop = true;
-    g_is_generating = false;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_cupcake_ai_LlamaEngine_isGenerating(JNIEnv* env, jobject thiz) {
+    return g_is_generating.load() ? JNI_TRUE : JNI_FALSE;
 }
 
 extern "C" JNIEXPORT void JNICALL
