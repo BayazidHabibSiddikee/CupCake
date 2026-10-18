@@ -1,4 +1,5 @@
 #include "net.h"
+#include "auth.h"
 #include <Preferences.h>
 
 static Net* self = nullptr;
@@ -116,7 +117,9 @@ void Net::updateBeacon() {
 
 void Net::connectWs() {
     if (phoneIp_.isEmpty() || !wifiReady() || wsConnected_) return;
-    ws_.begin(phoneIp_, phonePort_, "/esp");
+    String path = "/esp";
+    if (auth_) path += "?device=" + auth_->deviceId() + "&token=" + auth_->token();
+    ws_.begin(phoneIp_, phonePort_, path.c_str());
     ws_.onEvent([](WStype_t type, uint8_t* payload, size_t len) {
         if (self) self->onWsEvent(type, payload, len);
     });

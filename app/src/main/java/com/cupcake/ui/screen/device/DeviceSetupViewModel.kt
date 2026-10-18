@@ -57,6 +57,8 @@ class DeviceSetupViewModel @Inject constructor(
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message.asStateFlow()
 
+    private val _connectingAddress = MutableStateFlow<String?>(null)
+
     val isBleSupported: Boolean = BleGattClient.isBleSupported(context)
 
     init {
@@ -68,8 +70,14 @@ class DeviceSetupViewModel @Inject constructor(
                 _connection.value = state
                 if (state is BleGattClient.ConnectionState.Connected) {
                     _isScanning.value = false
-                    _message.value = "Connected to ${state.deviceName}"
-                    refreshStatus()
+                    _message.value = "Authenticating with ${state.deviceName}…"
+                    val address = _connectingAddress.value
+                    val ok = address?.let { authenticate(it) } ?: false
+                    if (ok) {
+                        _message.value = "Paired with ${state.deviceName}"
+                        refreshStatus()
+                    }
+                    _busy.value = false
                 }
             }
         }
@@ -120,7 +128,67 @@ class DeviceSetupViewModel @Inject constructor(
         val device = deviceMap[address] ?: return
         stopScan()
         _message.value = "Connecting…"
+        _busy.value = true
+        _connectingAddress.value = address
         client.connect(device)
+    }
+
+    /**
+     * Device-auth handshake right after GATT connect.
+     * Owned devices verify our stored token; unowned ones get bound to this
+     * phone with a freshly minted token. Boards owned by a DIFFERENT phone
+     * are rejected (single-account device binding).
+     */
+    private suspend fun authenticate(address: String): Boolean {
+        val stored = com.cupcake.ble.DeviceAuthStore.binding(address)
+        return runCatching {
+            // 1) challenge (with our token, when we have one)
+            var resp: com.cupcake.protocol.CommandResponse? = client.sendCommand(
+                com.cupcake.protocol.Command(
+                    type = "auth",
+                    action = "challenge",
+                    params = mapOf("token" to (stored?.token ?: ""))
+                ),
+                timeoutMs = 8_000L
+            )
+            if (resp == null) return false
+            if (resp?.status != "ok") return false
+            val bound = resp?.data?.get("bound") == "true"
+            val authorized = resp?.data?.get("authorized") == "true"
+            val deviceId = resp?.data?.get("device_id") ?: ""
+
+            if (bound && stored == null) {
+                _message.value = "🔒 This CupCake is paired with someone else's phone"
+                client.disconnect("Device owned by another phone")
+                return false
+            }
+            if (bound && authorized) {
+                return true
+            }
+            if (!bound) {
+                // 2) bind: mint token, write it, confirm
+                val fresh = com.cupcake.ble.DeviceAuthStore.mintToken(address)
+                resp = client.sendCommand(
+                    com.cupcake.protocol.Command(
+                        type = "auth",
+                        action = "pair",
+                        params = mapOf("token" to fresh, "owner" to "local")
+                    ),
+                    timeoutMs = 8_000L
+                )
+                if (resp?.status != "ok") {
+                    _message.value = resp?.data?.get("message") ?: "Pairing failed"
+                    client.disconnect("Pairing failed")
+                    return false
+                }
+                com.cupcake.ble.DeviceAuthStore.bind(address, fresh, deviceId)
+                _message.value = "🔒 Paired & locked to this phone"
+            }
+            true
+        }.getOrElse { e ->
+            _message.value = "Auth failed: ${e.message}"
+            false
+        }
     }
 
     fun disconnect() {

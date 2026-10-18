@@ -21,6 +21,8 @@
 #include <ArduinoJson.h>
 #include <functional>
 
+class DeviceAuth;
+
 class Net {
 public:
     static constexpr int BEACON_PORT = 44880;
@@ -42,6 +44,9 @@ public:
     std::function<void(const String&)> onFace;    // expression
     std::function<void(const String&)> onMotor;   // action name
 
+    /** Auth for the WS handshake — connects as /esp?token=<pairing-token>. */
+    void setAuth(DeviceAuth* auth) { auth_ = auth; }
+
 private:
     void updateBeacon();
     void ensureUdp();
@@ -52,6 +57,7 @@ private:
 
     WebSocketsClient ws_;
     WiFiUDP udp_;
+    DeviceAuth* auth_ = nullptr;
     String phoneIp_;
     int phonePort_ = 8080;
     bool wsConnected_ = false;

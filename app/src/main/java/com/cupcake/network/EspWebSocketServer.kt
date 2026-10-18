@@ -11,6 +11,7 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
 import io.ktor.websocket.*
+import io.ktor.server.websocket.DefaultWebSocketServerSession
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -129,9 +130,11 @@ object EspWebSocketServer {
                     install(WebSockets)
                     routing {
                         webSocket("/esp") {
+                            if (!verifyPairingToken()) return@webSocket
                             handleWebSocketSession()
                         }
                         webSocket("/esp/ws") {
+                            if (!verifyPairingToken()) return@webSocket
                             handleWebSocketSession()
                         }
                         // Serve the companion's emotion art so the ESP board can render
@@ -175,6 +178,22 @@ object EspWebSocketServer {
             Log.e(TAG, "Failed to start server", e)
             false
         }
+    }
+
+    /**
+     * Rejects WS handshakes that don't carry a valid pairing token in the query
+     * string. Open (no tokens issued yet: nothing is paired) is allowed so the
+     * first-time provisioning still works.
+     */
+    private suspend fun DefaultWebSocketServerSession.verifyPairingToken(): Boolean {
+        val owned = com.cupcake.ble.DeviceAuthStore.ownedTokens()
+        if (owned.isEmpty()) return true
+        val token = call.request.queryParameters["token"]
+        if (token != null && token in owned) return true
+        Log.w(TAG, "ESP32 WS rejected: invalid pairing token")
+        close(io.ktor.websocket.CloseReason(
+            io.ktor.websocket.CloseReason.Codes.PROTOCOL_ERROR, "auth_required"))
+        return false
     }
 
     private suspend fun DefaultWebSocketSession.handleWebSocketSession() {

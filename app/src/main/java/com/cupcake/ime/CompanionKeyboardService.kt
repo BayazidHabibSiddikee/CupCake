@@ -49,9 +49,12 @@ class CompanionKeyboardService : InputMethodService() {
     private var lastDraftLen = 0
     private var justTyped: String = ""
     private var lastQuip = ""
+    private var deleteStreak = 0
+    private var longFiredAt = 0L
+    private var lastReactMs = 0L
 
     private val handler = Handler(Looper.getMainLooper())
-    private val debounceRun = Runnable { react(spoken = false) }
+    private val debounceRun = Runnable { react(spoken = false) }  // PAUSE trigger
 
     private var faceView: ImageView? = null
     private var bubbleView: TextView? = null
@@ -217,6 +220,8 @@ class CompanionKeyboardService : InputMethodService() {
         handler.removeCallbacks(debounceRun)
         draft = ""
         lastDraftLen = 0
+        deleteStreak = 0
+        longFiredAt = 0L
     }
 
     override fun onUpdateSelection(
@@ -235,38 +240,65 @@ class CompanionKeyboardService : InputMethodService() {
         } else {
             before.takeLast(1)
         }
+        val wasLength = draft.length
         draft = before
         lastDraftLen = draft.length
 
-        // Combined persona triggers: punctuation fires instantly; everything
-        // else waits for the 1.2 s thinking pause.
-        if (PersonaEngine.shouldFireInstantly(draft, lastDraftLen, justTyped)) {
-            react(spoken = true)
-        } else {
-            handler.removeCallbacks(debounceRun)
-            if (draft.isNotBlank()) handler.postDelayed(debounceRun, 1200)
+        // Backspace flood: consecutive deletions read as draft anxiety.
+        if (draft.length < wasLength) {
+            deleteStreak++
+        } else if (justTyped.isNotBlank()) {
+            deleteStreak = 0
         }
+
+        // Fast triggers: spicy words and caps shouting fire instantly (both
+        // rate-limited by [maybeCooldown]), delete floods speak quietly.
+        when {
+            PersonaEngine.isSpicy(justTyped) && cool(15) -> react(spoken = true, trigger = Trigger.SPICE)
+            Regex("[A-Z]{4,}").containsMatchIn(justTyped) && draft.length >= 6 && cool(12) ->
+                react(spoken = true, trigger = Trigger.SHOUT)
+            deleteStreak >= 5 -> {
+                deleteStreak = 0
+                if (cool(8)) react(spoken = false, trigger = Trigger.DELETE_SPAM)
+            }
+            draft.length > 150 && longFiredAt == 0L && cool(30) -> {
+                longFiredAt = System.currentTimeMillis()
+                react(spoken = false, trigger = Trigger.LONG)
+            }
+            PersonaEngine.shouldFireInstantly(draft, lastDraftLen, justTyped) ->
+                react(spoken = true, trigger = Trigger.PAUSE)
+        }
+        if (draft.length <= 150 && millisSince(longFiredAt) > 5_000) longFiredAt = 0
+
+        handler.removeCallbacks(debounceRun)
+        if (draft.isNotBlank()) handler.postDelayed(debounceRun, 1200)
     }
+
+    private fun millisSince(t: Long) = if (t == 0L) Long.MAX_VALUE else System.currentTimeMillis() - t
+
+    /** Rate-limit: true when the last reaction is older than [minMs]. */
+    private fun cool(minMs: Long): Boolean = millisSince(lastReactMs) > minMs
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (keyCode == KeyEvent.KEYCODE_ENTER && !isPasswordField && draft.isNotBlank()) {
-            react(spoken = true)
+            react(spoken = true, trigger = Trigger.SEND)
         }
         return super.onKeyDown(keyCode, event)
     }
 
     // ----------------- persona reaction -----------------
 
-    private fun react(spoken: Boolean) {
+    private fun react(spoken: Boolean, trigger: Trigger = Trigger.PAUSE) {
         val text = draft
         if (text.isBlank()) return
-        var reaction = PersonaEngine.canned(currentMode())
+        var reaction = PersonaEngine.reaction(trigger, currentMode())
         if (reaction.quip == lastQuip) {
             // Don't repeat the same line on every pause; try another personality voice.
             val varied = PersonaEngine.canned(PersonaMode.AUTO)
             reaction = varied.takeIf { it.quip != lastQuip } ?: reaction
         }
         lastQuip = reaction.quip
+        lastReactMs = System.currentTimeMillis()
 
         bubbleView?.text = reaction.quip
 

@@ -3,6 +3,7 @@
 #include "face.h"
 #include "motor.h"
 #include "ble.h"
+#include "auth.h"
 #include "net.h"
 
 static constexpr const char* FW_NAME = "CupCake-Companion";
@@ -12,6 +13,7 @@ Face face;
 Motors motors;
 BleLink ble;
 Net net;
+DeviceAuth auth;
 
 // Battery sense: battery+ -> 2x 100k divider -> battery PIN.
 // Plain ESP32: GPIO2 is ADC2 (unusable while WiFi is on) — use ADC1-only
@@ -102,6 +104,10 @@ void setup() {
         handleCommand(type, action, params, data);
     };
 
+    auth.begin();
+    ble.setAuth(&auth);
+    net.setAuth(&auth);
+
     ble.begin(FW_NAME);
     net.begin();
 }
@@ -111,6 +117,17 @@ void loop() {
     net.tick();
     face.tick();
     motors.tick();
+
+    // Dev escape hatch: typing "auth-reset" on the USB serial clears pairing.
+    if (Serial.available()) {
+        static String line;
+        line = Serial.readStringUntil('\n');
+        line.trim();
+        if (line == "auth-reset") {
+            auth.factoryReset();
+            Serial.println("[auth] pairing cleared");
+        }
+    }
 
     // Battery telemetry over the existing BLE battery frame every 5 s.
     if (millis() - lastBatterySend_ > 5000) {

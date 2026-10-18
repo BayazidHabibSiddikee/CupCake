@@ -34,6 +34,9 @@ class CupCakeApplication : Application(), ImageLoaderFactory {
         // Initialize Native Llama Engine
         com.cupcake.ai.LlamaEngine.initialize(this)
 
+        // Device-auth store (pairing tokens for the ESP32)
+        com.cupcake.ble.DeviceAuthStore.initialize(this)
+
         // Warm the active on-device model in the background for instant first replies
         com.cupcake.ai.ModelPreloader.preload(this)
 

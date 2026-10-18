@@ -21,6 +21,9 @@
 #include <BLE2902.h>
 #include <ArduinoJson.h>
 #include <functional>
+#include "auth.h"
+
+class DeviceAuth;
 
 class BleLink {
 public:
@@ -39,9 +42,13 @@ public:
     std::function<void(const String& type, const String& action,
                        JsonObjectConst params, JsonObject data)> onCommand;
 
+    /** Device-auth guard (optional): all dispatch is gated on pairing. */
+    void setAuth(DeviceAuth* auth) { auth_ = auth; }
+
 private:
     BLEServer* server_ = nullptr;
     BLECharacteristic* tx_ = nullptr;
     BLECharacteristic* rx_ = nullptr;
+    DeviceAuth* auth_ = nullptr;
     void respond(const String& id, bool ok, JsonObjectConst data);
 };

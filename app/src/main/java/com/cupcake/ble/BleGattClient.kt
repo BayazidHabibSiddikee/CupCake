@@ -478,7 +478,14 @@ class BleGattClient(private val context: Context) {
             error = "RX characteristic not available"
         )
 
-        val data = ProtocolDecoder.encodeCommand(command)
+        // Auto-attach the pairing token so every command is device-authenticated.
+        val effective = if (command.type != "auth") {
+            DeviceAuthStore.token(targetDeviceRef.get()?.address ?: "")?.let { t ->
+                command.copy(params = command.params + ("token" to t))
+            } ?: command
+        } else command
+
+        val data = ProtocolDecoder.encodeCommand(effective)
         if (data.isEmpty()) {
             return CommandResponse(
                 id = command.id,
