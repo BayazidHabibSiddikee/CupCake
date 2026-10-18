@@ -1,137 +1,211 @@
 package com.cupcake.service
 
-import android.app.*
-import android.content.*
-import android.media.*
-import android.os.*
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.Service
+import android.content.Intent
+import android.media.AudioFormat
+import android.media.AudioRecord
+import android.media.MediaRecorder
+import android.os.Build
+import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.cupcake.R
 import com.cupcake.ai.SoundClassifier
-import com.cupcake.ime.PersonaEngine
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
+/**
+ * CupCake's "ear": captures microphone audio, runs YAMNet locally and turns
+ * recognised sounds (music, crying, gunfire, laughter…) into companion
+ * reactions. Long-running work lives in a foreground service.
+ */
 class SoundReactionService : Service() {
+
     private var audioRecord: AudioRecord? = null
     private var classifier: SoundClassifier? = null
-    private var isListening = false
-    private val serviceScope = CoroutineScope(Dispatchers.Default + Job())
+    @Volatile private var listening = false
+    private val scope = CoroutineScope(Dispatchers.Default + Job())
 
-    companion object {
-        const val ACTION_TOGGLE_LISTEN = "com.cupcake.action.TOGGLE_LISTEN"
-        var isListening = false
-    }
+    /** Per-category throttle so the companion doesn't repeat the same quip. */
+    private val lastReactionAt = HashMap<String, Long>()
+    private var lastLabel: String? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
         classifier = SoundClassifier(this)
-        ensureNotificationChannel()
+        ensureChannel()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_TOGGLE_LISTEN) {
-            toggleListening()
+        when (intent?.action) {
+            ACTION_START -> startListening()
+            ACTION_STOP -> stopListening()
         }
         return START_STICKY
     }
 
-    private fun toggleListening() {
-        isListening = !isListening
-        SoundReactionService.isListening = isListening
-        
-        if (isListening) {
-            startCapturing()
-            startForegroundNotification("CupCake is listening for sounds...")
-        } else {
-            stopCapturing()
-            stopForeground(true)
+    private fun startListening() {
+        if (listening) return
+        val clf = classifier
+        if (clf == null || !clf.isReady) {
+            Log.w(TAG, "YAMNet unavailable — cannot listen")
+            stopSelf()
+            return
         }
-    }
 
-    private fun startCapturing() {
-        val sampleRate = 16000
-        val bufferSize = AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_FLOAT)
-        
-        audioRecord = AudioRecord(
-            MediaRecorder.AudioSource.MIC,
-            sampleRate,
+        val minBuf = AudioRecord.getMinBufferSize(
+            SoundClassifier.SAMPLE_RATE,
             AudioFormat.CHANNEL_IN_MONO,
-            AudioFormat.ENCODING_PCM_FLOAT,
-            bufferSize
+            AudioFormat.ENCODING_PCM_16BIT,
         )
+        val bufBytes = maxOf(minBuf, SoundClassifier.SAMPLE_COUNT * 2)
 
-        audioRecord?.startRecording()
+        val record = try {
+            AudioRecord(
+                MediaRecorder.AudioSource.MIC,
+                SoundClassifier.SAMPLE_RATE,
+                AudioFormat.CHANNEL_IN_MONO,
+                AudioFormat.ENCODING_PCM_16BIT,
+                bufBytes,
+            )
+        } catch (e: SecurityException) {
+            Log.e(TAG, "RECORD_AUDIO permission missing", e)
+            stopSelf()
+            return
+        }
 
-        serviceScope.launch {
-            val buffer = FloatArray(15600) // YAMNet frame size approx
-            while (isListening) {
-                // AudioRecord.read(FloatArray, ...) is not available in all Android versions.
-                // Using FloatArray with a wrapper or converting from ShortArray.
-                val shortBuffer = ShortArray(buffer.size)
-                val read = audioRecord?.read(shortBuffer, 0, shortBuffer.size) ?: 0
+        if (record.state != AudioRecord.STATE_INITIALIZED) {
+            Log.e(TAG, "AudioRecord failed to initialise")
+            record.release()
+            stopSelf()
+            return
+        }
+
+        audioRecord = record
+        record.startRecording()
+        listening = true
+        isListening = true
+        startForeground(NOTIF_ID, buildNotification("Listening for sounds…"))
+        Log.i(TAG, "Listening started")
+
+        scope.launch {
+            val shorts = ShortArray(SoundClassifier.SAMPLE_COUNT)
+            val floats = FloatArray(SoundClassifier.SAMPLE_COUNT)
+            while (listening) {
+                val read = record.read(shorts, 0, shorts.size)
                 if (read > 0) {
-                    // Convert Short to Float normalized to [-1.0, 1.0]
+                    // Discard clipped silence so the classifier isn't fed pure noise.
+                    var peak = 0
                     for (i in 0 until read) {
-                        buffer[i] = shortBuffer[i] / 32768.0f
+                        val s = shorts[i].toInt()
+                        if (s > peak) peak = s else if (-s > peak) peak = -s
                     }
-                    val category = classifier?.classify(buffer)
-                    if (category != null) {
-                        handleSoundEvent(category)
+                    if (peak > 900) {
+                        for (i in 0 until read) floats[i] = shorts[i] / 32768f
+                        val event = classifier?.classify(floats)
+                        if (event != null) handleEvent(event.category, event.label, event.confidence)
                     }
                 }
-                delay(500) // Avoid CPU thrashing
+                delay(150)
             }
         }
     }
 
-    private fun stopCapturing() {
-        audioRecord?.stop()
-        audioRecord?.release()
+    private fun stopListening() {
+        listening = false
+        isListening = false
+        runCatching {
+            audioRecord?.stop()
+            audioRecord?.release()
+        }
         audioRecord = null
+        stopForeground(true)
+        stopSelf()
     }
 
-    private fun handleSoundEvent(category: String) {
-        Log.i("SoundReaction", "Detected sound: $category")
+    private fun handleEvent(category: String, label: String, confidence: Float) {
+        val now = System.currentTimeMillis()
+        // Same sound event within 8 s → ignore (debounce); different label → allow.
+        if (label == lastLabel && now - (lastReactionAt[category] ?: 0L) < 8_000L) return
+        if (now - (lastReactionAt[category] ?: 0L) < 8_000L) return
+
         val (emotion, quip) = when (category) {
-            "music" -> "excited" to "I love this beat! 💃"
-            "crying" -> "sad" to "Oh no! Don't cry, I'm here for you... 🥺"
-            "gunshot" -> "surprised" to "Whoa! What was that loud noise?! 😱"
-            "laughter" -> "happy" to "Hehehe! That's so funny!"
-            else -> "neutral" to null
+            "music" -> "excited" to "Ooh, I like this beat! 💃"
+            "crying" -> "sad" to "Aww… don't cry, I'm right here with you 🥺"
+            "gunshot" -> "surprised" to "Whoa!! That was LOUD — you okay?! 😱"
+            "laughter" -> "happy" to "Hehe, someone's having fun 😄"
+            "scream" -> "shock" to "Eep! What's happening?!"
+            "applause" -> "happy" to "Yay! Take a bow 🎉"
+            "animal" -> "lovely" to "Aww, a little friend! 🐾"
+            "nature" -> "sleepy" to "Mmm, sounds cosy… 🌧️"
+            "alert" -> "annoyed" to "That alarm again? hmph"
+            else -> return
         }
 
-        if (quip != null) {
-            // Forward to the brain
-            com.cupcake.ime.PersonaEngine.triggerReaction(emotion, quip)
+        lastReactionAt[category] = now
+        lastLabel = label
+        Log.i(TAG, "Event $label ($category) ${"%.2f".format(confidence)} → $emotion")
+
+        // Drive the companion: floating overlay + ESP face + spoken quip.
+        com.cupcake.ime.PersonaEngine.triggerReaction(emotion, quip)
+        reactOnCompanion(emotion, quip)
+    }
+
+    private fun reactOnCompanion(emotion: String, quip: String) {
+        val ctx = applicationContext
+        val asset = runCatching {
+            val stem = com.cupcake.ai.EmotionAssets.espFaceForStem(emotion)
+            com.cupcake.ai.EmotionAssets.assetForStem(stem)
+        }.getOrNull()
+        if (com.cupcake.service.ShimejiPetService.isRunning) {
+            com.cupcake.service.ShimejiPetService.showSpeech(ctx, quip, asset)
         }
     }
 
-    private fun ensureNotificationChannel() {
+    private fun ensureChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
-                "sound_reaction", "Sound Reactions",
-                NotificationManager.IMPORTANCE_LOW
+                CHANNEL_ID, "Sound Reactions", NotificationManager.IMPORTANCE_LOW,
             )
-            val manager = getSystemService(NotificationManager::class.java)
-            manager.createNotificationChannel(channel)
+            getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
         }
     }
 
-    private fun startForegroundNotification(text: String) {
-        val notification = NotificationCompat.Builder(this, "sound_reaction")
-            .setContentTitle("CupCake Ear")
+    private fun buildNotification(text: String) =
+        NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("CupCake is listening")
             .setContentText(text)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setOngoing(true)
             .build()
-        startForeground(1, notification)
-    }
 
     override fun onDestroy() {
         super.onDestroy()
-        stopCapturing()
+        listening = false
+        runCatching {
+            audioRecord?.stop()
+            audioRecord?.release()
+        }
         classifier?.close()
-        serviceScope.cancel()
+        scope.cancel()
+    }
+
+    companion object {
+        private const val TAG = "SoundReactionService"
+        private const val CHANNEL_ID = "sound_reaction"
+        private const val NOTIF_ID = 42
+        const val ACTION_START = "com.cupcake.action.START_LISTENING"
+        const val ACTION_STOP = "com.cupcake.action.STOP_LISTENING"
+
+        @Volatile var isListening = false
+            private set
     }
 }

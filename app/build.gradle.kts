@@ -122,6 +122,7 @@ android {
 
     androidResources {
         noCompress += "gguf"
+        noCompress += "tflite"
     }
 
     externalNativeBuild {

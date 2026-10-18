@@ -1,5 +1,10 @@
 package com.cupcake.ui.screen.settings
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,6 +45,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -53,6 +59,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -60,8 +67,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.core.content.ContextCompat
 import com.cupcake.data.model.ApiProvider
 import com.cupcake.data.model.ModelConfig
+import com.cupcake.service.SoundReactionService
 import com.cupcake.ui.theme.CupCakeTheme
 
 private val SectionSpacing = 16.dp
@@ -196,6 +205,15 @@ fun SettingsScreen(
                     }
                 }
 
+                // ---- Sound awareness (CupCake's ear) --------------------------
+                item {
+                    SectionHeader(
+                        "👂", "Sound Awareness",
+                        "Let CupCake hear what's playing around you — music, games, videos — and react to it."
+                    )
+                }
+                item { SoundAwarenessCard() }
+
                 // ---- On-device models -----------------------------------------
                 item {
                     SectionHeader("🧠", "On-Device Models", "Offline AI running on your phone's CPU. Switch anytime without losing chat history.")
@@ -321,6 +339,86 @@ private fun SectionHeader(emoji: String, title: String, subtitle: String) {
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
+}
+
+/**
+ * Toggle for CupCake's "ear" — captures the mic, classifies sounds on-device
+ * with YAMNet and drives companion reactions. Requests RECORD_AUDIO on enable.
+ */
+@Composable
+private fun SoundAwarenessCard() {
+    val context = LocalContext.current
+    var listening by remember { mutableStateOf(SoundReactionService.isListening) }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            startSoundService(context)
+            listening = true
+        } else {
+            listening = false
+        }
+    }
+
+    fun enable() {
+        val granted = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+        if (granted) {
+            startSoundService(context)
+            listening = true
+        } else {
+            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Listen to my surroundings", fontWeight = FontWeight.SemiBold)
+                Text(
+                    if (listening) "CupCake is listening 👂" else "Off — tap to let CupCake hear music, games & more",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(
+                checked = listening,
+                onCheckedChange = { on ->
+                    if (on) enable() else {
+                        stopSoundService(context)
+                        listening = false
+                    }
+                }
+            )
+        }
+    }
+}
+
+private fun startSoundService(context: android.content.Context) {
+    val intent = Intent(context, SoundReactionService::class.java)
+        .setAction(SoundReactionService.ACTION_START)
+    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+        context.startForegroundService(intent)
+    } else {
+        context.startService(intent)
+    }
+}
+
+private fun stopSoundService(context: android.content.Context) {
+    context.startService(
+        Intent(context, SoundReactionService::class.java)
+            .setAction(SoundReactionService.ACTION_STOP)
+    )
 }
 
 @Composable
