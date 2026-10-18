@@ -55,39 +55,17 @@ def robot_sprite(eyes_fn, head_tilt=0.0, arm_phase=0, extras=None):
 
     cx = W // 2
     # ground shadow
-    d.ellipse([cx - 170*S, 462*S, cx + 170*S, 486*S], fill=SHADOW)
+    d.ellipse([cx - 170*S, 470*S, cx + 170*S, 492*S], fill=SHADOW)
 
-    # ---------------- legs / feet ----------------
+    # ---------------- legs: visible from under the torso down to the ground ----------------
     for sx in (-52, 52):
         fx = cx + sx * S
-        rrect(d, [fx - 44*S, 424*S, fx + 44*S, 464*S], 18*S, fill=BLUE_D)
-        rrect(d, [fx - 16*S, 396*S, fx + 16*S, 430*S], 12*S, fill=BLUE)
-        d.rounded_rectangle([fx - 40*S, 428*S, fx + 40*S, 462*S], radius=15*S,
+        # beam peeking below the torso wall (torso bottom = 448)
+        rrect(d, [fx - 20*S, 436*S, fx + 20*S, 478*S], 14*S, fill=BLUE_D)
+        # rounded foot pad sitting on the ground line
+        rrect(d, [fx - 44*S, 438*S, fx + 44*S, 486*S], 18*S, fill=BLUE_D)
+        d.rounded_rectangle([fx - 40*S, 442*S, fx + 40*S, 482*S], radius=15*S,
                             outline=BLUE_L, width=max(1, 2*S))
-
-    # ---------------- arms (behind torso) ----------------
-    def arm(sx, raise_deg):
-        pivot = (cx + sx * 96 * S, 320 * S)
-        pad = Image.new("RGBA", (W, W), (0, 0, 0, 0))
-        pd = ImageDraw.Draw(pad)
-        pd.ellipse([pivot[0] - 13*S, pivot[1] - 13*S, pivot[0] + 13*S, pivot[1] + 13*S],
-                   fill=BLUE_D)
-        # paddle hanging down-left/right in local frame
-        px = pivot[0] + sx * 6 * S
-        rrect(pd, [px - 15*S, pivot[1], px + 15*S, pivot[1] + 78*S], 14*S, fill=BLUE)
-        pad = rot(pad, -raise_deg * (1 if sx > 0 else -1), pivot)
-        img.alpha_composite(pad)
-
-    if arm_phase == 0:
-        arm(-1, 10); arm(1, 10)
-    elif arm_phase == 1:
-        arm(-1, 95); arm(1, 95)
-    elif arm_phase == -1:
-        arm(-1, 0); arm(1, 0)
-    elif arm_phase == 2:
-        arm(-1, 70); arm(1, 100)
-    elif arm_phase == 3:
-        arm(-1, 12); arm(1, 130)
 
     # ---------------- torso ----------------
     rrect(d, [cx - 104*S, 262*S, cx + 104*S, 448*S], 46*S, fill=BLUE)
@@ -101,6 +79,35 @@ def robot_sprite(eyes_fn, head_tilt=0.0, arm_phase=0, extras=None):
     # shoulder caps
     for sx in (-104, 104):
         d.ellipse([cx + sx*S - 16*S, 300*S, cx + sx*S + 16*S, 332*S], fill=BLUE_D)
+
+    # ---------------- arms (in front of the torso, robot-glove look) ----------------
+    def arm(sx, raise_deg):
+        pivot = (cx + sx * 104 * S, 316 * S)
+        pad = Image.new("RGBA", (W, W), (0, 0, 0, 0))
+        pd = ImageDraw.Draw(pad)
+        pd.ellipse([pivot[0] - 14*S, pivot[1] - 14*S, pivot[0] + 14*S, pivot[1] + 14*S],
+                   fill=BLUE_D)
+        # white forearm + mitten hand, outlined so it reads against the blue body
+        px = pivot[0] + sx * 14 * S
+        rrect(pd, [px - 15*S, pivot[1] - 6*S, px + 15*S, pivot[1] + 90*S], 14*S,
+              fill=WHITE, outline=BLUE_D, width=max(1, 3*S))
+        # mitten ball at the end
+        hy_end = pivot[1] + 108 * S
+        pd.ellipse([px - 17*S, hy_end - 22*S, px + 17*S, hy_end + 14*S],
+                   fill=BLUE, outline=BLUE_D, width=max(1, 3*S))
+        pad = rot(pad, -raise_deg * (1 if sx > 0 else -1), pivot)
+        img.alpha_composite(pad)
+
+    if arm_phase == 0:
+        arm(-1, 10); arm(1, 10)
+    elif arm_phase == 1:
+        arm(-1, 95); arm(1, 95)
+    elif arm_phase == -1:
+        arm(-1, 0); arm(1, 0)
+    elif arm_phase == 2:
+        arm(-1, 70); arm(1, 100)
+    elif arm_phase == 3:
+        arm(-1, 12); arm(1, 130)
 
     # ---------------- head (own layer so it can tilt) ----------------
     head = Image.new("RGBA", (W, W), (0, 0, 0, 0))
@@ -251,7 +258,7 @@ def e_annoyed(d, hx, hy):
 
 
 EMOTIONS = {
-    "happy":      (e_happy,      0.0,   1),
+    "happy":      (e_happy,      0.0,   0),
     "normal":     (e_normal,     0.0,   0),
     "sleepy":     (e_sleepy,     -6.0,  -1),
     "surprised":  (e_surprised,  0.0,   0),

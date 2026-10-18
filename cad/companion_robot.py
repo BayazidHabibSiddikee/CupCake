@@ -91,7 +91,7 @@ P = {
     # Arms — TWO mirrored shoulder servos, so the arms can swing in OPPOSITE
     # phase (one forward while the other goes back) exactly like walking.
     "shoulder_z":    30.0,    # shoulder pivot height in the torso
-    "arm_hang":      34.0,    # arm paddle drop below the shoulder pivot
+    "arm_hang":      38.0,    # arm paddle drop below the shoulder pivot (longer hands)
     "arm_t":         4.0,     # arm paddle thickness (along x)
     "arm_pw":        13.0,    # arm paddle width (along y)
     "boss_r":        6.5,     # pivot boss radius on arm/leg plates
@@ -100,7 +100,7 @@ P = {
     # (+/-35 deg) by a printed skirt slot + pin on each leg. HARD stops, not
     # firmware trust: the pin physically hits the skirt twice per stride.
     "hip_z":         8.6,     # hip pivot height in the torso
-    "leg_h":         24.0,    # beam drop below the hip pivot
+    "leg_h":         28.0,    # beam drop below the hip pivot
     "leg_t":         4.0,     # leg plate thickness (along x)
     "leg_w":         12.0,    # leg beam width (along y)
     "foot_h":        6.0,
