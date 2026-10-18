@@ -452,7 +452,9 @@ class ChatViewModel @Inject constructor(
                             }
 
                             override fun onComplete() {
-                                _currentResponse.value = com.cupcake.ai.BanglishTranslator.translate(fullResponse, personality)
+                                // Handled in finally — translating here flashed a
+                                // fully "translated" bubble mid-stream and then the
+                                // finally-block translated AGAIN (garbled flicker).
                             }
 
                             override fun onError(error: String) {
@@ -497,6 +499,24 @@ class ChatViewModel @Inject constructor(
 
                     // Send to ESP32 for TTS (use translated text for speech)
                     sendToEspForTts(translatedText)
+                } else {
+                    // Zero-token stream (HTTP error body, non-stream reply the
+                    // parser didn't understand, or a wedged engine) used to vanish
+                    // the typing bubble with no error. Keep the companion alive by
+                    // answering in-character instead of dead air.
+                    val fallbackName = _currentCharacter.value?.name ?: "CupCake"
+                    val fallbackLine = when ((0..2).random()) {
+                        0 -> "*tilts head* Hmm… $fallbackName zoned out for a second there. Say that again?"
+                        1 -> "*scratches head* My thoughts got all fuzzy… what were we talking about?"
+                        else -> "*blinks* Eh? I lost you for a moment~ try me again! ✨"
+                    }
+                    addMessage(
+                        ChatMessage.assistant(
+                            fallbackLine,
+                            conversationId,
+                            modelUsed = _modelConfig.value.modelName
+                        )
+                    )
                 }
             }
         }
