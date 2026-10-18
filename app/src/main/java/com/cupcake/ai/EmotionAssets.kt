@@ -113,4 +113,14 @@ object EmotionAssets {
     fun espFaceForStem(stem: String): String = stemToEspFace[stem] ?: "neutral"
 
     fun espFaceForText(text: String): String = espFaceForStem(stemForText(text))
+
+    /** Maps any legacy tag/stem (e.g. "shock") onto the 9 canonical art stems. */
+    fun canonicalStem(tagOrStem: String): String =
+        tagToStem[tagOrStem.lowercase().trim()] ?: tagOrStem
+
+    /** Extracts the stem ("happy") from an asset URL like "file:///android_asset/cupcake/emotions/angry.png". */
+    fun stemFromAsset(assetUrl: String?): String? {
+        val url = assetUrl ?: return null
+        return Regex("emotions/([a-z_]+)\\.png").find(url)?.groupValues?.get(1)
+    }
 }

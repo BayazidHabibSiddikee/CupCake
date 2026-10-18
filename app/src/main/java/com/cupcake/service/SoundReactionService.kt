@@ -41,7 +41,14 @@ class SoundReactionService : Service() {
     private var candidateCategory: String? = null
     private var candidateLabel: String? = null
     private var candidateHits = 0
+
+    /**
+     * Usually 2, but a single very-confident hit reacts immediately — one-off sounds
+     * (a meow, a scream) often never repeat within a burst, and they were exactly the
+     * categories that previously never fired.
+     */
     private val requiredHits = 2
+    private val strongHitConfidence = 0.6f
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -146,17 +153,19 @@ class SoundReactionService : Service() {
                     if (read > 0) {
                         frames++
                         // Discard clipped silence so the classifier isn't fed pure noise.
+                        // The threshold is low: quiet speech and meows still count as sound.
                         var peak = 0
                         for (i in 0 until read) {
                             val s = shorts[i].toInt()
                             if (s > peak) peak = s else if (-s > peak) peak = -s
                         }
-                        if (peak > 900) {
+                        if (peak > 480) {
                             for (i in 0 until read) floats[i] = shorts[i] / 32768f
                             val event = classifier?.classify(floats)
                             if (event != null) {
                                 // Require the same category twice in a row before reacting —
-                                // single-frame noise blips are ignored.
+                                // single-frame noise blips are ignored — except one very
+                                // confident frame, which is acted on right away.
                                 if (event.category == candidateCategory) {
                                     candidateHits++
                                 } else {
@@ -164,7 +173,7 @@ class SoundReactionService : Service() {
                                     candidateLabel = event.label
                                     candidateHits = 1
                                 }
-                                if (candidateHits >= requiredHits) {
+                                if (candidateHits >= requiredHits || event.confidence >= strongHitConfidence) {
                                     handleEvent(event.category, event.label, event.confidence)
                                     acted = true
                                 }
@@ -206,13 +215,22 @@ class SoundReactionService : Service() {
         if (now - (lastReactionAt[category] ?: 0L) < 8_000L) return
 
         val (emotion, quip) = when (category) {
-            "music" -> "excited" to "Ooh, I like this beat! 💃"
+            "music" -> "happy" to "Ooh, I like this beat! 💃"
             "crying" -> "sad" to "Aww… don't cry, I'm right here with you 🥺"
             "gunshot" -> "surprised" to "Whoa!! That was LOUD — you okay?! 😱"
             "laughter" -> "happy" to "Hehe, someone's having fun 😄"
-            "scream" -> "shock" to "Eep! What's happening?!"
+            "scream" -> "surprised" to "Eep! What's happening?! 😱"
+            "talk" -> {
+                // Pick a talk quip by label so conversation, narration and singing differ.
+                val line = when {
+                    label.contains("sing") || label.contains("chant") -> "Sing more! I'm listening 🎤"
+                    label.contains("speech") || label.contains("conversation") -> "Are you talking to me? 💬 Talk more, I'm listening!"
+                    else -> "I heard your voice! 💬 Tell me more!"
+                }
+                "happy" to line
+            }
             "applause" -> "happy" to "Yay! Take a bow 🎉"
-            "animal" -> "lovely" to "Aww, a little friend! 🐾"
+            "animal" -> "happy" to "Aww, a little friend! 🐾"
             "nature" -> "sleepy" to "Mmm, sounds cosy… 🌧️"
             "alert" -> "annoyed" to "That alarm again? hmph"
             else -> return
@@ -236,6 +254,17 @@ class SoundReactionService : Service() {
         if (com.cupcake.service.ShimejiPetService.isRunning) {
             com.cupcake.service.ShimejiPetService.showSpeech(ctx, quip, asset)
         }
+        // Speak the reaction out loud (gated by the voice toggle inside LocalSpeaker).
+        runCatching { speaker.speak(quip) }
+            .onFailure { Log.w(TAG, "voice reaction failed: ${it.message}") }
+    }
+
+    /** Lazily built local TTS voice for spoken reactions. */
+    private val speaker: com.cupcake.tts.LocalSpeaker by lazy {
+        val tts = com.cupcake.tts.TtsManager(applicationContext).apply {
+            if (!initialize()) Log.w(TAG, "system TTS unavailable — reactions stay silent")
+        }
+        com.cupcake.tts.LocalSpeaker(applicationContext, tts)
     }
 
     private fun ensureChannel() {

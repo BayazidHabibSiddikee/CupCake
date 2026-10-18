@@ -9,7 +9,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.graphics.PixelFormat
-import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -21,9 +20,7 @@ import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
-import android.widget.ImageView
 import android.widget.TextView
-import coil.load
 import com.cupcake.MainActivity
 import com.cupcake.R
 import com.cupcake.ai.CharacterManager
@@ -51,7 +48,8 @@ class ShimejiPetService : Service() {
     private var speechBubbleDismissRunnable: Runnable? = null
     private var faceRestoreRunnable: Runnable? = null
 
-    private var baseImageSource: String? = null
+    private var petRig: com.cupcake.pet.PetRigView? = null
+    private var baseEmotion = com.cupcake.ai.EmotionAssets.canonicalStem("normal")
 
     // Lively roaming/dancing animation state.
     private var roamRunnable: Runnable? = null
@@ -99,15 +97,15 @@ class ShimejiPetService : Service() {
                 applyAnger(level, line, emotion)
             }
             else -> {
-                val avatar = intent?.getStringExtra(EXTRA_AVATAR)
                 val characterName = intent?.getStringExtra(EXTRA_NAME) ?: "Companion"
-                setupFloatingView(avatar, characterName)
+                val avatar = intent?.getStringExtra(EXTRA_AVATAR)
+                setupFloatingView(characterName, avatar)
             }
         }
         return START_STICKY
     }
 
-    private fun setupFloatingView(avatar: String?, characterName: String) {
+    private fun setupFloatingView(characterName: String, avatar: String? = null) {
         if (!Settings.canDrawOverlays(this)) {
             Log.w(TAG, "Cannot draw overlays: permission missing")
             stopSelf()
@@ -115,8 +113,7 @@ class ShimejiPetService : Service() {
         }
 
         if (floatView != null) {
-            // Already created, update image
-            updatePetVisual(avatar)
+            // Already created, nothing else to refresh — the rig self-animates.
             return
         }
 
@@ -145,12 +142,16 @@ class ShimejiPetService : Service() {
         }
 
 
-        // Inflate view
+        // Inflate view — the articulated rig draws the robot (no static sprite).
         val inflater = LayoutInflater.from(this)
         val view = inflater.inflate(R.layout.overlay_shimeji_pet, null)
         floatView = view
-
-        updatePetVisual(avatar)
+        petRig = view.findViewById(R.id.pet_rig)
+        // Start from the companion's chosen art (e.g. "happy") if we know it.
+        EmotionAssets.stemFromAsset(avatar)?.let { stem ->
+            baseEmotion = stem
+            petRig?.emotion = stem
+        }
 
         // Drag & Click Logic
         view.setOnTouchListener(object : View.OnTouchListener {
@@ -179,6 +180,7 @@ class ShimejiPetService : Service() {
                         }
 
                         if (isDragging) {
+                            petRig?.gait = com.cupcake.pet.Gait.IDLE
                             layoutParams!!.x = initialX + dx
                             layoutParams!!.y = initialY + dy
                             windowManager?.updateViewLayout(floatView, layoutParams)
@@ -200,6 +202,7 @@ class ShimejiPetService : Service() {
                                 0,
                                 (screenHeight - petHeight).coerceAtLeast(0)
                             )
+                            if (!angryMode) startRoaming()
                         } else {
                             val now = System.currentTimeMillis()
                             if (now - lastClickTime < 350) {
@@ -245,9 +248,9 @@ class ShimejiPetService : Service() {
     }
 
     /**
-     * Drives the desktop-pet loop: strolls horizontally across the whole screen with a
-     * gentle walk-bob, and periodically breaks into a bouncing spin-dance for a few seconds.
-     * Pauses automatically while the user drags the pet.
+     * Drives the desktop-pet loop: strolls horizontally across the whole screen and
+     * periodically breaks into a dance. The rig animates limbs/face itself; this loop
+     * only moves the window and flips gait.
      */
     private fun startRoaming() {
         if (roamRunnable != null) return
@@ -255,8 +258,8 @@ class ShimejiPetService : Service() {
         screenW = metrics.widthPixels
         screenH = metrics.heightPixels
         val params = layoutParams ?: return
-        petWidth = floatView?.width?.takeIf { it > 0 } ?: (120 * metrics.density).toInt()
-        petHeight = floatView?.height?.takeIf { it > 0 } ?: (140 * metrics.density).toInt()
+        petWidth = floatView?.width?.takeIf { it > 0 } ?: (132 * metrics.density).toInt()
+        petHeight = floatView?.height?.takeIf { it > 0 } ?: (148 * metrics.density).toInt()
         baseY = params.y.coerceIn(0, (screenH - petHeight).coerceAtLeast(0))
 
         val runner = object : Runnable {
@@ -281,15 +284,14 @@ class ShimejiPetService : Service() {
         } else if (danceCooldown > 0) {
             danceCooldown--
         }
-
+        val rig = petRig ?: return
         if (dancing) {
-            // Bounce in place + spin wiggle.
-            params.y = baseY - (abs(kotlin.math.sin(tick / 4.0)) * 28).toInt()
-            val wobble = (kotlin.math.sin(tick / 3.0) * 16f).toFloat()
-            applyPetTransforms(view, faceRight = facing >= 0, rotation = wobble)
+            rig.facingLeft = facing < 0
+            rig.gait = com.cupcake.pet.Gait.DANCE
+            params.y = baseY
         } else {
             // Stroll left/right across the whole screen.
-            val speed = ((screenW / 260).coerceIn(3, 12))
+            val speed = ((screenW / 200).coerceIn(4, 14))
             params.x += facing * speed
             val maxX = (screenW - petWidth).coerceAtLeast(0)
             if (params.x <= 0) {
@@ -299,8 +301,9 @@ class ShimejiPetService : Service() {
                 params.x = maxX
                 facing = -1
             }
-            params.y = baseY + (kotlin.math.sin(tick / 7.0) * 7).toInt()
-            applyPetTransforms(view, faceRight = facing >= 0, rotation = 0f)
+            params.y = baseY
+            rig.facingLeft = facing < 0
+            rig.gait = com.cupcake.pet.Gait.WALK
 
             if (danceCooldown <= 0 && (0..6).random() == 0) {
                 danceTicksLeft = 30 + (0..24).random()
@@ -315,46 +318,9 @@ class ShimejiPetService : Service() {
         }
     }
 
-    private fun applyPetTransforms(view: View, faceRight: Boolean, rotation: Float) {
-        val scaleX = if (faceRight) 1f else -1f
-        view.findViewById<ImageView>(R.id.pet_image)?.let {
-            it.scaleX = scaleX
-            it.rotation = rotation
-        }
-        view.findViewById<TextView>(R.id.pet_emoji)?.let {
-            it.scaleX = scaleX
-            it.rotation = rotation
-        }
-    }
-
     private fun stopRoaming() {
         roamRunnable?.let { handler.removeCallbacks(it) }
         roamRunnable = null
-    }
-
-    private fun updatePetVisual(avatar: String?) {
-        val view = floatView ?: return
-        val petImageView = view.findViewById<ImageView>(R.id.pet_image) ?: return
-        val petEmojiView = view.findViewById<TextView>(R.id.pet_emoji) ?: return
-
-        // Base look = the 2D sprite from the emotion set (no GIFs anymore).
-        val imageSource = avatar?.takeIf { it.isNotBlank() }
-        baseImageSource = imageSource
-
-        if (imageSource != null && (imageSource.startsWith("http") || imageSource.startsWith("content://") || imageSource.startsWith("file://") || imageSource.endsWith(".png") || imageSource.endsWith(".webp") || imageSource.endsWith(".jpg"))) {
-            petEmojiView.visibility = View.GONE
-            petImageView.visibility = View.VISIBLE
-            petImageView.load(imageSource) {
-                crossfade(true)
-                placeholder(R.drawable.ic_pet_placeholder)
-                error(R.drawable.ic_pet_placeholder)
-            }
-        } else {
-            // Emoji or fallback
-            petImageView.visibility = View.GONE
-            petEmojiView.visibility = View.VISIBLE
-            petEmojiView.text = avatar?.takeIf { it.isNotBlank() } ?: "🐱"
-        }
     }
 
     /**
@@ -368,7 +334,10 @@ class ShimejiPetService : Service() {
             val wasAngry = angryMode
             angryMode = true
             stopRoaming()
-            setPetFace(EmotionAssets.assetForStem("angry"))
+            petRig?.gait = com.cupcake.pet.Gait.IDLE
+            // Glare without touching baseEmotion, so the thaw restores the real face.
+            faceRestoreRunnable?.let { handler.removeCallbacks(it) }
+            petRig?.emotion = "angry"
             scheduleAngerCoolOff()
             // Deliver a single cross line as she goes cold, but only on the transition so
             // she does not keep re-announcing it every cycle.
@@ -408,51 +377,31 @@ class ShimejiPetService : Service() {
         handler.postDelayed(check, MoodStore.COOLDOWN_MS + 2_000L)
     }
 
-    /** Persistently shows [asset] as the pet face (no auto-restore). */
-    private fun setPetFace(asset: String) {
-        val view = floatView ?: return
+    /** Persistently shows [stem] as the pet face (no auto-restore). */
+    private fun setPetFace(stem: String) {
         faceRestoreRunnable?.let { handler.removeCallbacks(it) }
-        val petImageView = view.findViewById<ImageView>(R.id.pet_image) ?: return
-        petImageView.visibility = View.VISIBLE
-        petImageView.load(asset) {
-            crossfade(true)
-            placeholder(R.drawable.ic_pet_placeholder)
-            error(R.drawable.ic_pet_placeholder)
-        }
+        baseEmotion = stem
+        petRig?.emotion = stem
     }
 
-    /** Restores the pet's default sprite after a temporary/angry face. */
+    /** Restores the pet's default face after a temporary/angry face. */
     private fun restoreBaseFace() {
-        val view = floatView ?: return
-        val restore = baseImageSource ?: return
-        view.findViewById<ImageView>(R.id.pet_image)?.load(restore) { crossfade(true) }
+        val rig = petRig ?: return
+        rig.emotion = baseEmotion
     }
 
     /**
-     * Swaps the 2D pet face to [asset] for a few seconds, then restores the base look.
+     * Swaps the pet face to [stem] for a few seconds, then restores the base look.
      * Reflects the companion's live emotion without opening a speech bubble.
      */
-    private fun setEmotionFace(asset: String) {
-        val view = floatView ?: return
+    private fun setEmotionFace(stemOrAsset: String) {
+        val rig = petRig ?: return
         // While sulking she keeps the angry face instead of mirroring chat emotions.
         if (angryMode) return
-        if (baseImageSource == null) return
-        val petImageView = view.findViewById<ImageView>(R.id.pet_image) ?: return
-
+        val stem = EmotionAssets.stemFromAsset(stemOrAsset) ?: EmotionAssets.canonicalStem(stemOrAsset)
         faceRestoreRunnable?.let { handler.removeCallbacks(it) }
-        petImageView.visibility = View.VISIBLE
-        petImageView.load(asset) {
-            crossfade(true)
-            placeholder(R.drawable.ic_pet_placeholder)
-            error(R.drawable.ic_pet_placeholder)
-        }
-
-        faceRestoreRunnable = Runnable {
-            val restore = baseImageSource
-            if (restore != null) {
-                petImageView.load(restore) { crossfade(true) }
-            }
-        }
+        rig.emotion = stem
+        faceRestoreRunnable = Runnable { rig.emotion = baseEmotion }
         handler.postDelayed(faceRestoreRunnable!!, 4000)
     }
 
@@ -468,26 +417,21 @@ class ShimejiPetService : Service() {
 
         speechText.text = text
         speechBubble.visibility = View.VISIBLE
+        petRig?.speaking = true
 
-        // Swap the 2D pet face to the spoken emotion, then restore the base look.
-        val petImageView = view.findViewById<ImageView>(R.id.pet_image)
-        if (emotionAsset != null && petImageView != null) {
-            petImageView.visibility = View.VISIBLE
-            petImageView.load(emotionAsset) {
-                crossfade(true)
-                placeholder(R.drawable.ic_pet_placeholder)
-                error(R.drawable.ic_pet_placeholder)
-            }
+        // Swap the pet face to the spoken emotion while she talks, then restore.
+        val emotionStem = emotionAsset?.let {
+            EmotionAssets.stemFromAsset(it) ?: EmotionAssets.canonicalStem(it)
+        }
+        if (emotionStem != null) {
+            val rig = petRig
+            if (rig != null) rig.emotion = emotionStem
         }
 
         speechBubbleDismissRunnable = Runnable {
             speechBubble.visibility = View.GONE
-            if (emotionAsset != null && petImageView != null) {
-                val restore = baseImageSource
-                if (restore != null) {
-                    petImageView.load(restore) { crossfade(true) }
-                }
-            }
+            petRig?.speaking = false
+            if (emotionStem != null) restoreBaseFace()
         }
         handler.postDelayed(speechBubbleDismissRunnable!!, 4000)
     }

@@ -34,7 +34,7 @@ class SoundClassifier(context: Context) {
         private const val CLASS_MAP = "models/sound/yamnet_class_map.csv"
         const val SAMPLE_COUNT = 15_600
         const val SAMPLE_RATE = 16_000
-        private const val MIN_CONFIDENCE = 0.5f
+        private const val MIN_CONFIDENCE = 0.35f
     }
 
     init {
