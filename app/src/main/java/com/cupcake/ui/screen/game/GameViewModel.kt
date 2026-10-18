@@ -7,6 +7,7 @@ import com.cupcake.ai.AdManager
 import com.cupcake.ai.AdResult
 import com.cupcake.ai.EmotionAssets
 import com.cupcake.ai.EnergyManager
+import com.cupcake.ai.MoodStore
 import com.cupcake.game.GameManager
 import com.cupcake.game.PointsManager
 import com.cupcake.network.EspWebSocketServer
@@ -94,7 +95,7 @@ class GameViewModel @Inject constructor(
 
                 // Show the same emotion on-device (avatar + floating pet) — not just on
                 // the ESP board — so games still emote when no hardware is connected.
-                val stem = when (reaction.mood) {
+                val moodStem = when (reaction.mood) {
                     GameManager.ReactionMood.ANGRY -> "angry"
                     GameManager.ReactionMood.SAD -> "sad"
                     GameManager.ReactionMood.GLOATING -> "annoyed"
@@ -105,6 +106,8 @@ class GameViewModel @Inject constructor(
                         else -> "happy"
                     }
                 }
+                // While sulking over too many shorts, she stays cross even mid-game.
+                val stem = if (MoodStore.isAngry(appContext)) "angry" else moodStem
                 _botEmotionStem.value = stem
                 if (ShimejiPetService.isRunning) {
                     ShimejiPetService.showSpeech(

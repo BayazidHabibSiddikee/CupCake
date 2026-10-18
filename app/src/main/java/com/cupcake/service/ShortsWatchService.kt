@@ -9,6 +9,7 @@ import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import com.cupcake.ai.EmotionAssets
+import com.cupcake.ai.MoodStore
 import com.cupcake.game.PointsManager
 import com.cupcake.ime.PersonaEngine
 import java.util.Calendar
@@ -147,12 +148,21 @@ class ShortsWatchService : AccessibilityService() {
 
         lastReactLevel = level
         lastReactAt = now
-        Log.i(TAG, "React level=$level today=$today → $emotion")
+
+        // Ramp the app-wide mood (persists ~2h, feeds chat/games) and let the floating
+        // pet decide: normal chatter below max, silent treatment at max anger.
+        val moodLevel = MoodStore.escalate(applicationContext, level)
+        Log.i(TAG, "React level=$level mood=$moodLevel today=$today → $emotion")
 
         PersonaEngine.triggerReaction(emotion, quip)
         if (ShimejiPetService.isRunning) {
             val stem = EmotionAssets.espFaceForStem(emotion)
-            ShimejiPetService.showSpeech(applicationContext, quip, EmotionAssets.assetForStem(stem))
+            ShimejiPetService.setAnger(
+                applicationContext,
+                moodLevel,
+                quip,
+                EmotionAssets.assetForStem(stem)
+            )
         }
     }
 

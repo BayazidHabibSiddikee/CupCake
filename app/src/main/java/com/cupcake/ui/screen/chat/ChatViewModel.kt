@@ -356,8 +356,9 @@ class ChatViewModel @Inject constructor(
         if (rawSys.isNotBlank()) {
             val cleanSys = PromptTemplates.replaceTemplateMacros(rawSys, charName, userName())
             val profile = userProfileBlock()
-            val withProfile = if (profile.isNotBlank()) "$cleanSys\n$profile" else cleanSys
-            messageList.add(OllamaEngine.OllamaMessage(role = "system", content = withProfile))
+            val mood = com.cupcake.ai.MoodStore.angerPrompt(appContext)
+            val withMood = listOf(cleanSys, profile, mood).filter { it.isNotBlank() }.joinToString("\n")
+            messageList.add(OllamaEngine.OllamaMessage(role = "system", content = withMood))
         }
         
         // Add conversation messages
@@ -535,7 +536,11 @@ class ChatViewModel @Inject constructor(
             }
         }
         val bodyBudget = (1400 - style.length - 1).coerceAtLeast(200)
-        val systemPrompt = "$style\n" + if (body.length > bodyBudget) body.take(bodyBudget) else body
+        // Mood is appended *after* the length budget so a grumpy/silent-treatment line
+        // can never be truncated away on long characters.
+        val mood = com.cupcake.ai.MoodStore.angerPrompt(appContext)
+        val moodLine = if (mood.isNotBlank()) "\n$mood" else ""
+        val systemPrompt = "$style\n" + (if (body.length > bodyBudget) body.take(bodyBudget) else body) + moodLine
         
         val builder = StringBuilder()
         builder.append("<|im_start|>system\n")

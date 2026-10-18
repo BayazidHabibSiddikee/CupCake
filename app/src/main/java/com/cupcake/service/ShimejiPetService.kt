@@ -27,6 +27,8 @@ import coil.load
 import com.cupcake.MainActivity
 import com.cupcake.R
 import com.cupcake.ai.CharacterManager
+import com.cupcake.ai.EmotionAssets
+import com.cupcake.ai.MoodStore
 import kotlin.math.abs
 
 /**
@@ -63,6 +65,10 @@ class ShimejiPetService : Service() {
     private var danceTicksLeft = 0
     private var danceCooldown = 90
 
+    /** Silent-treatment state: frozen in place, angry face, no chatter. */
+    private var angryMode = false
+    private var angerCoolRunnable: Runnable? = null
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
@@ -85,6 +91,12 @@ class ShimejiPetService : Service() {
             }
             ACTION_SET_FACE -> {
                 intent.getStringExtra(EXTRA_FACE_ASSET)?.let { setEmotionFace(it) }
+            }
+            ACTION_SET_ANGER -> {
+                val level = intent.getIntExtra(EXTRA_ANGER, MoodStore.LEVEL_CALM)
+                val line = intent.getStringExtra(EXTRA_ANGRY_LINE)
+                val emotion = intent.getStringExtra(EXTRA_EMOTION)
+                applyAnger(level, line, emotion)
             }
             else -> {
                 val avatar = intent?.getStringExtra(EXTRA_AVATAR)
@@ -219,7 +231,14 @@ class ShimejiPetService : Service() {
         try {
             windowManager?.addView(floatView, layoutParams)
             Log.i(TAG, "Shimeji pet overlay attached successfully")
-            view.post { startRoaming() }
+            // Resuming mid-sulk? Stay frozen and glaring instead of strolling happily.
+            view.post {
+                if (MoodStore.isMaxAngry(this)) {
+                    applyAnger(MoodStore.LEVEL_MAX, null, null)
+                } else {
+                    startRoaming()
+                }
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to add floating view", e)
         }
@@ -339,11 +358,84 @@ class ShimejiPetService : Service() {
     }
 
     /**
+     * Applies the companion's anger level to the overlay. At [MoodStore.LEVEL_MAX] she
+     * enters silent treatment: stops roaming, glares with the angry face and refuses to
+     * chatter (she may deliver a single [line] as she snaps, then goes quiet). Any lower
+     * level restores the lively roaming pet.
+     */
+    private fun applyAnger(level: Int, line: String?, emotionAsset: String?) {
+        if (level >= MoodStore.LEVEL_MAX) {
+            val wasAngry = angryMode
+            angryMode = true
+            stopRoaming()
+            setPetFace(EmotionAssets.assetForStem("angry"))
+            scheduleAngerCoolOff()
+            // Deliver a single cross line as she goes cold, but only on the transition so
+            // she does not keep re-announcing it every cycle.
+            if (!wasAngry && !line.isNullOrBlank()) {
+                showSpeechBubble(line, EmotionAssets.assetForStem("angry"), force = true)
+            }
+        } else {
+            angerCoolRunnable?.let { handler.removeCallbacks(it) }
+            angerCoolRunnable = null
+            if (angryMode) {
+                angryMode = false
+                restoreBaseFace()
+                startRoaming()
+            }
+            if (!line.isNullOrBlank()) {
+                showSpeechBubble(line, emotionAsset ?: EmotionAssets.assetForStem("annoyed"))
+            }
+        }
+    }
+
+    /**
+     * Nothing else will poke the pet when the 2-hour anger cooldown simply lapses, so
+     * poll once per cooldown and thaw her back to the lively roaming pet.
+     */
+    private fun scheduleAngerCoolOff() {
+        angerCoolRunnable?.let { handler.removeCallbacks(it) }
+        val check = object : Runnable {
+            override fun run() {
+                if (!MoodStore.isMaxAngry(this@ShimejiPetService)) {
+                    applyAnger(MoodStore.LEVEL_CALM, null, null)
+                } else {
+                    handler.postDelayed(this, MoodStore.COOLDOWN_MS + 2_000L)
+                }
+            }
+        }
+        angerCoolRunnable = check
+        handler.postDelayed(check, MoodStore.COOLDOWN_MS + 2_000L)
+    }
+
+    /** Persistently shows [asset] as the pet face (no auto-restore). */
+    private fun setPetFace(asset: String) {
+        val view = floatView ?: return
+        faceRestoreRunnable?.let { handler.removeCallbacks(it) }
+        val petImageView = view.findViewById<ImageView>(R.id.pet_image) ?: return
+        petImageView.visibility = View.VISIBLE
+        petImageView.load(asset) {
+            crossfade(true)
+            placeholder(R.drawable.ic_pet_placeholder)
+            error(R.drawable.ic_pet_placeholder)
+        }
+    }
+
+    /** Restores the pet's default sprite after a temporary/angry face. */
+    private fun restoreBaseFace() {
+        val view = floatView ?: return
+        val restore = baseImageSource ?: return
+        view.findViewById<ImageView>(R.id.pet_image)?.load(restore) { crossfade(true) }
+    }
+
+    /**
      * Swaps the 2D pet face to [asset] for a few seconds, then restores the base look.
      * Reflects the companion's live emotion without opening a speech bubble.
      */
     private fun setEmotionFace(asset: String) {
         val view = floatView ?: return
+        // While sulking she keeps the angry face instead of mirroring chat emotions.
+        if (angryMode) return
         if (baseImageSource == null) return
         val petImageView = view.findViewById<ImageView>(R.id.pet_image) ?: return
 
@@ -364,7 +456,10 @@ class ShimejiPetService : Service() {
         handler.postDelayed(faceRestoreRunnable!!, 4000)
     }
 
-    fun showSpeechBubble(text: String, emotionAsset: String? = null) {
+    fun showSpeechBubble(text: String, emotionAsset: String? = null, force: Boolean = false) {
+        // Silent treatment: ignore cheerful chatter, but still allow the single angry
+        // line she snaps out when the anger peaks.
+        if (angryMode && !force) return
         val view = floatView ?: return
         val speechBubble = view.findViewById<View>(R.id.speech_bubble) ?: return
         val speechText = view.findViewById<TextView>(R.id.speech_text) ?: return
@@ -457,6 +552,7 @@ class ShimejiPetService : Service() {
         }
         speechBubbleDismissRunnable?.let { handler.removeCallbacks(it) }
         faceRestoreRunnable?.let { handler.removeCallbacks(it) }
+        angerCoolRunnable?.let { handler.removeCallbacks(it) }
         isRunning = false
         super.onDestroy()
     }
@@ -475,12 +571,15 @@ class ShimejiPetService : Service() {
         const val ACTION_STOP = "com.cupcake.shimeji.STOP"
         const val ACTION_SHOW_SPEECH = "com.cupcake.shimeji.SHOW_SPEECH"
         const val ACTION_SET_FACE = "com.cupcake.shimeji.SET_FACE"
+        const val ACTION_SET_ANGER = "com.cupcake.shimeji.SET_ANGER"
 
         const val EXTRA_AVATAR = "extra_avatar"
         const val EXTRA_NAME = "extra_name"
         const val EXTRA_TEXT = "extra_text"
         const val EXTRA_EMOTION = "extra_emotion"
         const val EXTRA_FACE_ASSET = "extra_face_asset"
+        const val EXTRA_ANGER = "extra_anger_level"
+        const val EXTRA_ANGRY_LINE = "extra_angry_line"
         const val KEY_RUNNING = "overlay_running"
 
         fun start(context: Context, avatar: String? = null, name: String? = null) {
@@ -521,6 +620,21 @@ class ShimejiPetService : Service() {
             val intent = Intent(context, ShimejiPetService::class.java).apply {
                 action = ACTION_SHOW_SPEECH
                 putExtra(EXTRA_TEXT, text)
+                if (emotionAsset != null) putExtra(EXTRA_EMOTION, emotionAsset)
+            }
+            context.startService(intent)
+        }
+
+        /**
+         * Applies an anger level to the floating pet. At [MoodStore.LEVEL_MAX] she enters
+         * silent treatment (frozen, glaring, silent aside from one [line]); lower levels
+         * bring back the lively roaming pet.
+         */
+        fun setAnger(context: Context, level: Int, line: String? = null, emotionAsset: String? = null) {
+            val intent = Intent(context, ShimejiPetService::class.java).apply {
+                action = ACTION_SET_ANGER
+                putExtra(EXTRA_ANGER, level)
+                if (line != null) putExtra(EXTRA_ANGRY_LINE, line)
                 if (emotionAsset != null) putExtra(EXTRA_EMOTION, emotionAsset)
             }
             context.startService(intent)
