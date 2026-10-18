@@ -67,8 +67,15 @@ class SoundReactionService : Service() {
         serviceScope.launch {
             val buffer = FloatArray(15600) // YAMNet frame size approx
             while (isListening) {
-                val read = audioRecord?.read(buffer, 0, buffer.size) ?: 0
+                // AudioRecord.read(FloatArray, ...) is not available in all Android versions.
+                // Using FloatArray with a wrapper or converting from ShortArray.
+                val shortBuffer = ShortArray(buffer.size)
+                val read = audioRecord?.read(shortBuffer, 0, shortBuffer.size) ?: 0
                 if (read > 0) {
+                    // Convert Short to Float normalized to [-1.0, 1.0]
+                    for (i in 0 until read) {
+                        buffer[i] = shortBuffer[i] / 32768.0f
+                    }
                     val category = classifier?.classify(buffer)
                     if (category != null) {
                         handleSoundEvent(category)

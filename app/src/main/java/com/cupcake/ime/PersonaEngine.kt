@@ -1,5 +1,7 @@
 package com.cupcake.ime
 
+import android.util.Log
+
 /**
  * The companion's typing-commentary brain.
  *

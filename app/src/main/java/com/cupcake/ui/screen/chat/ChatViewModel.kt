@@ -509,12 +509,6 @@ class ChatViewModel @Inject constructor(
                     .trim()
     }
 
-    private fun sanitizeInput(text: String): String {
-        return text.replace(Regex("[\\uD83C-\\uDBFF\\uDC00-\\uDFFF]+"), "")
-                    .replace(Regex("[~\"']"), "")
-                    .trim()
-    }
-
     private fun buildPrompt(): String {
         val charName = _currentCharacter.value?.name ?: "CupCake"
         val customSys = _systemPrompt.value?.fullPrompt()
