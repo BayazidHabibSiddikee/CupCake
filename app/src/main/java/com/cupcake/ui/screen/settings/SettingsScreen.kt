@@ -591,14 +591,14 @@ private fun ActiveEngineCard(
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text("Active engine", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(
-                    text = if (isLocal) (modelName ?: "Bundled on-device model") else (provider?.name ?: "External provider"),
+                    text = if (isLocal) "On-device AI" else (provider?.name ?: "Cloud AI"),
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = if (isLocal) "Running offline on this device" else (provider?.baseUrl ?: ""),
+                    text = if (isLocal) "Runs fully offline on this device" else "Connected to external service",
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,

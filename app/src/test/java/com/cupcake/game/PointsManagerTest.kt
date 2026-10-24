@@ -3,6 +3,7 @@ package com.cupcake.game
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Test
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.async
@@ -127,5 +128,58 @@ class PointsManagerTest {
 
         val level = kotlinx.coroutines.withTimeout(2_000) { firstLevelUp.await() }
         assertTrue("expected level >= 2 but was $level", level >= 2)
+    }
+    @Test
+    fun `awardPoints records total games, wins and per-game stats for win and loss`() {
+        val manager = manager()
+        manager.awardPoints(100, Game.GameType.CHESS, won = true)
+        manager.awardPoints(40, Game.GameType.PING_PONG, won = false) // loss
+        manager.awardPoints(30, Game.GameType.CONNECT_FOUR, won = false) // draw-like outcome
+
+        assertEquals(3, manager.totalGamesPlayed.value)
+        assertEquals(1, manager.totalWins.value)
+        assertEquals(1, manager.gameStats.value[Game.GameType.CHESS]?.gamesPlayed)
+        assertEquals(1, manager.gameStats.value[Game.GameType.CHESS]?.wins)
+        assertEquals(1, manager.gameStats.value[Game.GameType.PING_PONG]?.gamesPlayed)
+        assertEquals(0, manager.gameStats.value[Game.GameType.PING_PONG]?.wins)
+        assertEquals(1, manager.gameStats.value[Game.GameType.CONNECT_FOUR]?.gamesPlayed)
+        assertEquals(0, manager.gameStats.value[Game.GameType.CONNECT_FOUR]?.wins)
+    }
+
+    @Test
+    fun `game stats and totals round-trip through the PointsStore`() {
+        val store = InMemoryPointsStore()
+        val first = manager(store)
+        first.awardPoints(100, Game.GameType.CHESS, won = true)      // earned = 300
+        first.awardPoints(40, Game.GameType.PING_PONG, won = false)   // earned = 0
+        first.awardPoints(200, Game.GameType.WORD_SCRAMBLE, won = true) // earned = 300
+
+        assertEquals(3, first.totalGamesPlayed.value)
+        assertEquals(2, first.totalWins.value)
+
+        // New manager over the same store must restore everything.
+        val reloaded = manager(store)
+        assertEquals(3, reloaded.totalGamesPlayed.value)
+        assertEquals(2, reloaded.totalWins.value)
+
+        val chess = reloaded.gameStats.value[Game.GameType.CHESS] ?: run { fail("CHESS stats missing"); return }
+        assertEquals(1, chess.gamesPlayed)
+        assertEquals(1, chess.wins)
+        assertEquals(300L, chess.totalPoints)
+        assertEquals(300, chess.bestScore)
+
+        val pong = reloaded.gameStats.value[Game.GameType.PING_PONG] ?: run { fail("PING_PONG stats missing"); return }
+        assertEquals(1, pong.gamesPlayed)
+        assertEquals(0, pong.wins)
+        assertEquals(0L, pong.totalPoints)
+
+        val scramble = reloaded.gameStats.value[Game.GameType.WORD_SCRAMBLE] ?: run { fail("WORD_SCRAMBLE stats missing"); return }
+        assertEquals(1, scramble.gamesPlayed)
+        assertEquals(1, scramble.wins)
+        assertEquals(300L, scramble.totalPoints)
+
+        val snapshot = store.load()
+        assertEquals(3, snapshot.totalGamesPlayed)
+        assertEquals(3, snapshot.stats.size)
     }
 }

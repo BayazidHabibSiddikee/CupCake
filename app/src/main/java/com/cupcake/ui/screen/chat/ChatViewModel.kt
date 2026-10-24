@@ -165,6 +165,12 @@ class ChatViewModel @Inject constructor(
         loadCurrentCharacter()
         ensureModelLoaded()
         scheduleIdleChatter()
+        // Listen for external user messages (e.g. from STT or BLE)
+        viewModelScope.launch {
+            com.cupcake.chat.MessagingBus.messages.collect { text ->
+                sendMessage(text)
+            }
+        }
     }
 
     /**

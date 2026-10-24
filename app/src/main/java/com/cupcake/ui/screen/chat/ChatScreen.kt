@@ -30,6 +30,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,6 +40,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.runtime.rememberCoroutineScope
+import com.cupcake.chat.MessagingBus
 import com.cupcake.data.model.ChatMessage
 import com.cupcake.ui.component.CharacterAvatar
 import com.cupcake.ui.component.ChatMessageItem
@@ -71,6 +74,7 @@ fun ChatScreen(
         com.cupcake.ai.EmotionAssets.assetForStem(it)
     } ?: currentCharacter?.avatar ?: "🤖"
     val isModelLoading = modelLoadState is ChatViewModel.ModelLoadState.Loading
+    val scope = rememberCoroutineScope()
 
     var scrollToBottom by remember { mutableStateOf(false) }
     var showCharacterPicker by remember { mutableStateOf(false) }
@@ -257,7 +261,11 @@ fun ChatScreen(
                 onSend = { text ->
                     viewModel.sendMessage(text)
                 },
-                enabled = !isGenerating
+                enabled = !isGenerating,
+                // Voice input: transcript → MessagingBus.publish → ChatViewModel.sendMessage
+                onSpeechResult = { text ->
+                    scope.launch { MessagingBus.sendUserMessage(text) }
+                },
             )
         }
     }

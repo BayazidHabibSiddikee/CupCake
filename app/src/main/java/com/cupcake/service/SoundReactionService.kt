@@ -15,12 +15,17 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import com.cupcake.R
 import com.cupcake.ai.SoundClassifier
+import com.cupcake.chat.MessagingBus
+import com.cupcake.stt.SpeechToTextManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * CupCake's "ear": captures microphone audio, runs YAMNet locally and turns
@@ -31,8 +36,10 @@ class SoundReactionService : Service() {
 
     private var audioRecord: AudioRecord? = null
     private var classifier: SoundClassifier? = null
+    private var sttManager: SpeechToTextManager? = null
     @Volatile private var listening = false
     private val scope = CoroutineScope(Dispatchers.Default + Job())
+    @Volatile private var micPaused = false
 
     /** Per-category throttle so the companion doesn't repeat the same quip. */
     private val lastReactionAt = HashMap<String, Long>()
@@ -55,7 +62,17 @@ class SoundReactionService : Service() {
     override fun onCreate() {
         super.onCreate()
         classifier = SoundClassifier(this)
+        sttManager = SpeechToTextManager(this)
         ensureChannel()
+
+        // Forward STT transcripts to the chat engine
+        scope.launch(Dispatchers.Main) {
+            sttManager?.transcript?.collect { text ->
+                if (!text.isNullOrBlank()) {
+                    MessagingBus.sendUserMessage(text)
+                }
+            }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -149,6 +166,7 @@ class SoundReactionService : Service() {
                 var frames = 0
 
                 while (listening && !acted && System.currentTimeMillis() < windowEnd) {
+                    if (micPaused) { delay(50); continue }
                     val read = record.read(shorts, 0, shorts.size)
                     if (read > 0) {
                         frames++
@@ -227,6 +245,10 @@ class SoundReactionService : Service() {
                     label.contains("speech") || label.contains("conversation") -> "Are you talking to me? 💬 Talk more, I'm listening!"
                     else -> "I heard your voice! 💬 Tell me more!"
                 }
+                // Trigger STT transcription for the next few seconds
+                micPaused = true
+                sttManager?.startListening()
+                scope.launch { withTimeoutOrNull(45_000L) { while (sttManager?.isListening?.value == true) delay(100) } ?: Log.w(TAG, "STT timed out; resuming sound reactions"); micPaused = false }
                 "happy" to line
             }
             "applause" -> "happy" to "Yay! Take a bow 🎉"
@@ -295,6 +317,7 @@ class SoundReactionService : Service() {
             audioRecord?.release()
         }
         classifier?.close()
+        sttManager?.destroy()
         scope.cancel()
     }
 

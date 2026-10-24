@@ -58,6 +58,8 @@ class ShimejiPetService : Service() {
     private var petWidth = 0
     private var petHeight = 0
     private var baseY = 0
+    /** Vertical roam velocity (px per frame); reversed when the pet hits top/bottom edges. */
+    private var roamVelY = 0
     private var facing = 1
     private var tick = 0
     private var danceTicksLeft = 0
@@ -257,7 +259,7 @@ class ShimejiPetService : Service() {
     }
 
     /**
-     * Drives the desktop-pet loop: strolls horizontally across the whole screen and
+     * Drives the desktop-pet loop: roams across the full screen (X and Y) and
      * periodically breaks into a dance. The rig animates limbs/face itself; this loop
      * only moves the window and flips gait.
      */
@@ -267,9 +269,10 @@ class ShimejiPetService : Service() {
         screenW = metrics.widthPixels
         screenH = metrics.heightPixels
         val params = layoutParams ?: return
-        petWidth = floatView?.width?.takeIf { it > 0 } ?: (132 * metrics.density).toInt()
-        petHeight = floatView?.height?.takeIf { it > 0 } ?: (148 * metrics.density).toInt()
+        petWidth = floatView?.width?.takeIf { it > 0 } ?: (84 * metrics.density).toInt()   // ~20% smaller: 105→84
+        petHeight = floatView?.height?.takeIf { it > 0 } ?: (94 * metrics.density).toInt()  // ~20% smaller: 118→94
         baseY = params.y.coerceIn(0, (screenH - petHeight).coerceAtLeast(0))
+        roamVelY = ((screenH / 300).coerceIn(1, 6))
 
         val runner = object : Runnable {
             override fun run() {
@@ -299,7 +302,7 @@ class ShimejiPetService : Service() {
             rig.gait = com.cupcake.pet.Gait.DANCE
             params.y = baseY
         } else {
-            // Stroll left/right across the whole screen.
+            // Roam across the full screen (X and Y), bouncing off all four edges.
             val speed = ((screenW / 200).coerceIn(4, 14))
             params.x += facing * speed
             val maxX = (screenW - petWidth).coerceAtLeast(0)
@@ -310,7 +313,19 @@ class ShimejiPetService : Service() {
                 params.x = maxX
                 facing = -1
             }
-            params.y = baseY
+            params.x = params.x.coerceIn(0, maxX)
+
+            // Vertical roam: drift up/down and bounce off top/bottom edges.
+            params.y += roamVelY
+            val maxY = (screenH - petHeight).coerceAtLeast(0)
+            if (params.y <= 0) {
+                params.y = 0
+                roamVelY = abs(roamVelY).coerceAtLeast(1)
+            } else if (params.y >= maxY) {
+                params.y = maxY
+                roamVelY = -abs(roamVelY).coerceAtLeast(1)
+            }
+            params.y = params.y.coerceIn(0, maxY)
             rig.facingLeft = facing < 0
             rig.gait = com.cupcake.pet.Gait.WALK
 

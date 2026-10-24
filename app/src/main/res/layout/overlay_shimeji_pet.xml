@@ -32,8 +32,8 @@
 
     <!-- Pet Mascot Container -->
     <FrameLayout
-        android:layout_width="132dp"
-        android:layout_height="148dp">
+        android:layout_width="84dp"
+        android:layout_height="94dp">
 
         <com.cupcake.pet.PetRigView
             android:id="@+id/pet_rig"
