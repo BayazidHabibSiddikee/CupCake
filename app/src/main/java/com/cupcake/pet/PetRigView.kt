@@ -16,7 +16,7 @@ import kotlin.math.min
 import kotlin.math.sin
 
 /** Companion gait the floating pet is currently performing. */
-enum class Gait { IDLE, WALK, DANCE }
+enum class Gait { IDLE, WALK, DANCE, JUMP, RUN, SPIN, WAVE, HOP, BOUNCE, SLEEP }
 
 /**
  * Code-drawn articulated copy of the CupCake robot sprite.
@@ -163,6 +163,13 @@ class PetRigView @JvmOverloads constructor(
         phase += when (gait) {
             Gait.WALK -> 0.14
             Gait.DANCE -> 0.22
+            Gait.JUMP -> 0.25
+            Gait.RUN -> 0.30
+            Gait.SPIN -> 0.15
+            Gait.WAVE -> 0.12
+            Gait.HOP -> 0.28
+            Gait.BOUNCE -> 0.20
+            Gait.SLEEP -> 0.02
             Gait.IDLE -> 0.035
         }
         if (phase > 1e9) phase = 0.0
@@ -200,14 +207,28 @@ class PetRigView @JvmOverloads constructor(
         val bodyBob = when (gait) {
             Gait.WALK -> 4.0 * sin(2 * t)
             Gait.DANCE -> -14.0 * abs(sin(t))
+            Gait.JUMP -> -30.0 * abs(sin(t))
+            Gait.RUN -> 6.0 * sin(3 * t)
+            Gait.SPIN -> 0.0
+            Gait.WAVE -> -6.0 * abs(sin(t))
+            Gait.HOP -> -20.0 * abs(sin(2 * t))
+            Gait.BOUNCE -> -12.0 * abs(sin(2 * t))
+            Gait.SLEEP -> 1.0 * sin(0.5 * t)
             Gait.IDLE -> 2.0 * sin(t)
         }
         val bodySway = when (gait) {
-            Gait.WALK, Gait.DANCE -> 4.0 * sin(t)
+            Gait.WALK, Gait.DANCE, Gait.RUN -> 4.0 * sin(t)
+            Gait.SPIN -> 0.0
+            Gait.JUMP, Gait.HOP, Gait.BOUNCE -> 2.0 * sin(2 * t)
+            Gait.WAVE -> 3.0 * sin(t)
+            Gait.SLEEP -> 0.5 * sin(0.5 * t)
             Gait.IDLE -> 0.0
         }
         val rigTilt = when (gait) {
             Gait.DANCE -> 6.5f * sin(t).toFloat()
+            Gait.SPIN -> (360.0 * (phase % 1.0)).toFloat()
+            Gait.JUMP, Gait.HOP -> 8.0f * sin(2 * t).toFloat()
+            Gait.RUN -> 3.0f * sin(t).toFloat()
             else -> 0f
         }
 
@@ -242,12 +263,18 @@ class PetRigView @JvmOverloads constructor(
         val stepDy = when (gait) {
             Gait.WALK -> -9.0 * max(0.0, (if (left) sin(t) else -sin(t)))
             Gait.DANCE -> -9.0 * max(0.0, (if ((tick / 5L + (if (left) 0L else 1L)) % 2L == 0L) 1.0 else 0.0))
-            Gait.IDLE -> 0.0
+            Gait.JUMP, Gait.HOP -> -15.0 * max(0.0, (if (left) sin(2 * t) else -sin(2 * t)))
+            Gait.RUN -> -12.0 * max(0.0, (if (left) sin(3 * t) else -sin(3 * t)))
+            Gait.BOUNCE -> -6.0 * max(0.0, (if (left) sin(2 * t) else -sin(2 * t)))
+            Gait.IDLE, Gait.SPIN, Gait.WAVE, Gait.SLEEP -> 0.0
         } + bob
         val stepSway = when (gait) {
             Gait.WALK -> (if (left) sway else -sway) * 0.6
             Gait.DANCE -> sway * 0.4
-            Gait.IDLE -> 0.0
+            Gait.RUN -> (if (left) sway else -sway) * 0.8
+            Gait.JUMP, Gait.HOP, Gait.BOUNCE -> sway * 0.3
+            Gait.WAVE -> (if (left) sway else -sway) * 0.2
+            Gait.SPIN, Gait.IDLE, Gait.SLEEP -> 0.0
         }
         paint.color = BOLT_NAVY
         rect.set((x0 + stepSway).toFloat(), stepDy.toFloat() + FOOT_TOP,
@@ -283,6 +310,13 @@ class PetRigView @JvmOverloads constructor(
         val angle = when (gait) {
             Gait.WALK -> 15.0 * (if (left) sin(t) else -sin(t))
             Gait.DANCE -> 42.0 * (if (left) sin(t * 1.5) else -sin(t * 1.5))
+            Gait.JUMP -> 60.0 * (if (left) sin(2 * t) else -sin(2 * t))
+            Gait.RUN -> 25.0 * (if (left) sin(3 * t) else -sin(3 * t))
+            Gait.SPIN -> 0.0
+            Gait.WAVE -> if (left) 60.0 * sin(t) else 0.0
+            Gait.HOP -> 30.0 * (if (left) sin(2 * t) else -sin(2 * t))
+            Gait.BOUNCE -> 20.0 * (if (left) sin(2 * t) else -sin(2 * t))
+            Gait.SLEEP -> 0.0
             Gait.IDLE -> (if (left) -3.0 else 3.0) + 2.5 * sin(t)
         }.toFloat()
         canvas.save()
@@ -313,6 +347,13 @@ class PetRigView @JvmOverloads constructor(
         val headBob = when (gait) {
             Gait.WALK -> 2.5f * sin(2 * t + 0.9).toFloat()
             Gait.DANCE -> -4f * abs(sin(t)).toFloat()
+            Gait.JUMP -> -8f * abs(sin(2 * t)).toFloat()
+            Gait.RUN -> 3f * sin(3 * t + 0.5).toFloat()
+            Gait.SPIN -> 0f
+            Gait.WAVE -> -2f * abs(sin(t)).toFloat()
+            Gait.HOP -> -5f * abs(sin(2 * t)).toFloat()
+            Gait.BOUNCE -> -3f * abs(sin(2 * t)).toFloat()
+            Gait.SLEEP -> 0.5f * sin(0.5 * t).toFloat()
             Gait.IDLE -> 1.5f * sin(t + 0.6).toFloat()
         }
         canvas.save()

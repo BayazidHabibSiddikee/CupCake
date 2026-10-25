@@ -4,11 +4,13 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.os.Build
+import android.Manifest
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -26,6 +28,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.random.Random
 
 /**
  * CupCake's "ear": captures microphone audio, runs YAMNet locally and turns
@@ -61,6 +64,17 @@ class SoundReactionService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+
+        // Check FOREGROUND_SERVICE_MICROPHONE permission for Android 14+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            val micPermissionGranted = checkSelfPermission(android.Manifest.permission.FOREGROUND_SERVICE_MICROPHONE) == PackageManager.PERMISSION_GRANTED
+            if (!micPermissionGranted) {
+                Log.e(TAG, "FOREGROUND_SERVICE_MICROPHONE permission not granted, stopping service")
+                stopSelf()
+                return
+            }
+        }
+
         classifier = SoundClassifier(this)
         sttManager = SpeechToTextManager(this)
         ensureChannel()
@@ -226,6 +240,65 @@ class SoundReactionService : Service() {
         stopSelf()
     }
 
+    private fun stopRecording() {
+        runCatching {
+            audioRecord?.stop()
+            audioRecord?.release()
+        }
+        audioRecord = null
+    }
+
+    private fun startRecording() {
+        val minBuf = AudioRecord.getMinBufferSize(
+            SoundClassifier.SAMPLE_RATE,
+            AudioFormat.CHANNEL_IN_MONO,
+            AudioFormat.ENCODING_PCM_16BIT,
+        )
+        val bufBytes = maxOf(minBuf, SoundClassifier.SAMPLE_COUNT * 2)
+
+        val record = try {
+            AudioRecord(
+                MediaRecorder.AudioSource.MIC,
+                SoundClassifier.SAMPLE_RATE,
+                AudioFormat.CHANNEL_IN_MONO,
+                AudioFormat.ENCODING_PCM_16BIT,
+                bufBytes,
+            )
+        } catch (e: SecurityException) {
+            Log.e(TAG, "RECORD_AUDIO permission missing", e)
+            stopSelf()
+            return
+        }
+
+        if (record.state != AudioRecord.STATE_INITIALIZED) {
+            Log.e(TAG, "AudioRecord failed to initialise")
+            record.release()
+            return
+        }
+
+        audioRecord = record
+        record.startRecording()
+        listening = true
+        isListening = true
+        try {
+            ServiceCompat.startForeground(
+                this,
+                NOTIF_ID,
+                buildNotification("Listening every 5 seconds…"),
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE else 0,
+            )
+        } catch (e: SecurityException) {
+            Log.w(TAG, "Cannot start mic foreground service: ${e.message}")
+            listening = false
+            isListening = false
+            runCatching { record.stop(); record.release() }
+            audioRecord = null
+            stopSelf()
+        }
+        Log.i(TAG, "Listening started")
+    }
+
     private fun handleEvent(category: String, label: String, confidence: Float) {
         val now = System.currentTimeMillis()
         // Same sound event within 8 s → ignore (debounce); different label → allow.
@@ -233,29 +306,172 @@ class SoundReactionService : Service() {
         if (now - (lastReactionAt[category] ?: 0L) < 8_000L) return
 
         val (emotion, quip) = when (category) {
-            "music" -> "happy" to "Ooh, I like this beat! 💃"
-            "crying" -> "sad" to "Aww… don't cry, I'm right here with you 🥺"
-            "gunshot" -> "surprised" to "Whoa!! That was LOUD — you okay?! 😱"
-            "laughter" -> "happy" to "Hehe, someone's having fun 😄"
-            "scream" -> "surprised" to "Eep! What's happening?! 😱"
+            "music" -> {
+                val lines = listOf(
+                    "Ooh, I like this beat! 💃",
+                    "This jam's gettin' me in the mood! 🎵",
+                    "Mmm, nice rhythm! 🤍",
+                    "This song's calling my name! 📱",
+                    "Dance with me? Just you and me and this beat 🕺",
+                    "The beat's hit different today isn't it? 🌟"
+                )
+                val line = lines.random()
+                "happy" to line
+            }
+            "crying" -> {
+                val lines = listOf(
+                    "Aww… don't cry, I'm right here with you 🥺",
+                    "It's okay, I'm here for you. 💛",
+                    "Take your time, I've got your back 🛡️",
+                    "Hey, you're okay, it's just a song right? 😌",
+                    "I'm right here. No one's going anywhere. 👀",
+                    "Crying is okay, I love you anyway 💕"
+                )
+                val line = lines.random()
+                "sad" to line
+            }
+            "gunshot" -> {
+                val lines = listOf(
+                    "Whoa!! That was LOUD — you okay?! 😱",
+                    "Eep! What's happening?! 😱",
+                    "BRRRRR! Was that a car or is everything okay?! 🚗",
+                    "Okay, breath in… breath out… you good? 🌬️",
+                    "Whoa, that was intense! Are you safe? 🛡️"
+                )
+                val line = lines.random()
+                "surprised" to line
+            }
+            "laughter" -> {
+                val lines = listOf(
+                    "Hehe, someone's having fun 😄",
+                    "Hahaha! You're cute when you laugh 😏",
+                    "Ooh, that's good! Keep that energy flowing! ⚡",
+                    "Hee hee! I love that sound! 👂",
+                    "That's a good one! Keep it coming! 🔥"
+                )
+                val line = lines.random()
+                "happy" to line
+            }
+            "scream" -> {
+                val lines = listOf(
+                    "Eep! What's happening?! 😱",
+                    "Whoa!! That was LOUD — you okay?! 😱",
+                    "Okay, okay, it's fine, just breathe 🫧",
+                    "I'm right here. Nothing to be scared of. 🌿",
+                    "Whoa, that was big! Are you okay? 🤔"
+                )
+                val line = lines.random()
+                "surprised" to line
+            }
             "talk" -> {
+                // Stop AudioRecord before starting STT (SpeechRecognizer needs exclusive mic access)
+                stopRecording()
+
                 // Pick a talk quip by label so conversation, narration and singing differ.
-                val line = when {
+                // Pick a talk quip by label so conversation, narration and singing differ.
+                val base = when {
                     label.contains("sing") || label.contains("chant") -> "Sing more! I'm listening 🎤"
-                    label.contains("speech") || label.contains("conversation") -> "Are you talking to me? 💬 Talk more, I'm listening!"
+                    label.contains("speech") || label.contains("conversation") -> "Are you talking to me? 💬 Tell me more!"
                     else -> "I heard your voice! 💬 Tell me more!"
+                }
+                val fullLines = listOf(
+                    base,
+                    "$base And I'm listening, so tell me everything 🎧",
+                    "$base You can go at your own pace 🙌",
+                    "$base I'm here, I'm listening, and I've got all the time in the world 🌸"
+                )
+                val line = if (label.contains("sing") || label.contains("chant")) {
+                    base
+                } else {
+                    fullLines.random()
                 }
                 // Trigger STT transcription for the next few seconds
                 micPaused = true
-                sttManager?.startListening()
-                scope.launch { withTimeoutOrNull(45_000L) { while (sttManager?.isListening?.value == true) delay(100) } ?: Log.w(TAG, "STT timed out; resuming sound reactions"); micPaused = false }
+                try {
+                    sttManager?.startListening()
+                } catch (e: Exception) {
+                    Log.e(TAG, "STT start failed: ${e.message}")
+                    // Restart audio recording after STT fails
+                    startRecording()
+                    micPaused = false
+                    return
+                }
+
+                // Schedule STT completion handler
+                val sttJob = scope.launch {
+                    try {
+                        withTimeoutOrNull(45_000L) {
+                            while (sttManager?.isListening?.value == true) {
+                                delay(100)
+                            }
+                        }
+                        Log.i(TAG, "STT finished, resuming sound reactions")
+                    } catch (e: Exception) {
+                        Log.w(TAG, "STT timed out: ${e.message}")
+                    } finally {
+                        micPaused = false
+                        // Restart audio recording after STT completes
+                        startRecording()
+                    }
+                }
+
                 "happy" to line
             }
-            "applause" -> "happy" to "Yay! Take a bow 🎉"
-            "animal" -> "happy" to "Aww, a little friend! 🐾"
-            "nature" -> "sleepy" to "Mmm, sounds cosy… 🌧️"
-            "alert" -> "annoyed" to "That alarm again? hmph"
-            else -> return
+            "applause" -> {
+                val lines = listOf(
+                    "Yay! Take a bow 🎉",
+                    "That was wonderful! You're amazing! 🌟",
+                    "Honestly, that was fantastic! 😍",
+                    "Bravo! Bravo! 👏👏",
+                    "I'm so proud of you! You crushed it! 🎉"
+                )
+                val line = lines.random()
+                "happy" to line
+            }
+            "animal" -> {
+                val lines = listOf(
+                    "Aww, a little friend! 🐾",
+                    "Ooh, I love animals! 🐶",
+                    "Is that a pet or a wild one? Tell me about it! 🦊",
+                    "Who's a good boy/girl? 👀👀",
+                    "Animals are so cute! Do you have any at home? 🐱"
+                )
+                val line = lines.random()
+                "happy" to line
+            }
+            "nature" -> {
+                val lines = listOf(
+                    "Mmm, sounds cosy… 🌧️",
+                    "The sound of rain is so relaxing, isn't it? 🌧️",
+                    "It feels like nature's breathing. I love it. 🌿",
+                    "Mmm, smells like peace 🌸",
+                    "Nature's just getting louder today! Is it nice outside? 🌄"
+                )
+                val line = lines.random()
+                "sleepy" to line
+            }
+            "alert" -> {
+                val lines = listOf(
+                    "That alarm again? hmph",
+                    "Alarms are so annoying! 🧐",
+                    "Is that an emergency or just a test? 🤔",
+                    "Alarms are so stressful, I hate them! 🚨",
+                    "What is it? Tell me everything! 📢"
+                )
+                val line = lines.random()
+                "annoyed" to line
+            }
+            else -> {
+                val lines = listOf(
+                    "I heard something! What was that? 🔍",
+                    "It's just a sound. Nothing to worry about. 🌬️",
+                    "Wait, what was that? Tell me! 👂",
+                    "Interesting! Is that a sound or a signal? 🔔",
+                    "I'm paying attention! What's happening? 👀"
+                )
+                val line = lines.random()
+                "curious" to line
+            }
         }
 
         lastReactionAt[category] = now

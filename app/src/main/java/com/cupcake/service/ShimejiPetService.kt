@@ -69,6 +69,9 @@ class ShimejiPetService : Service() {
     private var angryMode = false
     private var angerCoolRunnable: Runnable? = null
 
+/** Movement the pet is currently performing on screen. */
+private var currentMovement = 0
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {

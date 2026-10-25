@@ -1,6 +1,7 @@
 package com.cupcake.ui.screen.settings
 
 import android.Manifest
+import android.os.Build
 import android.content.Intent
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -380,14 +381,32 @@ private fun SoundAwarenessCard() {
         }
     }
 
-    fun enable() {
-        val granted = ContextCompat.checkSelfPermission(
-            context, Manifest.permission.RECORD_AUDIO
-        ) == PackageManager.PERMISSION_GRANTED
+    val foregroundServiceMicrophonePermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()    ) { granted ->
         if (granted) {
             startSoundService(context)
             listening = true
         } else {
+            listening = false
+        }
+    }
+
+    fun enable() {
+        val micPermissionGranted = Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE &&
+            ContextCompat.checkSelfPermission(
+                context, android.Manifest.permission.FOREGROUND_SERVICE_MICROPHONE
+            ) == PackageManager.PERMISSION_GRANTED
+        
+        val recordAudioGranted = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+        
+        if (micPermissionGranted && recordAudioGranted) {
+            startSoundService(context)
+            listening = true
+        } else if (!micPermissionGranted) {
+            foregroundServiceMicrophonePermissionLauncher.launch(android.Manifest.permission.FOREGROUND_SERVICE_MICROPHONE)
+        } else if (!recordAudioGranted) {
             permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
     }

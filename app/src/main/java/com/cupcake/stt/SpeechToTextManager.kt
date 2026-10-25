@@ -124,6 +124,13 @@ class SpeechToTextManager(
     }
 
     fun startListening() {
+        // Check RECORD_AUDIO permission before starting STT
+        val context = context as? android.content.Context ?: return
+        if (context.checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            Log.e(TAG, "RECORD_AUDIO permission not granted")
+            return
+        }
+
         val lang = languagePreference[languageIndex]
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)

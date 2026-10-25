@@ -51,6 +51,13 @@ class MainActivity : ComponentActivity() {
                     android.util.Log.i("MainActivity", "POST_NOTIFICATIONS granted: $isGranted")
                 }
 
+                // Foreground service microphone permission launcher (Android 14+)
+                val micPermissionLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.RequestPermission()
+                ) { isGranted ->
+                    android.util.Log.i("MainActivity", "FOREGROUND_SERVICE_MICROPHONE granted: $isGranted")
+                }
+
                 LaunchedEffect(Unit) {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                         if (ContextCompat.checkSelfPermission(
@@ -59,6 +66,17 @@ class MainActivity : ComponentActivity() {
                             ) != android.content.pm.PackageManager.PERMISSION_GRANTED
                         ) {
                             notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                    }
+
+                    // Foreground service microphone permission (Android 14+)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        if (ContextCompat.checkSelfPermission(
+                                context,
+                                android.Manifest.permission.FOREGROUND_SERVICE_MICROPHONE
+                            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+                        ) {
+                            micPermissionLauncher.launch(android.Manifest.permission.FOREGROUND_SERVICE_MICROPHONE)
                         }
                     }
 
