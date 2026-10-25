@@ -54,7 +54,8 @@ class ChatViewModel @Inject constructor(
     private val modelRepository: ModelRepository,
     private val systemPromptRepository: SystemPromptRepository,
     private val modelDownloadManager: com.cupcake.ai.ModelDownloadManager,
-    private val userProfileStore: UserProfileStore
+    private val userProfileStore: UserProfileStore,
+    private val activityContextProvider: com.cupcake.ai.ActivityContextProvider
 ) : ViewModel() {
 
     val characterId: String =
@@ -629,8 +630,12 @@ class ChatViewModel @Inject constructor(
         // The style line must always survive the length budget below, otherwise the
         // model silently loses the mood-tag + emoji instructions on long characters.
         val style = com.cupcake.ai.LilTiiPromptTemplate.CUTE_STYLE
+        // Inject activity context so CupCake knows what the user is doing
+        val activityAugmentation = activityContextProvider.getActivityAwarePromptAugmentation()
+        val activityContext = if (activityAugmentation.isNotBlank()) "\n$activityAugmentation" else ""
         val body = buildString {
             append(cleanSystemPrompt)
+            append(activityContext)
             if (profile.isNotBlank()) {
                 append("\n")
                 append(profile)

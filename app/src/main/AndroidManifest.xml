@@ -24,6 +24,8 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
 
 
@@ -104,6 +106,16 @@
             <meta-data
                 android:name="android.accessibilityservice"
                 android:resource="@xml/shorts_watch_service" />
+        </service>
+
+        <!-- Activity Monitor Service: sees what apps user is using for AI context -->
+        <service
+            android:name=".service.ActivityMonitorService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Activity context monitor for AI companion" />
         </service>
 
         <!-- FileProvider for exporting and sharing Character Cards -->
