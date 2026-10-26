@@ -16,7 +16,11 @@ import kotlin.math.min
 import kotlin.math.sin
 
 /** Companion gait the floating pet is currently performing. */
-enum class Gait { IDLE, WALK, DANCE, JUMP, RUN, SPIN, WAVE, HOP, BOUNCE, SLEEP }
+enum class Gait { IDLE, WALK, DANCE, JUMP, RUN, SPIN, WAVE, HOP, BOUNCE, SLEEP,
+    DANCE_POP, DANCE_ROCK, DANCE_ELECTRONIC, DANCE_HIPHOP, DANCE_KPOP,
+    DANCE_FOLK, DANCE_PARTY, DANCE_BREAK, DANCE_SALSA, DANCE_BALLROOM,
+    DANCE_FREEZE, DANCE_CONGA, DANCE_MACARENA, DANCE_CHA_CHA, DANCE_SLOW
+}
 
 /**
  * Code-drawn articulated copy of the CupCake robot sprite.
@@ -163,6 +167,22 @@ class PetRigView @JvmOverloads constructor(
         phase += when (gait) {
             Gait.WALK -> 0.14
             Gait.DANCE -> 0.22
+            // Classified dance styles
+            Gait.DANCE_POP -> 0.22
+            Gait.DANCE_ROCK -> 0.22
+            Gait.DANCE_ELECTRONIC -> 0.22
+            Gait.DANCE_HIPHOP -> 0.22
+            Gait.DANCE_KPOP -> 0.22
+            Gait.DANCE_FOLK -> 0.22
+            Gait.DANCE_PARTY -> 0.22
+            Gait.DANCE_BREAK -> 0.22
+            Gait.DANCE_SALSA -> 0.22
+            Gait.DANCE_BALLROOM -> 0.22
+            Gait.DANCE_FREEZE -> 0.22
+            Gait.DANCE_CONGA -> 0.22
+            Gait.DANCE_MACARENA -> 0.22
+            Gait.DANCE_CHA_CHA -> 0.22
+            Gait.DANCE_SLOW -> 0.22
             Gait.JUMP -> 0.25
             Gait.RUN -> 0.30
             Gait.SPIN -> 0.15
@@ -207,6 +227,22 @@ class PetRigView @JvmOverloads constructor(
         val bodyBob = when (gait) {
             Gait.WALK -> 4.0 * sin(2 * t)
             Gait.DANCE -> -14.0 * abs(sin(t))
+            // Classified dance styles
+            Gait.DANCE_POP -> -14.0 * abs(sin(t))
+            Gait.DANCE_ROCK -> -14.0 * abs(sin(t))
+            Gait.DANCE_ELECTRONIC -> -14.0 * abs(sin(t))
+            Gait.DANCE_HIPHOP -> -14.0 * abs(sin(t))
+            Gait.DANCE_KPOP -> -14.0 * abs(sin(t))
+            Gait.DANCE_FOLK -> -14.0 * abs(sin(t))
+            Gait.DANCE_PARTY -> -14.0 * abs(sin(t))
+            Gait.DANCE_BREAK -> -14.0 * abs(sin(t))
+            Gait.DANCE_SALSA -> -14.0 * abs(sin(t))
+            Gait.DANCE_BALLROOM -> -14.0 * abs(sin(t))
+            Gait.DANCE_FREEZE -> -14.0 * abs(sin(t))
+            Gait.DANCE_CONGA -> -14.0 * abs(sin(t))
+            Gait.DANCE_MACARENA -> -14.0 * abs(sin(t))
+            Gait.DANCE_CHA_CHA -> -14.0 * abs(sin(t))
+            Gait.DANCE_SLOW -> -14.0 * abs(sin(t))
             Gait.JUMP -> -30.0 * abs(sin(t))
             Gait.RUN -> 6.0 * sin(3 * t)
             Gait.SPIN -> 0.0
@@ -218,6 +254,22 @@ class PetRigView @JvmOverloads constructor(
         }
         val bodySway = when (gait) {
             Gait.WALK, Gait.DANCE, Gait.RUN -> 4.0 * sin(t)
+            // Classified dance styles
+            Gait.DANCE_POP -> 4.0 * sin(t)
+            Gait.DANCE_ROCK -> 4.0 * sin(t)
+            Gait.DANCE_ELECTRONIC -> 4.0 * sin(t)
+            Gait.DANCE_HIPHOP -> 4.0 * sin(t)
+            Gait.DANCE_KPOP -> 4.0 * sin(t)
+            Gait.DANCE_FOLK -> 4.0 * sin(t)
+            Gait.DANCE_PARTY -> 4.0 * sin(t)
+            Gait.DANCE_BREAK -> 4.0 * sin(t)
+            Gait.DANCE_SALSA -> 4.0 * sin(t)
+            Gait.DANCE_BALLROOM -> 4.0 * sin(t)
+            Gait.DANCE_FREEZE -> 4.0 * sin(t)
+            Gait.DANCE_CONGA -> 4.0 * sin(t)
+            Gait.DANCE_MACARENA -> 4.0 * sin(t)
+            Gait.DANCE_CHA_CHA -> 4.0 * sin(t)
+            Gait.DANCE_SLOW -> 4.0 * sin(t)
             Gait.SPIN -> 0.0
             Gait.JUMP, Gait.HOP, Gait.BOUNCE -> 2.0 * sin(2 * t)
             Gait.WAVE -> 3.0 * sin(t)
@@ -263,6 +315,22 @@ class PetRigView @JvmOverloads constructor(
         val stepDy = when (gait) {
             Gait.WALK -> -9.0 * max(0.0, (if (left) sin(t) else -sin(t)))
             Gait.DANCE -> -9.0 * max(0.0, (if ((tick / 5L + (if (left) 0L else 1L)) % 2L == 0L) 1.0 else 0.0))
+            // Classified dance styles (15 genres from music detection)
+            Gait.DANCE_POP -> -9.0 * max(0.0, (if ((tick / 5L + (if (left) 0L else 1L) + gait.ordinal) % 2L == 0L) 1.0 else 0.0))
+            Gait.DANCE_ROCK -> -9.0 * max(0.0, (if ((tick / 5L + (if (left) 0L else 1L) + gait.ordinal) % 2L == 0L) 1.0 else 0.0))
+            Gait.DANCE_ELECTRONIC -> -9.0 * max(0.0, (if ((tick / 5L + (if (left) 0L else 1L) + gait.ordinal) % 2L == 0L) 1.0 else 0.0))
+            Gait.DANCE_HIPHOP -> -9.0 * max(0.0, (if ((tick / 5L + (if (left) 0L else 1L) + gait.ordinal) % 2L == 0L) 1.0 else 0.0))
+            Gait.DANCE_KPOP -> -9.0 * max(0.0, (if ((tick / 5L + (if (left) 0L else 1L) + gait.ordinal) % 2L == 0L) 1.0 else 0.0))
+            Gait.DANCE_FOLK -> -9.0 * max(0.0, (if ((tick / 5L + (if (left) 0L else 1L) + gait.ordinal) % 2L == 0L) 1.0 else 0.0))
+            Gait.DANCE_PARTY -> -9.0 * max(0.0, (if ((tick / 5L + (if (left) 0L else 1L) + gait.ordinal) % 2L == 0L) 1.0 else 0.0))
+            Gait.DANCE_BREAK -> -9.0 * max(0.0, (if ((tick / 5L + (if (left) 0L else 1L) + gait.ordinal) % 2L == 0L) 1.0 else 0.0))
+            Gait.DANCE_SALSA -> -9.0 * max(0.0, (if ((tick / 5L + (if (left) 0L else 1L) + gait.ordinal) % 2L == 0L) 1.0 else 0.0))
+            Gait.DANCE_BALLROOM -> -9.0 * max(0.0, (if ((tick / 5L + (if (left) 0L else 1L) + gait.ordinal) % 2L == 0L) 1.0 else 0.0))
+            Gait.DANCE_FREEZE -> -9.0 * max(0.0, (if ((tick / 5L + (if (left) 0L else 1L) + gait.ordinal) % 2L == 0L) 1.0 else 0.0))
+            Gait.DANCE_CONGA -> -9.0 * max(0.0, (if ((tick / 5L + (if (left) 0L else 1L) + gait.ordinal) % 2L == 0L) 1.0 else 0.0))
+            Gait.DANCE_MACARENA -> -9.0 * max(0.0, (if ((tick / 5L + (if (left) 0L else 1L) + gait.ordinal) % 2L == 0L) 1.0 else 0.0))
+            Gait.DANCE_CHA_CHA -> -9.0 * max(0.0, (if ((tick / 5L + (if (left) 0L else 1L) + gait.ordinal) % 2L == 0L) 1.0 else 0.0))
+            Gait.DANCE_SLOW -> -9.0 * max(0.0, (if ((tick / 5L + (if (left) 0L else 1L) + gait.ordinal) % 2L == 0L) 1.0 else 0.0))
             Gait.JUMP, Gait.HOP -> -15.0 * max(0.0, (if (left) sin(2 * t) else -sin(2 * t)))
             Gait.RUN -> -12.0 * max(0.0, (if (left) sin(3 * t) else -sin(3 * t)))
             Gait.BOUNCE -> -6.0 * max(0.0, (if (left) sin(2 * t) else -sin(2 * t)))
@@ -271,6 +339,22 @@ class PetRigView @JvmOverloads constructor(
         val stepSway = when (gait) {
             Gait.WALK -> (if (left) sway else -sway) * 0.6
             Gait.DANCE -> sway * 0.4
+            // Classified dance styles
+            Gait.DANCE_POP -> sway * 0.4
+            Gait.DANCE_ROCK -> sway * 0.4
+            Gait.DANCE_ELECTRONIC -> sway * 0.4
+            Gait.DANCE_HIPHOP -> sway * 0.4
+            Gait.DANCE_KPOP -> sway * 0.4
+            Gait.DANCE_FOLK -> sway * 0.4
+            Gait.DANCE_PARTY -> sway * 0.4
+            Gait.DANCE_BREAK -> sway * 0.4
+            Gait.DANCE_SALSA -> sway * 0.4
+            Gait.DANCE_BALLROOM -> sway * 0.4
+            Gait.DANCE_FREEZE -> sway * 0.4
+            Gait.DANCE_CONGA -> sway * 0.4
+            Gait.DANCE_MACARENA -> sway * 0.4
+            Gait.DANCE_CHA_CHA -> sway * 0.4
+            Gait.DANCE_SLOW -> sway * 0.4
             Gait.RUN -> (if (left) sway else -sway) * 0.8
             Gait.JUMP, Gait.HOP, Gait.BOUNCE -> sway * 0.3
             Gait.WAVE -> (if (left) sway else -sway) * 0.2
@@ -310,6 +394,22 @@ class PetRigView @JvmOverloads constructor(
         val angle = when (gait) {
             Gait.WALK -> 15.0 * (if (left) sin(t) else -sin(t))
             Gait.DANCE -> 42.0 * (if (left) sin(t * 1.5) else -sin(t * 1.5))
+            // Classified dance styles
+            Gait.DANCE_POP -> 42.0 * (if (left) sin(t * 1.5) else -sin(t * 1.5))
+            Gait.DANCE_ROCK -> 42.0 * (if (left) sin(t * 1.5) else -sin(t * 1.5))
+            Gait.DANCE_ELECTRONIC -> 42.0 * (if (left) sin(t * 1.5) else -sin(t * 1.5))
+            Gait.DANCE_HIPHOP -> 42.0 * (if (left) sin(t * 1.5) else -sin(t * 1.5))
+            Gait.DANCE_KPOP -> 42.0 * (if (left) sin(t * 1.5) else -sin(t * 1.5))
+            Gait.DANCE_FOLK -> 42.0 * (if (left) sin(t * 1.5) else -sin(t * 1.5))
+            Gait.DANCE_PARTY -> 42.0 * (if (left) sin(t * 1.5) else -sin(t * 1.5))
+            Gait.DANCE_BREAK -> 42.0 * (if (left) sin(t * 1.5) else -sin(t * 1.5))
+            Gait.DANCE_SALSA -> 42.0 * (if (left) sin(t * 1.5) else -sin(t * 1.5))
+            Gait.DANCE_BALLROOM -> 42.0 * (if (left) sin(t * 1.5) else -sin(t * 1.5))
+            Gait.DANCE_FREEZE -> 42.0 * (if (left) sin(t * 1.5) else -sin(t * 1.5))
+            Gait.DANCE_CONGA -> 42.0 * (if (left) sin(t * 1.5) else -sin(t * 1.5))
+            Gait.DANCE_MACARENA -> 42.0 * (if (left) sin(t * 1.5) else -sin(t * 1.5))
+            Gait.DANCE_CHA_CHA -> 42.0 * (if (left) sin(t * 1.5) else -sin(t * 1.5))
+            Gait.DANCE_SLOW -> 42.0 * (if (left) sin(t * 1.5) else -sin(t * 1.5))
             Gait.JUMP -> 60.0 * (if (left) sin(2 * t) else -sin(2 * t))
             Gait.RUN -> 25.0 * (if (left) sin(3 * t) else -sin(3 * t))
             Gait.SPIN -> 0.0
@@ -347,6 +447,22 @@ class PetRigView @JvmOverloads constructor(
         val headBob = when (gait) {
             Gait.WALK -> 2.5f * sin(2 * t + 0.9).toFloat()
             Gait.DANCE -> -4f * abs(sin(t)).toFloat()
+            // Classified dance styles
+            Gait.DANCE_POP -> -4f * abs(sin(t)).toFloat()
+            Gait.DANCE_ROCK -> -4f * abs(sin(t)).toFloat()
+            Gait.DANCE_ELECTRONIC -> -4f * abs(sin(t)).toFloat()
+            Gait.DANCE_HIPHOP -> -4f * abs(sin(t)).toFloat()
+            Gait.DANCE_KPOP -> -4f * abs(sin(t)).toFloat()
+            Gait.DANCE_FOLK -> -4f * abs(sin(t)).toFloat()
+            Gait.DANCE_PARTY -> -4f * abs(sin(t)).toFloat()
+            Gait.DANCE_BREAK -> -4f * abs(sin(t)).toFloat()
+            Gait.DANCE_SALSA -> -4f * abs(sin(t)).toFloat()
+            Gait.DANCE_BALLROOM -> -4f * abs(sin(t)).toFloat()
+            Gait.DANCE_FREEZE -> -4f * abs(sin(t)).toFloat()
+            Gait.DANCE_CONGA -> -4f * abs(sin(t)).toFloat()
+            Gait.DANCE_MACARENA -> -4f * abs(sin(t)).toFloat()
+            Gait.DANCE_CHA_CHA -> -4f * abs(sin(t)).toFloat()
+            Gait.DANCE_SLOW -> -4f * abs(sin(t)).toFloat()
             Gait.JUMP -> -8f * abs(sin(2 * t)).toFloat()
             Gait.RUN -> 3f * sin(3 * t + 0.5).toFloat()
             Gait.SPIN -> 0f

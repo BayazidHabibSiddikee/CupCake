@@ -379,6 +379,8 @@ Java_com_cupcake_ai_LlamaEngine_generate(
         while (generated < max_tokens && !g_should_stop.load()) {
             llama_token id = llama_sampler_sample(smpl, g_ctx, -1);
             
+            if (g_should_stop.load()) break; // Check again after potentially slow sampling
+
             if (llama_token_is_eog(g_model, id)) {
                 break;
             }

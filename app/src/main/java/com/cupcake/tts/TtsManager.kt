@@ -139,8 +139,8 @@ class TtsManager(private val context: Context) {
      * Baked in once at init so every synthesis (file + stream) gets it.
      */
     fun applyChildishRobotVoice() {
-        tts?.setPitch(1.65f)   // high pitch — child-like
-        tts?.setSpeechRate(1.15f) // slightly faster — snappy, robotic energy
+        tts?.setPitch(2.0f)   // Even higher pitch for "child/robotic" feel
+        tts?.setSpeechRate(1.25f) // Snappier delivery
     }
 
     fun autoDetectLanguage(text: String): Locale {

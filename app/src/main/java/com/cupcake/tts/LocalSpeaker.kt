@@ -50,8 +50,16 @@ class LocalSpeaker @Inject constructor(
         }
         Log.i(TAG, "speak: ${rawText.take(40)}")
         stop()
-        val text = normalize(rawText)
+
+        // 1. Clean text: remove emojis and special characters to prevent TTS from reading them literally
+        val cleanedText = rawText
+            .replace(Regex("[^a-zA-Z0-9\\s,.?!'\"-—\\u0980-\\u09FF]"), " ")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+
+        val text = normalize(cleanedText)
         if (text.isBlank()) return
+
 
         val player = Player(normalize)
         current.set(player)

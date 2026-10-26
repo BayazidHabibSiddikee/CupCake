@@ -125,5 +125,32 @@ class SoundClassifier(context: Context) {
             l.contains("speech") || l.contains("narration") || l.contains("conversation") -> "talk"
             else -> "other"
         }
+
+
+    /** Maps YAMNet AudioSet labels to 15 dance music genres. */
+    fun genreFor(label: String): String {
+        val l = label.lowercase()
+        return when {
+            l.contains("pop") -> "pop"
+            l.contains("rock") -> "rock"
+            l.contains("electronic") || l.contains("techno") -> "electronic"
+            l.contains("hiphop") || l.contains("rap") -> "hiphop"
+            l.contains("kpop") -> "kpop"
+            l.contains("folk") -> "folk"
+            l.contains("party") -> "party"
+            l.contains("break") || l.contains("breakbeat") -> "break"
+            l.contains("salsa") -> "salsa"
+            l.contains("ballroom") -> "ballroom"
+            l.contains("freeze") -> "freeze"
+            l.contains("conga") -> "conga"
+            l.contains("macarena") -> "macarena"
+            l.contains("cha_cha") -> "cha_cha"
+            l.contains("slow") || l.contains("dramatic") -> "slow"
+            else -> "other"
+        }
+    }
+
+    /** Converts a SoundEvent's label to a dance genre string. */
+    fun genreForEvent(event: SoundEvent): String = genreFor(event.label)
     }
 }
