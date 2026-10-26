@@ -35,6 +35,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 import dagger.hilt.android.lifecycle.HiltViewModel
 
@@ -62,6 +63,20 @@ class ChatViewModel @Inject constructor(
         savedStateHandle.get<String>("characterId") ?: "cupcake_kitagawa"
 
     val conversationId: String = sessionStore.conversationIdFor(characterId)
+
+    private companion object {
+        /**
+         * Per-rung ceiling for the *grammar-constrained* attempts only.
+         *
+         * The sampler masks every EOG token while the grammar is not yet accepting
+         * (`llama_grammar_apply_impl`), so a constrained attempt that the 0.6B model
+         * cannot complete does not stop early — it runs all the way to the token
+         * budget. Left unbounded, two bad rungs can eat the engine's 90s watchdog
+         * twice before the unconstrained fallback ever gets a turn. A constrained
+         * rung that has produced nothing in this long is not going to be salvaged.
+         */
+        const val CONSTRAINED_RUNG_TIMEOUT_MS = 30_000L
+    }
 
     sealed interface ModelLoadState {
         data object Idle : ModelLoadState
@@ -483,17 +498,46 @@ class ChatViewModel @Inject constructor(
                         null
                     )
                     var decodeFailed: Exception? = null
-                    for (grammar in grammarLadder) {
+                    // Truncated output from a timed-out rung: kept only as a last
+                    // resort so the next rung still gets a chance to answer cleanly.
+                    var partialFallback = ""
+                    for ((rung, grammar) in grammarLadder.withIndex()) {
                         engine.setGrammar(grammar)
                         var attempt = ""
                         var tick = 0
+                        var timedOut = false
+                        // Timing per rung: a constrained decode whose grammar the model
+                        // cannot complete masks EOG until the grammar accepts, so it can
+                        // burn the whole token budget instead of stopping. Knowing each
+                        // rung's wall-clock is what separates "wedged" from "slow".
+                        val startedAt = System.currentTimeMillis()
+                        val stream = engine.generateStream(prompt, preempt = true)
                         try {
-                            for (token in engine.generateStream(prompt, preempt = true)) {
-                                attempt += token
-                                _currentResponse.value = attempt
-                                if (++tick % 3 == 0) refreshLiveEmotion(attempt)
+                            val completed = withTimeoutOrNull(
+                                if (grammar != null) CONSTRAINED_RUNG_TIMEOUT_MS else Long.MAX_VALUE
+                            ) {
+                                for (token in stream) {
+                                    attempt += token
+                                    _currentResponse.value = attempt
+                                    if (++tick % 3 == 0) refreshLiveEmotion(attempt)
+                                }
+                                true
+                            } ?: false
+                            if (completed) {
+                                decodeFailed = null
+                            } else {
+                                // Timed out: stop the native worker (cancelling the receive
+                                // alone does not unblock the JNI decode loop) and fall through
+                                // to the next rung instead of burning the engine watchdog.
+                                timedOut = true
+                                runCatching { engine.cancel() }
+                                runCatching { stream.cancel() }
+                                decodeFailed = Exception("grammar rung timed out after ${CONSTRAINED_RUNG_TIMEOUT_MS}ms")
+                                Log.w(
+                                    "ChatViewModel",
+                                    "attempt with grammar=${grammar?.take(10) ?: "none"} timed out"
+                                )
                             }
-                            decodeFailed = null
                         } catch (e: Exception) {
                             decodeFailed = e
                             Log.w(
@@ -501,11 +545,26 @@ class ChatViewModel @Inject constructor(
                                 "attempt with grammar=${grammar?.take(10) ?: "none"} failed: ${e.message}"
                             )
                         }
+                        Log.i(
+                            "ChatViewModel",
+                            "rung $rung/${grammarLadder.lastIndex} grammar=${grammar != null} " +
+                                "timedOut=$timedOut chars=${attempt.length} " +
+                                "elapsedMs=${System.currentTimeMillis() - startedAt}"
+                        )
                         refreshLiveEmotion(attempt)
-                        if (attempt.isNotBlank()) {
+                        if (attempt.isNotBlank() && !timedOut) {
                             fullResponse = attempt
                             break
                         }
+                        if (attempt.isNotBlank() && timedOut) {
+                            // A rung that ran out the clock mid-sentence produced a
+                            // truncated reply. Hold it, but let the remaining rungs
+                            // try for a complete one first.
+                            partialFallback = attempt
+                        }
+                    }
+                    if (fullResponse.isBlank() && partialFallback.isNotBlank()) {
+                        fullResponse = partialFallback
                     }
                     if (fullResponse.isBlank() && decodeFailed != null) throw decodeFailed
                 } else {

@@ -106,6 +106,15 @@ Java_com_cupcake_ai_LlamaEngine_setCallback(
     g_on_token = env->GetMethodID(cls, "onToken", "(Ljava/lang/String;)V");
     g_on_complete = env->GetMethodID(cls, "onComplete", "(I)V");
     g_on_error = env->GetMethodID(cls, "onError", "(Ljava/lang/String;)V");
+    // GetObjectClass hands back a local ref; without this it accumulates on the
+    // calling thread until that thread detaches.
+    env->DeleteLocalRef(cls);
+    // A failed lookup makes every emit_* a silent no-op (the guards below bail out
+    // on a null method id), which looks exactly like "the engine never finished".
+    // Log it so a lost callback is distinguishable from a wedged decode.
+    if (!g_on_token) LOGE("setCallback: onToken(String) not found on callback class");
+    if (!g_on_complete) LOGE("setCallback: onComplete(int) not found on callback class");
+    if (!g_on_error) LOGE("setCallback: onError(String) not found on callback class");
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -176,14 +185,21 @@ static void emit_token(JNIEnv* env, const std::string& token) {
 }
 
 static void emit_complete(JNIEnv* env, int status) {
-    if (!g_callback || !g_on_complete) return;
+    if (!g_callback || !g_on_complete) {
+        LOGE("emit_complete(%d) dropped: %s", status,
+             !g_callback ? "no callback installed" : "onComplete method id is null");
+        return;
+    }
     
     env->CallVoidMethod(g_callback, g_on_complete, status);
 }
 
 static void emit_error(JNIEnv* env, const std::string& error) {
-    if (!g_callback || !g_on_error) return;
-    
+    if (!g_callback || !g_on_error) {
+        LOGE("emit_error('%s') dropped: %s", error.c_str(),
+             !g_callback ? "no callback installed" : "onError method id is null");
+        return;
+    }
     jstring jerror = env->NewStringUTF(error.c_str());
     env->CallVoidMethod(g_callback, g_on_error, jerror);
     env->DeleteLocalRef(jerror);
@@ -201,6 +217,10 @@ Java_com_cupcake_ai_LlamaEngine_generate(
     JNIEnv* env, jobject thiz, jstring prompt
 ) {
     if (!g_ctx || !g_model) {
+        // Previously a silent `-1`: Kotlin only saw a non-zero return and had no
+        // reason string. Report it through the callback so the UI can say why.
+        LOGE("generate: model not loaded");
+        emit_error(env, "Model is not loaded");
         return -1;
     }
 
@@ -217,7 +237,10 @@ Java_com_cupcake_ai_LlamaEngine_generate(
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
     if (!claimed) {
-        LOGE("generate: previous generation still running after wait; refusing");
+        // Do NOT emit_error here: Kotlin treats -2 as a recoverable "busy" signal
+        // and retries on the return value. An onError would close the caller's
+        // stream and turn the retry that eventually succeeds into a failed one.
+        LOGE("generate: previous generation still running after wait; refusing (-2, caller may retry)");
         return -2;
     }
 
@@ -243,7 +266,10 @@ Java_com_cupcake_ai_LlamaEngine_generate(
         }
     }
     if (n_tokens <= 0) {
-        LOGE("Tokenization failed or prompt empty");
+        // No retry path exists for -3 in Kotlin, so reporting the reason here is safe
+        // and replaces the opaque "Generate failed: -3" with something actionable.
+        LOGE("generate: tokenization failed or prompt empty");
+        emit_error(env, "Prompt could not be tokenized (empty prompt or context too small)");
         env->ReleaseStringUTFChars(prompt, prompt_str);
         g_is_generating = false;
         return -3;
@@ -255,8 +281,20 @@ Java_com_cupcake_ai_LlamaEngine_generate(
     
     // Run generation in background thread
     std::thread([=]() {
-        JNIEnv* env;
-        if (g_jvm->AttachCurrentThread(&env, nullptr) != JNI_OK) {
+        JNIEnv* env = nullptr;
+        // Attaching can fail transiently under memory pressure. Without an env we
+        // cannot call back into Kotlin at all, so retry briefly; if it still fails
+        // the caller is left waiting on its watchdog, and this log is the only
+        // explanation available.
+        for (int attempt = 0; attempt < 3; ++attempt) {
+            if (g_jvm->AttachCurrentThread(&env, nullptr) == JNI_OK && env != nullptr) {
+                break;
+            }
+            env = nullptr;
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        }
+        if (env == nullptr) {
+            LOGE("generate: worker could not attach to the JVM; no completion will be emitted");
             g_is_generating = false;
             return;
         }

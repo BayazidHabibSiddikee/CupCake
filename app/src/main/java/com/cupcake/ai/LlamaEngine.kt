@@ -204,6 +204,10 @@ class LlamaEngine private constructor() {
             if (result == 0) {
                 _isModelLoaded = true
                 _loadedModelName = targetName
+                // The native side clamps a non-positive budget back to 128, so log the
+                // pushed value: a watchdog timeout at ~90s is only interpretable if we
+                // know whether the decode was bounded at 128 or 512 tokens.
+                Log.i(TAG, "loadModel: nCtx=${config.nCtx} nBatch=${config.nBatch} maxTokens=${config.maxTokens} grammar=${config.grammar != null}")
                 setSamplingParams(
                     config.temperature,
                     config.topP,
