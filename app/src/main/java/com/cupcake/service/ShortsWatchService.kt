@@ -3,6 +3,7 @@ package com.cupcake.service
 import android.accessibilityservice.AccessibilityService
 import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import android.provider.Settings
 import android.text.TextUtils
 import android.util.Log
@@ -102,6 +103,8 @@ class ShortsWatchService : AccessibilityService() {
             blob.contains("clips") || blob.contains("reel")
         pkg == FACEBOOK ->
             blob.contains("reel") || blob.contains("shorts")
+        pkg == TIKTOK ->
+            blob.contains("reel") || blob.contains("video") || blob.contains("swipe")
         else -> false
     }
 
@@ -121,10 +124,10 @@ class ShortsWatchService : AccessibilityService() {
         PointsManager.spendPersisted(this, COIN_COST_PER_SHORT)
 
         Log.i(TAG, "Short #$sessionCount today=$today pkg=$pkg")
-        react(today)
+        react(today, pkg)
     }
 
-    private fun react(today: Int) {
+    private fun react(today: Int, pkg: String) {
         val level = when {
             today >= 30 -> 3
             today >= 15 -> 2
@@ -148,6 +151,15 @@ class ShortsWatchService : AccessibilityService() {
 
         lastReactLevel = level
         lastReactAt = now
+
+        // Broadcast Short detection so ActivityMonitorService / ActivityContextProvider knows
+        val broadcast = Intent("com.cupcake.action.SHORTS_DETECTED").apply {
+            putExtra("package_name", pkg)
+            putExtra("today_count", today)
+            putExtra("react_level", level)
+            putExtra("timestamp", System.currentTimeMillis())
+        }
+        sendBroadcast(broadcast)
 
         // Ramp the app-wide mood (persists ~2h, feeds chat/games) and let the floating
         // pet decide: normal chatter below max, silent treatment at max anger.
@@ -192,8 +204,9 @@ class ShortsWatchService : AccessibilityService() {
         const val YOUTUBE = "com.google.android.youtube"
         const val INSTAGRAM = "com.instagram.android"
         const val FACEBOOK = "com.facebook.katana"
+        const val TIKTOK = "com.zhiliaoapp.musically"
 
-        private val TARGETS = setOf(YOUTUBE, INSTAGRAM, FACEBOOK)
+        private val TARGETS = setOf(YOUTUBE, INSTAGRAM, FACEBOOK, TIKTOK)
 
         /** Coins docked from the wallet for every short/reel watched. */
         const val COIN_COST_PER_SHORT = 2L

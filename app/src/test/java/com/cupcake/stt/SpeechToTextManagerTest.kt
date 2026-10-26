@@ -1,5 +1,6 @@
 package com.cupcake.stt
 
+import android.Manifest
 import android.content.Intent
 import android.os.Bundle
 import android.speech.RecognitionListener
@@ -12,6 +13,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
 
 @RunWith(RobolectricTestRunner::class)
 class SpeechToTextManagerTest {
@@ -23,8 +25,10 @@ class SpeechToTextManagerTest {
     @Before
     fun setUp() {
         recognizer = mockk(relaxed = true)
+        val application = RuntimeEnvironment.application
+        shadowOf(application).grantPermissions(Manifest.permission.RECORD_AUDIO)
         val listenerSlot = slot<RecognitionListener>()
-        manager = SpeechToTextManager(RuntimeEnvironment.application, recognizer)
+        manager = SpeechToTextManager(application, recognizer)
         verify(exactly = 1) { recognizer.setRecognitionListener(capture(listenerSlot)) }
         listener = listenerSlot.captured
     }

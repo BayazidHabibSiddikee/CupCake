@@ -1,12 +1,17 @@
 package com.cupcake.stt
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.util.Log
+import androidx.core.content.ContextCompat
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -45,6 +50,13 @@ class SpeechToTextManager(
     private val _isListening = MutableStateFlow(false)
     val isListening: StateFlow<Boolean> = _isListening.asStateFlow()
 
+    /** Main-looper handler used to space out recognition retries. */
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    private companion object {
+        const val RETRY_DELAY_MS = 600L
+    }
+
     init {
         recognizer?.setRecognitionListener(object : RecognitionListener {
             override fun onReadyForSpeech(params: Bundle?) {
@@ -66,10 +78,8 @@ class SpeechToTextManager(
                     error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT ||
                     error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY
                 if (transient && _transcript.value.isNullOrBlank() && attempts < maxAttempts - 1) {
-                    attempts++
-                    languageIndex = (languageIndex + 1) % languagePreference.size
-                    Log.i(TAG, "STT: transient error $error; retrying (attempt ${attempts + 1})")
-                    startListening()
+                    Log.i(TAG, "STT: transient error $error; scheduling retry")
+                    scheduleRetry()
                     return
                 }
                 attempts = 0
@@ -98,10 +108,8 @@ class SpeechToTextManager(
 
                 // Nothing captured: bounded auto-retry with the next preferred language.
                 if (attempts < maxAttempts - 1) {
-                    attempts++
-                    languageIndex = (languageIndex + 1) % languagePreference.size
-                    Log.w(TAG, "STT: Empty result — retrying with ${languagePreference[languageIndex]} (attempt $attempts/$maxAttempts)")
-                    startListening()
+                    Log.w(TAG, "STT: Empty result — scheduling retry")
+                    scheduleRetry()
                     return
                 }
 
@@ -124,13 +132,17 @@ class SpeechToTextManager(
     }
 
     fun startListening() {
-        // Check RECORD_AUDIO permission before starting STT
-        val context = context as? android.content.Context ?: return
-        if (context.checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-            Log.e(TAG, "RECORD_AUDIO permission not granted")
+        if (!hasRecordAudioPermission()) {
+            Log.e(TAG, "RECORD_AUDIO permission not granted; cannot start recognition")
             return
         }
+        // New utterance: restart the language/attempt ladder from the top.
+        attempts = 0
+        startBurst()
+    }
 
+    /** Fires one recognition burst using the current [languageIndex]; never mutates attempt state. */
+    private fun startBurst() {
         val lang = languagePreference[languageIndex]
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
@@ -138,12 +150,43 @@ class SpeechToTextManager(
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
         }
-        _transcript.value = null
-        attempts++
-        recognizer?.startListening(intent)
-            ?: Log.w(TAG, "STT: SpeechRecognizer unavailable on this device")
-        Log.i(TAG, "STT: Listening (language=$lang, attempt=$attempts/$maxAttempts)")
+        // Only a fresh utterance clears stale text; retries keep whatever was captured.
+        if (attempts == 0) _transcript.value = null
+        val engine = recognizer
+        if (engine == null) {
+            Log.w(TAG, "STT: SpeechRecognizer unavailable on this device")
+            return
+        }
+        _isListening.value = true
+        engine.startListening(intent)
+        Log.i(TAG, "STT: Listening (language=$lang, attempt=${attempts + 1}/$maxAttempts)")
     }
+
+    /**
+     * Restarts recognition on the next preferred language after a short delay.
+     * Posting through the main looper gives the engine time to leave a busy/error
+     * state; calling startListening() from inside onError is what produces
+     * repeat ERROR_RECOGNIZER_BUSY on device.
+     */
+    private fun scheduleRetry() {
+        if (attempts >= maxAttempts - 1) {
+            attempts = 0
+            languageIndex = 0
+            Log.w(TAG, "STT: Retry budget exhausted after $maxAttempts attempts")
+            return
+        }
+        attempts++
+        languageIndex = (languageIndex + 1) % languagePreference.size
+        val lang = languagePreference[languageIndex]
+        Log.i(TAG, "STT: Retrying in ${RETRY_DELAY_MS}ms with $lang (attempt ${attempts + 1}/$maxAttempts)")
+        mainHandler.postDelayed({
+            if (hasRecordAudioPermission()) startBurst()
+        }, RETRY_DELAY_MS)
+    }
+
+    private fun hasRecordAudioPermission(): Boolean =
+        ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED
 
     fun stopListening() {
         recognizer?.stopListening()
@@ -161,6 +204,7 @@ class SpeechToTextManager(
     }
 
     fun destroy() {
+        mainHandler.removeCallbacksAndMessages(null)
         recognizer?.destroy()
     }
 }

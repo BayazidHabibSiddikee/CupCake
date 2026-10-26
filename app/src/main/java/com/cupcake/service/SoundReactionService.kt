@@ -3,10 +3,12 @@ package com.cupcake.service
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.media.AudioFormat
+import android.media.AudioManager
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.os.Build
@@ -109,6 +111,13 @@ class SoundReactionService : Service() {
             return
         }
 
+        // Check RECORD_AUDIO runtime permission
+        if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            Log.e(TAG, "RECORD_AUDIO permission not granted — cannot start listening")
+            stopSelf()
+            return
+        }
+
         val minBuf = AudioRecord.getMinBufferSize(
             SoundClassifier.SAMPLE_RATE,
             AudioFormat.CHANNEL_IN_MONO,
@@ -170,6 +179,13 @@ class SoundReactionService : Service() {
             // listening non-stop. Cheaper on battery and less "creepy always-on".
             var nextWindowAt = System.currentTimeMillis()
             while (listening) {
+                // Skip listening while media is audible (YouTube, browsers,
+                // music players) so video audio is never classified as an event.
+                if (isMediaPlaying(applicationContext)) {
+                    delay(LISTEN_INTERVAL_MS)
+                    nextWindowAt = System.currentTimeMillis() + LISTEN_INTERVAL_MS
+                    continue
+                }
                 val wait = nextWindowAt - System.currentTimeMillis()
                 if (wait > 0) delay(wait)
 
@@ -238,6 +254,31 @@ class SoundReactionService : Service() {
         audioRecord = null
         stopForeground(true)
         stopSelf()
+    }
+
+    /**
+     * True when media audio (YouTube, a browser, a music player) is currently
+     * playing on the device.
+     *
+     * Used to skip microphone classification while media is audible, so CupCake
+     * never mistakes video audio for a "sound event" and never fights media
+     * playback for audio focus.
+     *
+     * Implementation note: package-level attribution (`AudioPlaybackConfiguration
+     * .clientUid`) is not part of the public SDK surface we compile against, so
+     * this intentionally uses the public `isMusicActive()` signal instead. Any
+     * vendor-ROM failure degrades to `false` so sound awareness keeps working
+     * rather than dying on the check.
+     */
+    private fun isMediaPlaying(context: Context): Boolean {
+        return try {
+            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+                ?: return false
+            audioManager.isMusicActive
+        } catch (e: Exception) {
+            Log.w(TAG, "Media playback check failed: ${e.message}")
+            false
+        }
     }
 
     private fun stopRecording() {

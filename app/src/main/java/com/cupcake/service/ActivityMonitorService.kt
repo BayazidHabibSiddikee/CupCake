@@ -4,8 +4,10 @@ import android.app.ActivityManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.IBinder
@@ -42,11 +44,44 @@ class ActivityMonitorService : Service() {
         this@ActivityMonitorService.packageManager
     }
 
+    private val shortsReceiver: BroadcastReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            val action = intent?.action ?: return
+            if (action != "com.cupcake.action.SHORTS_DETECTED") return
+
+            val packageName = intent.getStringExtra("package_name") ?: "com.google.android.youtube"
+            val todayCount = intent.getIntExtra("today_count", 0)
+            val reactLevel = intent.getIntExtra("react_level", 0)
+
+            val appLabel = try {
+                pm.getApplicationLabel(pm.getApplicationInfo(packageName, 0)).toString()
+            } catch (e: PackageManager.NameNotFoundException) {
+                "YouTube"
+            }
+
+            val classification = com.cupcake.ai.ActivityClassifier.classify(packageName, appLabel)
+
+            lastClassification = classification
+            Log.i(TAG, "Shorts detected: $packageName (today=$todayCount level=$reactLevel)")
+            broadcastActivityChange(classification)
+        }
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
         ensureNotificationChannel()
+        // Register Shorts detection broadcast receiver.
+        // Internal app broadcast only, so explicitly mark it not exported on
+        // API 34+ where a receiver flag is mandatory.
+        val filter = IntentFilter("com.cupcake.action.SHORTS_DETECTED")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(shortsReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("UnspecifiedRegisterReceiverFlag")
+            registerReceiver(shortsReceiver, filter)
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -145,6 +180,15 @@ class ActivityMonitorService : Service() {
      * Check if the app is running.
      */
     fun isMonitoring(): Boolean = monitoring
+
+    override fun onDestroy() {
+        try {
+            unregisterReceiver(shortsReceiver)
+        } catch (e: IllegalArgumentException) {
+            // Receiver not registered
+        }
+        super.onDestroy()
+    }
 
     companion object {
         private const val TAG = "ActivityMonitorService"
